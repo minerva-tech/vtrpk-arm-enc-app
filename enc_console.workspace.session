@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Session Name="/home/a/Documents/enc_console/enc_console.workspace">
+  <int Value="5" Name="m_selectedTab"/>
+  <wxString Value="/home/a/Documents/enc_console/enc_console.workspace" Name="m_workspaceName"/>
+  <TabInfoArray Name="TabInfoArray">
+    <TabInfo>
+      <wxString Value="/home/a/Documents/enc_console/cap.h" Name="FileName"/>
+      <int Value="39" Name="FirstVisibleLine"/>
+      <int Value="55" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/a/Documents/enc_console/cap.cpp" Name="FileName"/>
+      <int Value="605" Name="FirstVisibleLine"/>
+      <int Value="618" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/a/Documents/dm365/enc/h264enc/apps/client/test/src/h264encoderapp.c" Name="FileName"/>
+      <int Value="111" Name="FirstVisibleLine"/>
+      <int Value="123" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/a/Documents/enc_console/enc.cpp" Name="FileName"/>
+      <int Value="253" Name="FirstVisibleLine"/>
+      <int Value="264" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/a/Documents/enc_console/main.cpp" Name="FileName"/>
+      <int Value="22" Name="FirstVisibleLine"/>
+      <int Value="32" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/a/Documents/dm365/test/tvp514x_ccdc_prv_rsz_file.c" Name="FileName"/>
+      <int Value="95" Name="FirstVisibleLine"/>
+      <int Value="106" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+    </TabInfo>
+  </TabInfoArray>
+  <SerializedObject Name="m_breakpoints">
+    <long Value="0" Name="Count"/>
+  </SerializedObject>
+</Session>
