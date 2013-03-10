@@ -116,8 +116,6 @@ Comm::~Comm()
 {
 	close();
 
-	m_io_service.stop();
-
 #if INTERPROCESS_SINGLETON
 	release();
 #endif
@@ -125,19 +123,11 @@ Comm::~Comm()
 
 bool Comm::open(const std::string& port)
 {
+	close();
+
 	boost::system::error_code ec;
 
-	m_port.close(ec);
-
-	this_thread::sleep(posix_time::milliseconds(125)); // special tweak, which is necessary on windows only probably. It's for the case if you want to open port right after closing it.
-
-	m_io_service.stop();
-
-	m_thread.join();
-
 	m_out_buf.reset();
-
-	m_io_service.reset();
 
 	m_port.open(port, ec);
 
@@ -155,6 +145,11 @@ bool Comm::open(const std::string& port)
 	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); // ?
 	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
 
+	m_sending_in_progress = false;
+	m_in_ff_idx = 0;
+	m_cur = m_in_buf[m_in_ff_idx].begin();
+	m_remains = 0;
+
 	m_port.async_read_some(asio::buffer(m_in_buf[m_in_ff_idx]), 
 		bind(&Comm::recv_chunk, this, m_in_buf[m_in_ff_idx].begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
 
@@ -167,7 +162,11 @@ void Comm::close()
 {
 	boost::system::error_code ec;
 
-	m_port.close(ec);
+	if (m_port.is_open()) {
+//            m_io_service.post(bind(&asio::serial_port::close, &m_port, ec));
+//            m_io_service.post([&](){m_port.close(ec);});
+		m_port.close(ec);
+	}
 
 	this_thread::sleep(posix_time::milliseconds(125));
 
@@ -175,10 +174,20 @@ void Comm::close()
 		log() << "Port closing error : " << ec.message();
 
 	m_io_service.stop();
-
+	
 	m_thread.join();
 
+	m_io_service.reset();
+
 	return;
+}
+
+void Comm::transmit_and_close()
+{
+    while (m_sending_in_progress)
+        this_thread::yield();
+
+    close();
 }
 
 #if INTERPROCESS_SINGLETON
@@ -230,22 +239,12 @@ void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 
 void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 {
-//	log() << "out buf size : " << m_out_buf.size();
-	
-//	while (m_out_buf.full()) {
-//		thread::yield();
-//	}
-	
-//	{
-//		lock_guard<mutex> _(m_transmit_lock);
-
 		m_out_buf.push_back(Pkt(id, size, p));
 
 		if (!m_sending_in_progress) {
 			m_sending_in_progress = true;
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		}
-//	}
 }
 
 void Comm::transmitted(const system::error_code& e, size_t size)
@@ -265,16 +264,6 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 	}
 }
 
-/*
-void Comm::transmitted(shared_ptr<Pkt> sp, const system::error_code& e, size_t)
-{
-	if (!e)
-		log() << *sp;
-	else
-		log() << Log::Error << "Transmission error occurred: " << e;
-}
-*/
-
 void Comm::recv_pkt(const Pkt* pkt)
 {
 	int comment = Invalid;
@@ -292,13 +281,20 @@ void Comm::recv_pkt(const Pkt* pkt)
 
 	if (m_callback[pkt->port()])
 		m_callback[pkt->port()](pkt->camera(), pkt->payload, comment);
-
-	log() << *pkt;
 }
 
 void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
 {
-	if (!e) {
+		if (e) {
+			if (e != asio::error::operation_aborted)
+				log() << Log::Error << "Error of data receiving : " << e.message();
+			else
+				log() << "Error of data receiving : operation aborted";
+
+			if (!bytes_transferred)
+				return;
+		}
+
 		uint8_t* pend = p + bytes_transferred;
 
 		while (m_remains + pend - m_cur >= sizeof(Pkt)) {
@@ -346,9 +342,4 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
 			m_port.async_read_some(asio::buffer(m_in_buf[m_in_ff_idx]),
 				bind(&Comm::recv_chunk, this, m_cur, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		}
-	} else if (e != asio::error::operation_aborted) {
-		log() << Log::Error << "Error of data receiving : " << e.message();
-	} else {
-		log() << "Error of data receiving : operation aborted";
-	}
 }
