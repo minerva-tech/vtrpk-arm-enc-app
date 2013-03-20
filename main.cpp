@@ -11,9 +11,9 @@
 #include "proto.h"
 
 extern "C" {
-#include "tables.h"
-#include "bs.h"
-#include "cabac.h"
+//#include "tables.h"
+//#include "bs.h"
+//#include "cabac.h"
 }
 
 bool g_stop = false;

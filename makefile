@@ -14,7 +14,8 @@ LINK = $(CROOT)/arm-unknown-linux-gnueabi-g++
 BOOST_MODULES = \
     date_time \
     thread \
-    system 
+    system \
+    chrono
 
 #  filesystem    \
 #  graph         \
@@ -29,7 +30,8 @@ OBJ = main.o \
       comm.o \
       read_params.o \
       error_msg.o \
-      cap.o
+      cap.o \
+      proto.o
 
 BOOST_MODULES_TYPE = 
 
