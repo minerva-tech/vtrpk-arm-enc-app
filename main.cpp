@@ -1,4 +1,6 @@
 #include <xdc/std.h>
+#include <ti/xdais/ires.h>
+#include <ti/sdo/fc/rman/rman.h>
 
 #include "ext_headers.h"
 #include "log_to_file.h"
@@ -102,7 +104,7 @@ void run()
 	const int to_skip = 3; // how much frames should be skipped after captured one to reduce framerate.
 
 	while(g_stop)
-		boost::this_thread::yield();
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
 
 	Enc enc;
 
@@ -116,7 +118,7 @@ void run()
 	std::vector<uint8_t> info_mask;
 	loadMask(info_mask, w, h);
 
-	bs_t info_bs;
+//	bs_t info_bs;
 
 	initMD();
 
@@ -134,21 +136,21 @@ void run()
 
 		fillInfo(info, info_mask, w, w, h);
 
-		bs_create(&info_bs);
+/*		bs_create(&info_bs);
 		bs_resize(&info_bs, w*h/8);
 
 		const int info_size = encode_frame(&info[0], &info_bs, w*h/8);
-
+*/
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
 		if (coded_size)
 			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
-
+/*
 		if (info_size)
 			Comm::instance().transmit(0, 2, info_size, (uint8_t*)info_bs.stream);
 
 		bs_delete(&info_bs);
-
+*/
 		for (int i=0; i<to_skip; i++) {
 			v4l2_buffer buf = cap.getFrame();
 			cap.putFrame(buf);
@@ -166,9 +168,18 @@ int main(int argc, char *argv[])
 		Server server(&cmds);
 
 		CMEM_init();
+		
+		Enc::rman_init();
 
-		while(1)
-			run();
+		while(1) {
+			try {
+				run();
+			}
+			catch (ex& e) {
+				log() << e.str();
+				g_stop = true;
+			}
+		}
 	}
 	catch (ex& e) {
 		log() << e.str();

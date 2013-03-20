@@ -84,7 +84,7 @@ void ARM926_Dcache_Disable()
 
 Enc::Enc()
 {
-	init();
+//	init();
 
 	cache_init();
 
@@ -110,9 +110,19 @@ Enc::~Enc()
 
 #ifdef _ENABLE_IRES_EDMA3
     if (IRES_OK != RMAN_unregister(&IRESMAN_EDMA3CHAN))
-        log() << "Unregister Protocol Failed";
+		log() << "Unregister Protocol Failed";
+/*	if (IRES_OK != RMAN_unregister(&IRESMAN_VICP2))
+		log() << "Unregister Protocol Failed";
+	if (IRES_OK != RMAN_unregister(&IRESMAN_HDVICP))
+		log() << "Unregister Protocol Failed";
+	if (IRES_OK != RMAN_unregister(&IRESMAN_ADDRSPACE))
+		log() << "Unregister Protocol Failed";
+	if (IRES_OK != RMAN_unregister(&IRESMAN_MEMTCM))
+        log() << "Unregister Protocol Failed";*/
 
-    RMAN_exit();
+//    RMAN_exit();
+
+//	log() << "RMAN exited";
 #endif
 }
 
@@ -155,7 +165,7 @@ void Enc::copyInputBuf(XDAS_Int8* in, int width, int height, int stride)
 	}
 }
 
-void Enc::init()
+void Enc::rman_init()
 {
     LockMP_init();
     SemMP_init();
@@ -163,6 +173,14 @@ void Enc::init()
     GT_init();
     Global_init();
     Sem_init();
+	
+	log() << "RMAN_init()";
+
+	const IRES_Status iresStatus = (IRES_Status) RMAN_init();
+	if (IRES_OK != iresStatus)
+		throw ex("RMAN initialization Failed");
+
+	log() << "RMAN initialization ok";
 }
 
 void Enc::cache_init()
@@ -413,12 +431,13 @@ void Enc::check_warnings()
 
 void Enc::ires_init()
 {
+	log() << "ires_init()";
 #ifdef _ENABLE_IRES_EDMA3
-    const IRES_Status iresStatus = (IRES_Status) RMAN_init();
-    if (IRES_OK != iresStatus)
-    	throw ex("RMAN initialization Failed");
+//    const IRES_Status iresStatus = (IRES_Status) RMAN_init();
+//    if (IRES_OK != iresStatus)
+//    	throw ex("RMAN initialization Failed");
 
-    log() << "RMAN initialization ok";
+//    log() << "RMAN initialization ok";
 
     {
     IRESMAN_Edma3ChanParams configParams;
