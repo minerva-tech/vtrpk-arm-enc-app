@@ -12,6 +12,7 @@
 #define E_TVP514X_NAME		"tvp514x"
 #define E_TVP7002_NAME		"tvp7002"
 #define E_MT9P031_NAME		"mt9p031"
+#define E_TEPLOVISOR_NAME	"teplovisor"
 #define E_CCDC_NAME		"DAVINCI CCDC"
 #define E_PRV_NAME		"DAVINCI PREVIEWER"
 #define E_RSZ_NAME		"DAVINCI RESIZER"
@@ -27,7 +28,8 @@
 #define P_RSZ_VID_IN	0 /* only one pad for video node */
 #define P_PRV_VID_IN	0
 #define P_PRV_VID_OUT	0
-#define P_TVP514X	0 /* only one pad for decoder */
+//#define P_TVP514X	0 /* only one pad for decoder */
+#define P_TEPLOVISOR 0
 #define P_TVP7002	0 /* only one pad for decoder */
 #define P_MT9P031	0 /* only one pad for sensor */
 #define P_CCDC_SINK	0 /* sink pad of ccdc */

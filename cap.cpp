@@ -41,7 +41,8 @@ m_diff_time(0),
 m_rsz_fd("/dev/v4l-subdev3"),
 m_prv_fd("/dev/v4l-subdev2"),
 m_ccdc_fd("/dev/v4l-subdev1"),
-m_tvp_fd("/dev/v4l-subdev0"),
+//m_tvp_fd("/dev/v4l-subdev0"),
+m_teplovisor_fd("/dev/v4l-subdev0"),
 m_capt_fd("/dev/video4"),
 m_media_fd("/dev/media0")
 {
@@ -154,8 +155,8 @@ Entity IDs can be non-contiguous. Applications must not try to enumerate entitie
 		if (!strcmp(m_entity[index].name, E_VIDEO_RSZ_OUT_NAME)) {
 			E_VIDEO = m_entity[index].id;
 		}
-		else if (!strcmp(m_entity[index].name, E_TVP514X_NAME)) {
-			E_TVP514X = m_entity[index].id;
+		else if (!strcmp(m_entity[index].name, E_TEPLOVISOR_NAME)) {
+			E_TEPLOVISOR = m_entity[index].id;
 		}
 		else if (!strcmp(m_entity[index].name, E_CCDC_NAME)) {
 			E_CCDC = m_entity[index].id;
@@ -223,14 +224,14 @@ void Cap::enumerate_links()
 
 void Cap::enable_links() // todo: these links wont break if exception will occur later. RAII?
 {
-	log() << "ENABLEing link [tvp514x]----------->[ccdc]";
+	log() << "ENABLEing link [teplovisor]----------->[ccdc]";
 
 	media_link_desc link;
 	memset(&link, 0, sizeof(link));
 
 	link.flags |=  MEDIA_LNK_FL_ENABLED;
-	link.source.entity = E_TVP514X;
-	link.source.index = P_TVP514X;
+	link.source.entity = E_TEPLOVISOR;
+	link.source.index = P_TEPLOVISOR;
 	link.source.flags = MEDIA_PAD_FL_OUTPUT;
 
 	link.sink.entity = E_CCDC;
@@ -240,7 +241,7 @@ void Cap::enable_links() // todo: these links wont break if exception will occur
 	if(ioctl(m_media_fd, MEDIA_IOC_SETUP_LINK, &link))
 		throw ex("failed to enable link between tvp514x and ccdc");
 	else
-		log() << "[tvp514x]----------->[ccdc] ENABLED";
+		log() << "[teplovisor]----------->[ccdc] ENABLED";
 
 	log() << "ENABLEing link [CCDC]----------->[PRV]";
 
@@ -459,14 +460,16 @@ static v4l2_subdev_format fmt(__u32 pad, __u32 which, __u32 code, __u32 w, __u32
 
 void Cap::set_formats()
 {
-	log() << "setting format on pad of tvp514x entity.";
+	log() << "setting format on pad of teplovisor entity.";
 
-	m_tvp_fd.open(O_RDWR);
+//	m_tvp_fd.open(O_RDWR);
+	m_teplovisor_fd.open(O_RDWR);
 
 	v4l2_subdev_format f;
 
-	f = fmt(P_TVP514X, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
-	int ret = ioctl(m_tvp_fd, VIDIOC_SUBDEV_S_FMT, &f);
+//	f = fmt(P_TVP514X, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_TEPLOVISOR, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	int ret = ioctl(m_teplovisor_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", fmt.pad);
 	else

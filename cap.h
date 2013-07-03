@@ -65,7 +65,8 @@ private:
 	CaptureFd m_rsz_fd;
 	CaptureFd m_prv_fd;
 	CaptureFd m_ccdc_fd;
-	CaptureFd m_tvp_fd;
+//	CaptureFd m_tvp_fd;
+	CaptureFd m_teplovisor_fd;
 	CaptureFd m_capt_fd;
 	CaptureFd m_media_fd;
 
@@ -73,7 +74,8 @@ private:
 	int 			m_entities_count;
 
 	int E_VIDEO;
-	int E_TVP514X;
+//	int E_TVP514X;
+	int E_TEPLOVISOR;
 	int E_CCDC;
 	int E_PRV;
 	int E_RSZ;
