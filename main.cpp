@@ -11,12 +11,12 @@
 #include "proto.h"
 
 extern "C" {
-//#include "tables.h"
-//#include "bs.h"
-//#include "cabac.h"
+#include "tables.h"
+#include "bs.h"
+#include "cabac.h"
 }
 
-bool g_stop = false;
+volatile bool g_stop = false;
 
 class ServerCmds : public IServerCmds
 {
@@ -101,14 +101,14 @@ void run()
 	const int w = 384;
 	const int h = 144;
 
-	const int to_skip = 3; // how much frames should be skipped after captured one to reduce framerate.
+	const int to_skip = 10; // how much frames should be skipped after captured one to reduce framerate.
 
 	while(g_stop)
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
 
 	Enc enc;
 
-	Cap cap(720, 480);
+	Cap cap(384, 288);
 
 	cap.start_streaming();
 
@@ -124,6 +124,8 @@ void run()
 
 	v4l2_buffer buf = cap.getFrame(); // skip first frame as it contains garbage
 	cap.putFrame(buf);
+
+//	FILE* f_dump = fopen("dump.h264", "wb");
 
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
@@ -143,8 +145,12 @@ void run()
 */
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
-		if (coded_size)
+		if (coded_size) {
+			
 			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
+			
+//			fwrite((uint8_t*)bs, 1, coded_size, f_dump);
+		}
 /*
 		if (info_size)
 			Comm::instance().transmit(0, 2, info_size, (uint8_t*)info_bs.stream);
@@ -156,12 +162,14 @@ void run()
 			cap.putFrame(buf);
 		}
 	}
+	
+//	fclose(f_dump);
 }
 
 int main(int argc, char *argv[])
 {
 	try {
-		if (!Comm::instance().open("/dev/ttyS0"))
+		if (!Comm::instance().open("/dev/ttyS1"))
 			throw ex("Cannot open serial port");
 
 		ServerCmds cmds;
