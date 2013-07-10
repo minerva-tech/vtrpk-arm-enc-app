@@ -468,7 +468,7 @@ void Cap::set_formats()
 	v4l2_subdev_format f;
 
 //	f = fmt(P_TVP514X, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
-	f = fmt(P_TEPLOVISOR, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_TEPLOVISOR, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	int ret = ioctl(m_teplovisor_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", fmt.pad);
@@ -479,7 +479,7 @@ void Cap::set_formats()
 
 	log() << "setting format on sink-pad of ccdc entity.";
 
-	f = fmt(P_CCDC_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_CCDC_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_ccdc_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", fmt.pad);
@@ -488,7 +488,7 @@ void Cap::set_formats()
 
 	log() << "setting format on OF-pad of ccdc entity.";
 
-	f = fmt(P_CCDC_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_CCDC_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_ccdc_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		printf("failed to set format on pad");// %x\n", fmt.pad);
@@ -497,7 +497,7 @@ void Cap::set_formats()
 
 	log() << "setting format on sink-pad of prv entity.";
 
-	f = fmt(P_PRV_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_PRV_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_prv_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		printf("failed to set format on pad");// %x\n", fmt.pad);
@@ -506,7 +506,7 @@ void Cap::set_formats()
 
 	log() << "setting format on source-pad of prv entity.";
 
-	f = fmt(P_PRV_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_PRV_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_prv_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", fmt.pad);
@@ -515,7 +515,7 @@ void Cap::set_formats()
 
 	log() << "setting format on sink-pad of rsz entity.";
 
-	f = fmt(P_RSZ_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_RSZ_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_rsz_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");//%x\n", fmt.pad);
@@ -524,7 +524,7 @@ void Cap::set_formats()
 
 	log() << "setting format on source-pad of rsz entity.";
 
-	f = fmt(P_RSZ_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, V4L2_MBUS_FMT_NV12_1X20, 384, 144, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+	f = fmt(P_RSZ_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, V4L2_MBUS_FMT_NV12_1X20, 384, 144, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_rsz_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", f.pad);
@@ -541,7 +541,7 @@ void Cap::set_formats()
 	v4l2_fmt.fmt.pix.height = 144;
 	//v4l2_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_UYVY;
 	v4l2_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_NV12;
-	v4l2_fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
+	v4l2_fmt.fmt.pix.field = V4L2_FIELD_NONE;
 
 	if (-1 == ioctl(m_capt_fd, VIDIOC_S_FMT, &v4l2_fmt))
 		throw ex("failed to set format on captute device");
