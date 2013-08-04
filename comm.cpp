@@ -104,6 +104,8 @@ Comm::Comm() :
 {
 //	asio::io_service::work work(m_io_service);
 
+//	fout = fopen("dump.dat", "wb");
+
 	memset(m_out_count_lsb, 0, sizeof(m_out_count_lsb));
 	memset(m_in_count_lsb, 0, sizeof(m_in_count_lsb));
 
@@ -114,6 +116,8 @@ Comm::Comm() :
 
 Comm::~Comm()
 {
+//	fclose(fout);
+	
 	close();
 
 #if INTERPROCESS_SINGLETON
@@ -121,7 +125,7 @@ Comm::~Comm()
 #endif
 }
 
-bool Comm::open(const std::string& port)
+bool Comm::open(const std::string& port, int baud_rate, bool flow_control)
 {
 	close();
 
@@ -136,13 +140,14 @@ bool Comm::open(const std::string& port)
 		return false;
 	}
 
-	m_port.set_option(asio::serial_port::baud_rate(115200/2)); // ? 
+	m_port.set_option(asio::serial_port::baud_rate(baud_rate)); // ? 
 //	m_port.set_option(asio::serial_port::baud_rate(2400)); // ? 
 	m_port.set_option(asio::serial_port::character_size(8));
 //	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::software)); // ?
-//	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::none)); // ?
-	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::hardware)); // ?
-	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); // ?
+	m_port.set_option(asio::serial_port::flow_control(flow_control ? asio::serial_port::flow_control::hardware : asio::serial_port::flow_control::none)); // ?
+//	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::hardware)); // ?
+	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); 
+//	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::odd));
 	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
 
 	m_sending_in_progress = false;
@@ -239,12 +244,22 @@ void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 
 void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 {
+//	log() << "out buf size : " << m_out_buf.size();
+	
+//	while (m_out_buf.full()) {
+//		thread::yield();
+//	}
+	
+//	{
+//		lock_guard<mutex> _(m_transmit_lock);
+
 		m_out_buf.push_back(Pkt(id, size, p));
 
 		if (!m_sending_in_progress) {
 			m_sending_in_progress = true;
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		}
+//	}
 }
 
 void Comm::transmitted(const system::error_code& e, size_t size)
@@ -264,6 +279,16 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 	}
 }
 
+/*
+void Comm::transmitted(shared_ptr<Pkt> sp, const system::error_code& e, size_t)
+{
+	if (!e)
+		log() << *sp;
+	else
+		log() << Log::Error << "Transmission error occurred: " << e;
+}
+*/
+
 void Comm::recv_pkt(const Pkt* pkt)
 {
 	int comment = Invalid;
@@ -281,10 +306,17 @@ void Comm::recv_pkt(const Pkt* pkt)
 
 	if (m_callback[pkt->port()])
 		m_callback[pkt->port()](pkt->camera(), pkt->payload, comment);
+
+//	log() << *pkt;
 }
 
 void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
 {
+//	log() << "rcv : " << bytes_transferred;
+
+//	fwrite(p, 1, bytes_transferred, fout);
+	
+//	if (!e) {
 		if (e) {
 			if (e != asio::error::operation_aborted)
 				log() << Log::Error << "Error of data receiving : " << e.message();
@@ -342,4 +374,9 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
 			m_port.async_read_some(asio::buffer(m_in_buf[m_in_ff_idx]),
 				bind(&Comm::recv_chunk, this, m_cur, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		}
+/*	} else if (e != asio::error::operation_aborted) {
+		log() << Log::Error << "Error of data receiving : " << e.message();
+	} else {
+		log() << "Error of data receiving : operation aborted";
+	}*/
 }

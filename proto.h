@@ -56,6 +56,7 @@ private:
 
 	void execute(uint8_t command);
 
+//	void getEncCfgChunk(const Message* msg);
 	template<typename CfgContainer, typename Cb>
 	void getEncCfgChunk(const Message* msg, CfgContainer& cfg, const Cb& cb);
 
@@ -64,6 +65,7 @@ private:
 
 	IServerCmds* m_callbacks;
 
+//	std::string m_config[3];
 	std::string m_enc_cfg;
 	std::string m_md_cfg;
 	std::vector<uint8_t> m_roi;

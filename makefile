@@ -15,7 +15,7 @@ BOOST_MODULES = \
     date_time \
     thread \
     system \
-    chrono
+	chrono
 
 #  filesystem    \
 #  graph         \
@@ -109,7 +109,7 @@ LDFLAGS_X86 += $(BOOST_LDFLAGS) -lpthread -static
 #LDFLAGS += -L /home/a/Documents/boost_1_48_0/stage/lib $(BOOST_LDFLAGS) -lpthread -static
 
 console: $(CONFIGPKG) $(OBJ)
-	$(LINK) -o console $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o $(LDFLAGS)
+	$(LINK) -o console $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o pbmtojbg85.o jbig85.o jbig_ar.o $(LDFLAGS)
 
 $(CONFIGPKG):
 	$(CONFIGURO) -c $(MVTOOL_DIR) -o $(CONFIGPKG) -t $(XDCTARGET) -p $(XDCPLATFORM) -b ./config.bld ./$(CONFIGPKG).cfg
@@ -120,6 +120,11 @@ $(CONFIGPKG):
 	$(CC) $(CPPFLAGS) -c alg_control.c
 	$(CC) $(CPPFLAGS) -c alg_malloc.c
 	$(CC) $(CPPFLAGS) -c cmem.c
+	$(CC) $(CPPFLAGS) -c pbmtojbg85.c
+	$(CC) $(CPPFLAGS) -c jbig85.c
+	$(CC) $(CPPFLAGS) -c jbig_ar.c
+#	$(CC) $(CPPFLAGS) -c bs.c
+#	$(CC) $(CPPFLAGS) -c tables.c
 #	$(CC) $(CPPFLAGS) -c testapp_arm926intc.c
 #	$(CC) $(CPPFLAGS) -c hdvicp_framework.c
 	$(CPPC) $(CPPFLAGS) -c $<

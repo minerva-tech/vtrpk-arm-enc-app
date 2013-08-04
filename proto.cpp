@@ -9,6 +9,7 @@
 const chrono::seconds Client::timeout(5);
 
 const int Server::msg_type_to_config_idx[Server::NumberOfMessageTypes] = {0, 1, 2, -1};
+const size_t Server::Message::mts;
 
 Server::Server(IServerCmds* callbacks) : 
 	m_callbacks(callbacks) 
@@ -74,10 +75,19 @@ void Server::execute(uint8_t command)
 template<typename CfgContainer, typename Cb>
 void Server::getEncCfgChunk(const Server::Message* msg, CfgContainer& cfg, const Cb& cb)
 {
+//	const int cfg_idx = msg_type_to_config_idx[msg->type()];
+	
+//	assert(cfg_idx >= 0);
+	
+//	std::string& str = m_config[cfg_idx];
+
+//	std::copy(&msg->payload[0], &msg->payload[msg->size()], std::inserter(str, str.end()));
 	std::copy(&msg->payload[0], &msg->payload[msg->size()], std::inserter(cfg, cfg.end()));
 
 	if (msg->last_pkt()) {
+//		m_callbacks->SetEncCfg(str);
 		cb(cfg);
+//		str.clear();
 		cfg.clear();
 	}
 
@@ -113,6 +123,26 @@ void Server::SendCfg(const CfgContainer& cfg, MessageTypes msg_type)
 void Server::SendEncCfg(const std::string& cfg) 
 {
 	SendCfg(cfg, EncConfig);
+	
+/*	std::vector<Server::Message> msgs;
+
+	std::string::const_iterator cfg_it = cfg.begin();
+
+	while(cfg_it != cfg.end()) {
+		const size_t data_left = cfg.end() - cfg_it;
+		const bool last_pkt = data_left <= Server::Message::mts;
+		const size_t to_send = std::min(data_left, Server::Message::mts);
+		msgs.push_back(Server::Message(EncConfig, last_pkt, to_send));
+
+		std::copy(cfg_it, cfg_it+to_send, &msgs.back().payload[0]);
+
+		cfg_it += to_send;
+	}
+
+	if (msgs.size())
+		Comm::instance().transmit(0, 0, msgs.size()*sizeof(msgs[0]), reinterpret_cast<const uint8_t*>(&msgs[0]));
+
+	return;*/
 }
 
 void Server::SendMDCfg(const std::string& str)

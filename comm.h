@@ -87,8 +87,10 @@ public:
 
 	Comm();
 	~Comm();
+	
+//	FILE* fout;
 
-	bool open(const std::string& port);
+	bool open(const std::string& port, int baud_rate, bool flow_control);
 	void close();
 	void transmit_and_close();
 
@@ -123,7 +125,7 @@ private:
 //	asio::io_service::work m_work;
 
 	asio::serial_port m_port;
-
+	
 	int m_in_count_lsb[CAMERAS_N];
 	int m_out_count_lsb[CAMERAS_N];
 

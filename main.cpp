@@ -2,6 +2,8 @@
 #include <ti/xdais/ires.h>
 #include <ti/sdo/fc/rman/rman.h>
 
+#include <sys/mman.h>
+
 #include "ext_headers.h"
 #include "log_to_file.h"
 #include "exception.h"
@@ -9,12 +11,14 @@
 #include "cap.h"
 #include "enc.h"
 #include "proto.h"
-
+/*
 extern "C" {
 #include "tables.h"
 #include "bs.h"
 #include "cabac.h"
-}
+}*/
+
+extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
 
 volatile bool g_stop = false;
 
@@ -66,14 +70,24 @@ public:
 
 void initMD()
 {
-	
+	std::ifstream cfg(std::string("md.cfg"));
+
+	int val1 = -1, val2 = -1, val3 = -1, val4 = -1, val5 = -1;
+
+	cfg >> val1;
+	cfg >> val2;
+	cfg >> val3;
+	cfg >> val4;
+	cfg >> val5;
+
+	log() << "MD config : " << val1 << ", " << val2 << ", " << val3 << ", " << val4 << ", " << val5; 
 }
 
 void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 {
 	std::ifstream cfg(std::string("md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
 	const std::streampos size = cfg.tellg();
-	
+
 	if (size <= 0) {
 		info_mask.resize(s*h/8);
 		return;
@@ -86,13 +100,84 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	cfg.read((char*)&info_mask[0], info_mask.size()*sizeof(info_mask[0]));
 }
 
+const char STARTCODE[12] = "FRAME START";
+
+void readStartcode(const volatile uint16_t* reg, int thres)
+{
+	bool startcode_at_begin = true;
+	
+	int startcode_off = 0;
+	int was_read = 0;
+
+	while (startcode_off != sizeof(STARTCODE)/(sizeof(STARTCODE[0])) && was_read++ < thres) {
+		const uint16_t val = *reg;
+
+		if (val == *(uint16_t*)&STARTCODE[startcode_off]) {
+			startcode_off += 2;
+		} else {
+			if (val == *(uint16_t*)&STARTCODE[0])
+				startcode_off = 2;
+			else
+				startcode_off = 0;
+			startcode_at_begin = false;
+			continue;
+		}
+	}
+
+	if (!startcode_at_begin)
+		log() << "No startcode was found at the place where it should be. Was thrown " << was_read*2 << " bytes.";
+	
+	if (startcode_off == 12)
+		log() << "Startcode was found";
+	else	
+		log() << "Startcode wasn't found";
+}
+
 void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, int w, int s, int h)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
 	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
 
-	while (it_info != info.end())
-		*it_info++ = *it_info_mask++;
+    int fd;
+
+    if ((fd = open("/dev/mem", O_RDONLY | O_SYNC)) == -1) {
+		log() << "cannot open /dev/mem. su?";
+		return;
+    }
+
+    void * volatile map_base = mmap(0, 1024, PROT_READ, MAP_SHARED, fd, 0x04000000);
+
+	const ptrdiff_t offset = 0x0030;
+
+	readStartcode((uint16_t*)((uint8_t*)map_base + offset), w*h*2/8+12);
+
+	for (int y=0; y<h*2; y+=2) {
+		for(int i=0; i<w/8; i+=2) {
+			const uint16_t val = *(volatile uint16_t*)((uint8_t*)map_base + offset);
+
+			if (val == 0xFAAC || val == 0xACFA)
+				log() << "FAAC!!!";
+
+			*(uint16_t*)&*it_info = val; // бгыыы
+			it_info += 2;
+
+//			*it_info++ = val & 0x0ff;
+//			*it_info++ = val >> 8;
+		}
+
+		for(int i=0; i<w/8; i+=2) {
+			const uint16_t val = *(volatile uint16_t*)((uint8_t*)map_base + offset);
+
+			if (val == 0xFAAC || val == 0xACFA)
+				log() << "FAAC!!!";
+		}
+	}
+
+    munmap((void*)map_base, 1024);
+    close(fd);
+
+//	while (it_info != info.end())
+//		*it_info++ = *it_info_mask++;
 //		*it_info++ &= *it_info_mask++;
 }
 
@@ -118,6 +203,9 @@ void run()
 	std::vector<uint8_t> info_mask;
 	loadMask(info_mask, w, h);
 
+	std::vector<uint8_t> info_out;
+	info_out.resize(w*h/8);
+
 //	bs_t info_bs;
 
 	initMD();
@@ -126,6 +214,7 @@ void run()
 	cap.putFrame(buf);
 
 //	FILE* f_dump = fopen("dump.h264", "wb");
+//FILE* f_dump_info = fopen("dump.anal", "wb");
 
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
@@ -138,25 +227,23 @@ void run()
 
 		fillInfo(info, info_mask, w, w, h);
 
-/*		bs_create(&info_bs);
-		bs_resize(&info_bs, w*h/8);
+//fwrite((uint8_t*)&info[0], 1, w*h/8, f_dump_info);
 
-		const int info_size = encode_frame(&info[0], &info_bs, w*h/8);
-*/
+		const uint8_t* cur = encode_frame(&info[0], &info_out[0], w, h);
+
+		const ptrdiff_t info_size = cur - &info_out[0];
+
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
 		if (coded_size) {
-			
 			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
-			
+
 //			fwrite((uint8_t*)bs, 1, coded_size, f_dump);
 		}
-/*
-		if (info_size)
-			Comm::instance().transmit(0, 2, info_size, (uint8_t*)info_bs.stream);
 
-		bs_delete(&info_bs);
-*/
+		if (info_size)
+			Comm::instance().transmit(0, 2, info_size, &info_out[0]);
+
 		for (int i=0; i<to_skip; i++) {
 			v4l2_buffer buf = cap.getFrame();
 			cap.putFrame(buf);
@@ -164,19 +251,25 @@ void run()
 	}
 	
 //	fclose(f_dump);
+//fclose(f_dump_info);
 }
 
 int main(int argc, char *argv[])
 {
 	try {
-		if (!Comm::instance().open("/dev/ttyS1"))
+		if (argc != 3) {
+			std::cout << "a.out <baud_rate> <flow_control>" << std::endl;
+			return 0;
+		}
+
+		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
 		ServerCmds cmds;
 		Server server(&cmds);
 
 		CMEM_init();
-		
+
 		Enc::rman_init();
 
 		while(1) {
