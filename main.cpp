@@ -133,7 +133,7 @@ void readStartcode(const volatile uint16_t* reg, int thres)
 		log() << "Startcode wasn't found";
 }
 
-void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, int w, int s, int h)
+void fillInfoFromFifo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, int w, int s, int h)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
 	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
@@ -181,12 +181,35 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 //		*it_info++ &= *it_info_mask++;
 }
 
+void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h)
+{
+	std::vector<uint8_t>::iterator it_info = info.begin();
+	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
+
+	for (int y=0; y<h; y++) {
+		uint8_t *p = data + y*s;
+		for (int x=0; x<w; x+=16, p+=16) {
+			uint8_t b = 0;
+			for (int i=0; i<16; i++)
+				if (p[i] > 0x80)
+					b |= 1 << i/2;
+					
+			*it_info++ = b;
+		}
+	}
+			
+
+//	while (it_info != info.end())
+//		*it_info++ = *it_info_mask++;
+//		*it_info++ &= *it_info_mask++;
+}
+
 void run()
 {
 	const int w = 384;
 	const int h = 144;
 
-	const int to_skip = 10; // how much frames should be skipped after captured one to reduce framerate.
+	const int to_skip = 5; // how much frames should be skipped after captured one to reduce framerate.
 
 	while(g_stop)
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
@@ -225,9 +248,9 @@ void run()
 
 		cap.putFrame(buf);
 
-		fillInfo(info, info_mask, w, w, h);
+		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w/2, w/2, h); // data is in chroma planes.
 
-//fwrite((uint8_t*)&info[0], 1, w*h/8, f_dump_info);
+//fwrite((uint8_t*)&info[0], 1, w/2*h/8, f_dump_info);
 
 		const uint8_t* cur = encode_frame(&info[0], &info_out[0], w, h);
 
