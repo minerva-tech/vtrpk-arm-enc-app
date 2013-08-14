@@ -117,19 +117,20 @@ void restartFpga()
 		regs[i] = *p++;
 
 	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
-	fprintf(fexport, "49");
+	fprintf(fexport, "92");
 	fclose(fexport);
 	
-	FILE* fdir = fopen("/sys/class/gpio/gpio49/direction", "wt");
+	FILE* fdir = fopen("/sys/class/gpio/gpio92/direction", "wt");
 	fprintf(fdir, "out");
 	fclose(fdir);
 
-	FILE* fval = fopen("/sys/class/gpio/gpio49/value", "wb");
-	fprintf(fval, "1\n");
+	FILE* fval = fopen("/sys/class/gpio/gpio92/value", "wb");
+	fprintf(fval, "0\n");
 	fflush(fval);
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-	fprintf(fval, "0\n");
+	fprintf(fval, "1\n");
 	fclose(fval);
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(750));
 
 	p = (uint16_t*)map_base;
 	log() << "Firmware version: " << std::hex << *(p+0x2e/2) << std::dec;
