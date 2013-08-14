@@ -63,6 +63,8 @@ public:
 		cfg << str;
 	}
 	virtual void SetROI(const std::vector<uint8_t>& str) {
+		if (str.size()<384*144/8) // dirty hack while we have no stable comm channel with error correction.
+			return;
 		std::ofstream cfg(std::string("md_roi.dat"));
 		cfg.write((char*)&str[0], str.size()*sizeof(str[0]));
 	}
@@ -178,7 +180,7 @@ void initMD()
 	
 	const int spat_thres = val2 * (13 - 1) / 100 + 1;
 	const int tmp = *(uint16_t*)(regs + 0x01A);
-	*(uint16_t*)(regs + 0x01A) = tmp & ~0x00f0 | (spat_thres << 4 & 0x01f0);
+	*(uint16_t*)(regs + 0x01A) = tmp & ~0x01f0 | (spat_thres << 4 & 0x01f0);
 
 	const double top_t = (pow(base, val3/100.0) - 1.)/(base - 1.) * (1.-1./256.) + 1./256.;
 	const int top_t_i = top_t * (1<<18);
@@ -223,8 +225,10 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	std::ifstream cfg(std::string("md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
 	const std::streampos size = cfg.tellg();
 
-	if (size <= 0) {
+//	if (size <= 0) {
+	if (size < s*h/8) { // dirty hack while we have no stable comm channel with error correction.		
 		info_mask.resize(s*h/8);
+		memset(&info_mask[0], 1, info_mask.size());
 		return;
 	}
 
@@ -233,6 +237,14 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	info_mask.resize(cfg.tellg());
 	cfg.seekg(std::ios_base::beg);
 	cfg.read((char*)&info_mask[0], info_mask.size()*sizeof(info_mask[0]));
+	
+	for(int i=0; i<info_mask.size(); i++) {
+		if (info_mask[i] != 0)
+			return;
+	}
+	
+	// as info_mask has nothing but zeroes, fill it with ones
+	memset(&info_mask[0], 1, info_mask.size());
 }
 
 const char STARTCODE[12] = "FRAME START";
@@ -321,20 +333,28 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 	std::vector<uint8_t>::iterator it_info = info.begin();
 	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
 
-	for (int y=0; y<h; y++) {
+// move detector data two pixels up-left
+
+	for (int y=2; y<h; y++) {
 		uint8_t *p = data + y*s;
-		for (int x=0; x<w; x+=16, p+=16) {
+		for (int x=2; x<w; x+=16, p+=16) {
 			uint8_t b = 0;
-			for (int i=0; i<16; i++) {
-				if (p[i] > 0x80)
+			const int pels_left = w-x > 16 ? 16 : w-x;
+			for (int i=0; i<pels_left; i++) {
+				if (i == 8)
+					it_info_mask++;
+				if (p[i] > 0x80 && *it_info_mask & 1<<7-i%8)
 					b |= 1 << 7-i/2;
 				p[i] = 0x80;
 			}
 
+			it_info_mask++;
 			*it_info++ = b;
 		}
+		it_info_mask += s/8;
 	}
-			
+	
+	memset(&info[(h-2)*s/2/8], 0, w/2*2/8); // set last two lines to zeroes
 
 //	while (it_info != info.end())
 //		*it_info++ = *it_info_mask++;
