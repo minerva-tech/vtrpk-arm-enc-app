@@ -170,8 +170,8 @@ void initMD()
 	
 	const double base = 10;
 	
-	const double time_thres = (pow(base, val1/100.0) - 1.)/(base - 1.) * (0.5 - 0.035) + 0.035;
-	const int time_thres_i = time_thres * (1<<18) / 64;
+	const double time_thres = (pow(base, val1/100.0) - 1.)/(base - 1.) * (0.625 - 0.0) + 0.0;
+	const int time_thres_i = time_thres * (1<<18);
 	*(uint16_t*)(regs + 0x014) = time_thres_i & 0xffff;
 	*(uint16_t*)(regs + 0x016) = time_thres_i>>16;
 	
@@ -189,7 +189,7 @@ void initMD()
 	*(uint16_t*)(regs + 0x004) = bot_t_i & 0xffff;
 	*(uint16_t*)(regs + 0x006) = bot_t_i>>16;
 
-	const double noise = (pow(base, val5/100.0) - 1.)/(base - 1.) * (0.08-0.005) + 0.005;
+	const double noise = (pow(base, val5/100.0) - 1.)/(base - 1.) * (0.1-0.0039) + 0.0039;
 	const double noise2 = noise*noise;
 	const double inoise = 1./noise/16.;
 
