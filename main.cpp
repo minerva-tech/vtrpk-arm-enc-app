@@ -228,7 +228,7 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 //	if (size <= 0) {
 	if (size < s*h/8) { // dirty hack while we have no stable comm channel with error correction.		
 		info_mask.resize(s*h/8);
-		memset(&info_mask[0], 1, info_mask.size());
+		memset(&info_mask[0], 0xff, info_mask.size());
 		return;
 	}
 
@@ -244,7 +244,7 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	}
 	
 	// as info_mask has nothing but zeroes, fill it with ones
-	memset(&info_mask[0], 1, info_mask.size());
+	memset(&info_mask[0], 0xff, info_mask.size());
 }
 
 const char STARTCODE[12] = "FRAME START";
@@ -336,7 +336,7 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 // move detector data two pixels up-left
 
 	for (int y=2; y<h; y++) {
-		uint8_t *p = data + y*s;
+		uint8_t *p = data + y*s + 2;
 		for (int x=2; x<w; x+=16, p+=16) {
 			uint8_t b = 0;
 			const int pels_left = w-x > 16 ? 16 : w-x;
