@@ -337,6 +337,11 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
 
 				uint8_t* pkt_start = std::find(buf_end - m_remains, buf_end, PREAMBLE);
 
+				if (buf_end - pkt_start + pend - m_cur < sizeof(Pkt)) {
+					m_remains = buf_end - pkt_start;
+					break;
+				}
+
 				if (pkt_start != m_in_buf[m_in_ff_idx^1].end()) {
 					Pkt pkt;
 					uint8_t* ppkt = pkt.buf();
