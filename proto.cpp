@@ -28,7 +28,7 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 
 	switch (msg->type()) {
 	case Command:
-		execute(msg->payload[0]);
+		execute(msg->payload[0], msg->payload[1]);
 		break;
 	case EncConfig:
 		//getEncCfgChunk(msg);
@@ -45,12 +45,12 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 	return;
 }
 
-void Server::execute(uint8_t command)
+void Server::execute(uint8_t command, uint8_t arg)
 {
 	switch (command) {
 	case Hello:
 		if (m_callbacks->Hello())
-			boost::thread(boost::bind(&Server::SendCommand, Hello));
+			boost::thread(boost::bind(&Server::SendCommand, Hello, 0));
 		break;
 	case Start:
 		m_callbacks->Start();
@@ -66,6 +66,9 @@ void Server::execute(uint8_t command)
 		break;
 	case RequestROI:
 		boost::thread(boost::bind(&Server::SendROI, m_callbacks->GetROI()));
+		break;
+	case RequestRegister:
+		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
 		break;
 	default:
 		log() << "Invalid command";
@@ -155,10 +158,11 @@ void Server::SendROI(const std::vector<uint8_t>& roi)
 	SendCfg(roi, ROIConfig);
 }
 
-void Server::SendCommand(Commands cmd)
+void Server::SendCommand(Commands cmd, uint8_t arg)
 {
 	Server::Message msg(Command, true, 1);
 	msg.payload[0] = cmd;
+	msg.payload[1] = arg;
 	Comm::instance().transmit(0, 0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
 }
 

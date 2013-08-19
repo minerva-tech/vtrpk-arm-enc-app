@@ -11,6 +11,7 @@ public:
 	virtual std::string GetEncCfg() = 0;
 	virtual std::string GetMDCfg() = 0;
 	virtual std::vector<uint8_t> GetROI() = 0;
+	virtual uint16_t GetRegister(uint8_t addr) = 0;
 
 	virtual void SetEncCfg(const std::string&) = 0;
 	virtual void SetMDCfg(const std::string&) = 0;
@@ -27,13 +28,14 @@ public:
 		Stop,
 		RequestEncConfig,
 		RequestMDConfig,
-		RequestROI
+		RequestROI,
+		RequestRegister
 	};
 
 	Server(IServerCmds* callbacks);
 	~Server();
 
-	static void SendCommand(Commands cmd);
+	static void SendCommand(Commands cmd, uint8_t arg = 0);
 
 	static void SendEncCfg(const std::string&);
 	static void SendMDCfg(const std::string&);
@@ -54,7 +56,7 @@ private:
 
 	void Callback(uint8_t camera, const uint8_t* payload, int comment);
 
-	void execute(uint8_t command);
+	void execute(uint8_t command, uint8_t arg = 0);
 
 //	void getEncCfgChunk(const Message* msg);
 	template<typename CfgContainer, typename Cb>
@@ -100,6 +102,7 @@ class Client {
 		virtual std::string GetEncCfg() {assert(0); return std::string();}
 		virtual std::string GetMDCfg() {assert(0); return std::string();}
 		virtual std::vector<uint8_t> GetROI() {assert(0); return std::vector<uint8_t>();}
+		virtual uint16_t GetRegister(uint8_t addr) { assert(0); return 0; }
 
 		virtual void SetEncCfg(const std::string& cfg) {m_enc_cfg = cfg; m_enc_cfg_received = true;}
 		virtual void SetMDCfg(const std::string& cfg) {m_md_cfg = cfg; m_md_cfg_received = true;}
@@ -126,7 +129,8 @@ namespace Auxiliary {
 
 	enum AuxiliaryType {
 		InvalidType = 0,
-		TimestampType
+		TimestampType,
+		RegisterValType
 	};
 
 	template <typename T>
@@ -139,14 +143,28 @@ namespace Auxiliary {
 		uint32_t sec;   // ok, it's actually crap, but i know that timestamps are long, and long on target platform (ARM v5t) with my compiler (GCC 4.7.2) is 32-bit.
 		uint32_t usec;  // so, use it, instead of "long int" which could be 64 bit on other platforms, where this code will be used for data receiving.
 	};
+	
+	struct RegisterValData {
+		uint8_t addr;
+		uint16_t val;
+	};
 
 	static_assert(sizeof(Pkt<TimestampData>) <= Comm::mss, "Size of single auxiliary data packet shouldnt exceed Comm::mss");
+	static_assert(sizeof(Pkt<RegisterValData>) <= Comm::mss, "Size of single auxiliary data packet shouldnt exceed Comm::mss");
 
 	inline void SendTimestamp(long sec, long usec) {
 		Pkt<TimestampData> pkt;
 		pkt.type = TimestampType;
 		pkt.data.sec  = sec;
 		pkt.data.usec = usec;
+		Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
+	}
+
+	inline void SendRegisterVal(uint8_t addr, uint16_t val) {
+		Pkt<RegisterValData> pkt;
+		pkt.type = RegisterValType;
+		pkt.data.addr = addr;
+		pkt.data.val = val;
 		Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
 	}
 
@@ -157,6 +175,12 @@ namespace Auxiliary {
 	inline TimestampData Timestamp(const uint8_t* data) {
 		assert(Type(data) == TimestampType);
 		const Pkt<TimestampData>* pkt = (const Pkt<TimestampData>*)data;
+		return pkt->data;
+	}
+
+	inline RegisterValData RegisterVal(const uint8_t* data) {
+		assert(Type(data) == RegisterValType);
+		const Pkt<RegisterValData>* pkt = (const Pkt<RegisterValData>*)data;
 		return pkt->data;
 	}
 };

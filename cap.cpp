@@ -623,8 +623,8 @@ v4l2_buffer Cap::getFrame()
 
 	const long long curr_time = buf.timestamp.tv_sec*1000000 + buf.timestamp.tv_usec;
 
-	if (curr_time - m_prev_time >= 3*m_diff_time/2)
-		log() << "Frame duration : " << (curr_time-m_prev_time)/1000 << " ms, instead of : " << m_diff_time/1000 << " ms. Frame was dropped, probably";
+//	if (curr_time - m_prev_time >= 3*m_diff_time/2)
+//		log() << "Frame duration : " << (curr_time-m_prev_time)/1000 << " ms, instead of : " << m_diff_time/1000 << " ms. Frame was dropped, probably";
 
 	m_diff_time = curr_time-m_prev_time;
 	m_prev_time = curr_time;

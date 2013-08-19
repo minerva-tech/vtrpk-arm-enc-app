@@ -21,6 +21,7 @@ extern "C" {
 extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
 
 volatile bool g_stop = false;
+int g_chroma_value = 0x80;
 
 class ServerCmds : public IServerCmds
 {
@@ -36,6 +37,7 @@ public:
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
 		return str;
 	}
+	
 	virtual std::string GetMDCfg() {
 		std::ifstream cfg(std::string("md.cfg"));
 		if (!cfg)
@@ -43,6 +45,7 @@ public:
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
 		return str;		
 	}
+	
 	virtual std::vector<uint8_t> GetROI() {
 		std::ifstream cfg(std::string("md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
 		if (!cfg)
@@ -52,6 +55,26 @@ public:
 		cfg.seekg(std::ios_base::beg);
 		cfg.read((char*)&str[0], str.size()*sizeof(str[0]));
 		return str;
+	}
+	
+	virtual uint16_t GetRegister(uint8_t addr) {
+		int fd;
+
+		if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+			log() << "cannot open /dev/mem. su?";
+			return 0;
+		}
+
+		void* map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+
+		uint16_t* regs = (uint16_t*)map_base;
+
+		const uint16_t val = regs[addr/2];
+
+		munmap((void*)map_base, 1024);
+		close(fd);
+
+		return val;		
 	}
 
 	virtual void SetEncCfg(const std::string& str) {
@@ -69,6 +92,37 @@ public:
 		cfg.write((char*)&str[0], str.size()*sizeof(str[0]));
 	}
 };
+
+void setReg(uint8_t addr, uint16_t val)
+{
+	int fd;
+
+    if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+		log() << "cannot open /dev/mem. su?";
+		return;
+    }
+
+    void* map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+
+	uint16_t* regs = (uint16_t*)map_base;
+	
+	regs[addr/2] = val;
+
+	munmap((void*)map_base, 1024);
+    close(fd);
+}
+
+void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
+{
+	if (comment & ~Comm::Normal)
+		log() << "Aux packet was received, flags: " << comment;
+		
+	if (Auxiliary::Type(payload) == Auxiliary::RegisterValType) {
+		Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
+		log() << "Set reg 0x" << std::hex << reg.addr << " to 0x" << reg.val << std::dec;
+		setReg(reg.addr, reg.val);
+	}
+}
 
 void dumpRegs()
 {
@@ -328,7 +382,7 @@ void fillInfoFromFifo(std::vector<uint8_t>& info, const std::vector<uint8_t>& in
 //		*it_info++ &= *it_info_mask++;
 }
 
-void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h)
+void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h, int chroma_val)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
 	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
@@ -345,7 +399,7 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 					it_info_mask++;
 				if (p[i] > 0x80 && *it_info_mask & 1<<7-i%8)
 					b |= 1 << 7-i/2;
-				p[i] = 0x80;
+				p[i] = chroma_val;
 			}
 
 			it_info_mask++;
@@ -401,7 +455,7 @@ void run()
 
 		size_t coded_size=0;
 
-		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2); // data is in chroma planes.
+		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
 		XDAS_Int8* bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
 
@@ -437,7 +491,7 @@ void run()
 int main(int argc, char *argv[])
 {
 	try {
-		if (argc != 3) {
+		if (argc < 3) {
 			std::cout << "a.out <baud_rate> <flow_control>" << std::endl;
 			return 0;
 		}
@@ -448,9 +502,14 @@ int main(int argc, char *argv[])
 		ServerCmds cmds;
 		Server server(&cmds);
 
+		Comm::instance().setCallback(auxiliaryCb, 3);
+
 		CMEM_init();
 
 		Enc::rman_init();
+
+		if (argc == 4)
+			g_chroma_value = atoi(argv[3]);
 
 		while(1) {
 			try {
