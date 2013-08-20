@@ -114,12 +114,14 @@ void setReg(uint8_t addr, uint16_t val)
 
 void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
 {
+	log() << "received aux packet: " << std::hex << (int)payload[0] << " " << (int)payload[1] << std::dec;
+
 	if (comment & ~Comm::Normal)
 		log() << "Aux packet was received, flags: " << comment;
-		
+
 	if (Auxiliary::Type(payload) == Auxiliary::RegisterValType) {
 		Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
-		log() << "Set reg 0x" << std::hex << reg.addr << " to 0x" << reg.val << std::dec;
+		log() << "Set reg 0x" << std::hex << (int)reg.addr << " to 0x" << reg.val << std::dec;
 		setReg(reg.addr, reg.val);
 	}
 }
@@ -140,9 +142,9 @@ void dumpRegs()
 	for (int i=0; i<0x30; i+=2) {
 		log() << std::hex << "reg 0x" << i << " : 0x" << *(uint16_t*)(regs+i);
 	}
-	
-	log() << std::dec;
-	
+
+	log() << "end dump" << std::dec;
+
     munmap((void*)map_base, 1024);
     close(fd);
 }
