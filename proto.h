@@ -135,8 +135,8 @@ namespace Auxiliary {
 
 	template <typename T>
 	struct Pkt {
-		AuxiliaryType 	type;
-		T				data;
+		uint8_t 	type;
+		T			data;
 	};
 
 	struct TimestampData {
@@ -169,7 +169,7 @@ namespace Auxiliary {
 	}
 
 	inline AuxiliaryType Type(const uint8_t* data) {
-		return ((Pkt<char>*)data)->type;
+		return (AuxiliaryType)((Pkt<char>*)data)->type;
 	}
 
 	inline TimestampData Timestamp(const uint8_t* data) {
