@@ -94,6 +94,8 @@ public:
 	void close();
 	void transmit_and_close();
 
+	std::vector<std::pair<std::string, uint32_t> > getStat();
+
 private:
 //	static Comm* m_this;
 
@@ -125,9 +127,12 @@ private:
 //	asio::io_service::work m_work;
 
 	asio::serial_port m_port;
-	
+
 	int m_in_count_lsb[CAMERAS_N];
 	int m_out_count_lsb[CAMERAS_N];
+
+	boost::chrono::steady_clock::time_point m_start;
+	uint32_t m_recv_amount[4];
 
 	static const int out_buf_size = 1000; //!< Number of packets, not bytes
 	CircBuf<Pkt> m_out_buf; // i'm not sure that it's really necessary. Simple and error-free way is to use deque<Pkt>, and call async_write for single element in a time. As we have bitrate 115200 top, async write will be called 960 times a second tops. But such simple way is not enough fun.

@@ -97,6 +97,7 @@ Comm::Comm() :
 	m_owners(0),
 #endif
 	m_out_buf(out_buf_size),
+	m_start(boost::chrono::steady_clock::now()),
 	m_sending_in_progress(false),
 	m_in_ff_idx(0),
 	m_cur(m_in_buf[m_in_ff_idx].begin()),
@@ -292,17 +293,19 @@ void Comm::transmitted(shared_ptr<Pkt> sp, const system::error_code& e, size_t)
 void Comm::recv_pkt(const Pkt* pkt)
 {
 	int comment = Invalid;
-	
+
 	if (!pkt->crc_valid())
 		comment |= CrcError;
 
 	if (pkt->count_lsb() != m_in_count_lsb[pkt->camera()])
 		comment |= PacketLost;
 
-	if (comment == Invalid) 
+	if (comment == Invalid)
 		comment = Normal;
 
 	m_in_count_lsb[pkt->camera()] = (pkt->count_lsb()+1) % LSB_MAX_VAL_PLUS_1;
+
+	m_recv_amount[pkt->port()] += mss;
 
 	if (m_callback[pkt->port()])
 		m_callback[pkt->port()](pkt->camera(), pkt->payload, comment);
@@ -384,4 +387,26 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
 	} else {
 		log() << "Error of data receiving : operation aborted";
 	}*/
+}
+
+/**
+ * returns Amount of bytes received per second.
+ * */
+std::vector<std::pair<std::string, uint32_t> > Comm::getStat()
+{
+	std::vector<std::pair<std::string, uint32_t> > times;
+
+	boost::chrono::duration<double> dur = boost::chrono::steady_clock::now() - m_start;
+	double count = dur.count();
+
+	times.push_back(std::pair<std::string, uint32_t>("Command bitrate: ", 		(m_recv_amount[0]+0.5)/count));
+	times.push_back(std::pair<std::string, uint32_t>("Video bitrate: ", 		(m_recv_amount[1]+0.5)/count));
+	times.push_back(std::pair<std::string, uint32_t>("Detector bitrate: ", 		(m_recv_amount[2]+0.5)/count));
+	times.push_back(std::pair<std::string, uint32_t>("Auxiliary bitrate: ", 	(m_recv_amount[3]+0.5)/count));
+
+	memset(m_recv_amount, 0, sizeof(m_recv_amount));
+
+	m_start = boost::chrono::steady_clock::now();
+
+	return times;
 }

@@ -135,7 +135,7 @@ namespace Auxiliary {
 
 	template <typename T>
 	struct Pkt {
-		uint8_t 	type;
+		uint32_t	type;
 		T			data;
 	};
 
@@ -145,8 +145,8 @@ namespace Auxiliary {
 	};
 	
 	struct RegisterValData {
-		uint8_t addr;
-		uint16_t val;
+		uint32_t addr;
+		uint32_t val;
 	};
 
 	static_assert(sizeof(Pkt<TimestampData>) <= Comm::mss, "Size of single auxiliary data packet shouldnt exceed Comm::mss");
@@ -169,19 +169,27 @@ namespace Auxiliary {
 	}
 
 	inline AuxiliaryType Type(const uint8_t* data) {
-		return (AuxiliaryType)((Pkt<char>*)data)->type;
+		int type;
+		const uint8_t* p = (uint8_t*)&((Pkt<uint32_t>*)data)->type;
+		memcpy(&type, p, sizeof(type)); // unaligned
+//		memcpy(&type, (uint8_t*)&((Pkt<uint32_t>*)data)->type, sizeof(type)); // doesn't work with gcc 4.7.2
+		return (AuxiliaryType)type;
 	}
 
-	inline TimestampData Timestamp(const uint8_t* data) {
-		assert(Type(data) == TimestampType);
-		const Pkt<TimestampData>* pkt = (const Pkt<TimestampData>*)data;
-		return pkt->data;
+	inline TimestampData Timestamp(const uint8_t* buf) {
+		assert(Type(buf) == TimestampType);
+		TimestampData data;
+		const uint8_t* p = (uint8_t*)&((Pkt<TimestampData>*)buf)->data;
+		memcpy(&data, p, sizeof(data)); // unaligned
+		return data;
 	}
 
-	inline RegisterValData RegisterVal(const uint8_t* data) {
-		assert(Type(data) == RegisterValType);
-		const Pkt<RegisterValData>* pkt = (const Pkt<RegisterValData>*)data;
-		return pkt->data;
+	inline RegisterValData RegisterVal(const uint8_t* buf) {
+		assert(Type(buf) == RegisterValType);
+		RegisterValData data;
+		const uint8_t* p = (uint8_t*)&((Pkt<RegisterValData>*)buf)->data;
+		memcpy(&data, p, sizeof(data)); // unaligned
+		return data;
 	}
 };
 

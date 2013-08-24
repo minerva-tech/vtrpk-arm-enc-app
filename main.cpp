@@ -114,10 +114,18 @@ void setReg(uint8_t addr, uint16_t val)
 
 void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
 {
-	log() << "received aux packet: " << std::hex << (int)payload[0] << " " << (int)payload[1] << std::dec;
+	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] << 
+	" " << (int)payload[2] << " " << (int)payload[3] << " " << (int)payload[4] << " " << (int)payload[5] <<
+	" " << (int)payload[6] << " " << (int)payload[7] << " " << (int)payload[8] << " " << (int)payload[9] <<
+	" " << (int)payload[10] << " " << (int)payload[11] << " " << (int)payload[12] << std::dec;
+
+	log() << "addr:" << std::hex << (int)&payload[0] << std::dec;
 
 	if (comment & ~Comm::Normal)
 		log() << "Aux packet was received, flags: " << comment;
+
+	log() << std::hex << "Type: " << Auxiliary::Type(payload);
+	log() << "Should be: " << Auxiliary::RegisterValType << std::dec;
 
 	if (Auxiliary::Type(payload) == Auxiliary::RegisterValType) {
 		Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
@@ -205,9 +213,9 @@ void initMD()
 	
 	std::ifstream cfg(std::string("md.cfg"));
 
-	int val1 = -1, val2 = -1, val3 = -1, val4 = -1, val5 = -1;
+	int val1 = -1, val2 = -1, val3 = -1, val4 = -1, val5 = -1, val6 = -1, val7 = -1;
 
-	cfg >> val1 >> val2 >> val3 >> val4 >> val5;
+	cfg >> val1 >> val2 >> val3 >> val4 >> val5 >> val6 >> val7;
 
 	log() << "MD config : " << val1 << ", " << val2 << ", " << val3 << ", " << val4 << ", " << val5; 
 
@@ -227,48 +235,34 @@ void initMD()
 
 	uint8_t* regs = (uint8_t*)map_base;
 	
-	const double base = 10;
-	
-	const double time_thres = (pow(base, val1/100.0) - 1.)/(base - 1.) * (0.625 - 0.0) + 0.0;
-	const int time_thres_i = time_thres * (1<<18);
-	*(uint16_t*)(regs + 0x014) = time_thres_i & 0xffff;
-	*(uint16_t*)(regs + 0x016) = time_thres_i>>16;
-	
-	const int spat_thres = val2 * (13 - 1) / 100 + 1;
+	*(uint16_t*)(regs + 0x014) = val1 & 0xffff;
+	*(uint16_t*)(regs + 0x016) = val1 >> 16;
+
 	const int tmp = *(uint16_t*)(regs + 0x01A);
-	*(uint16_t*)(regs + 0x01A) = tmp & ~0x01f0 | (spat_thres << 4 & 0x01f0);
+	*(uint16_t*)(regs + 0x01A) = tmp & ~0x01f0 | (val2 << 4 & 0x01f0);
 
-	const double top_t = (pow(base, val3/100.0) - 1.)/(base - 1.) * (1.-1./256.) + 1./256.;
-	const int top_t_i = top_t * (1<<18);
-	*(uint16_t*)(regs + 0x000) = top_t_i & 0xffff;
-	*(uint16_t*)(regs + 0x002) = top_t_i>>16;
+	*(uint16_t*)(regs + 0x000) = val3 & 0xffff;
+	*(uint16_t*)(regs + 0x002) = val3 >> 16;
+	
+	*(uint16_t*)(regs + 0x004) = val4 & 0xffff;
+	*(uint16_t*)(regs + 0x006) = val4 >> 16;
+	
+	*(uint16_t*)(regs + 0x00c) = val5 & 0xffff;
+	*(uint16_t*)(regs + 0x00e) = val5 >> 16;
+	
+	*(uint16_t*)(regs + 0x008) = val6 & 0xffff;
+	*(uint16_t*)(regs + 0x00a) = val6 >> 16;
+	
+	*(uint16_t*)(regs + 0x010) = val7 & 0xffff;
+	*(uint16_t*)(regs + 0x012) = val7 >> 16;
 
-	const double bot_t = (pow(base, val4/100.0) - 1.)/(base - 1.) * (1.-0) + 0;
-	const int bot_t_i = bot_t * (1<<18);
-	*(uint16_t*)(regs + 0x004) = bot_t_i & 0xffff;
-	*(uint16_t*)(regs + 0x006) = bot_t_i>>16;
-
-	const double noise = (pow(base, val5/100.0) - 1.)/(base - 1.) * (0.1-0.0039) + 0.0039;
-	const double noise2 = noise*noise;
-	const double inoise = 1./noise/16.;
-
-	const int noise_i = noise * (1<<18);
-	const int noise2_i = noise2 * (1<<18);
-	const int inoise_i = inoise * (1<<18);
-
-	*(uint16_t*)(regs + 0x00c) = noise_i & 0xffff;
-	*(uint16_t*)(regs + 0x00e) = noise_i>>16;
-	*(uint16_t*)(regs + 0x008) = noise2_i & 0xffff;
-	*(uint16_t*)(regs + 0x00a) = noise2_i>>16;
-	*(uint16_t*)(regs + 0x010) = inoise_i & 0xffff;
-	*(uint16_t*)(regs + 0x012) = inoise_i>>16;
-
-
-	log() << "Time thres: " << time_thres << " (0x" << std::hex << time_thres_i << std::dec << 
-			"), spat thres: " << spat_thres << " (0x" << std::hex << spat_thres << std::dec << 
-			"), top temp: " << top_t << " (0x" << std::hex << top_t_i << std::dec << 
-			"), bot temp: " << bot_t << " (0x" << std::hex << bot_t_i << std::dec << 
-			"), noise: " << noise << " (0x" << std::hex << noise_i << std::dec << ")";
+	log() << "Time thres: 0x" << std::hex << val1 <<
+			"), spat thres: 0x" << val2 << 
+			"), top temp: 0x" << val3 <<
+			"), bot temp: 0x" << val4 << 
+			"), noise: 0x" << val5 <<
+			"), noise2: 0x" << val6 << 
+			"), inoise: 0x" << val7 << std::dec;
 
     munmap((void*)map_base, 1024);
     close(fd);

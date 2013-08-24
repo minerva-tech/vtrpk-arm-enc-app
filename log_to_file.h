@@ -8,8 +8,8 @@
 class Log {
 	friend Log& log();
 public:
-    Log() : m_ofs("./log.txt", std::ios_base::app), m_sev_stream(Debug)
-	{ m_ofs << "[" << boost::gregorian::day_clock::local_day() << "]" << std::endl; }
+    Log() : /*m_ofs("./log.txt", std::ios_base::app),*/ m_sev_stream(Debug)
+	{ /*m_ofs << "[" << boost::gregorian::day_clock::local_day() << "]" << std::endl;*/ }
 
 	enum Severity {
 		Dump = 0,
@@ -26,7 +26,7 @@ public:
 		template <typename T>  // BTW, for char[] input it generates different methods for different string len. I.e. log() << "hello" and log() << "hi" are TWO different functions generated. Looks like crap.
 		PrintLine& operator << (const T& v) {
 			if (m_write_to_stream){
-				m_ofs << v;
+//				m_ofs << v;
 				std::cout << v;
 			}
 			return *this;
@@ -35,7 +35,7 @@ public:
 //		template <>
         PrintLine& operator << /*<std::string>*/(const std::string& v) { // qt shit
 			if (m_write_to_stream) {
-				m_ofs << v;
+//				m_ofs << v;
 				std::cout << v;
 			}
 			return *this;
@@ -43,15 +43,15 @@ public:
 
 		~PrintLine() { 
 			if (m_write_to_stream) {
-				m_ofs << std::endl << std::flush;
+//				m_ofs << std::endl << std::flush;
 				std::cout << std::endl << std::flush;
 			}
 		}
 
 	private:
 		template <typename T>
-		PrintLine(const T& v, std::ofstream& ofs, bool write_to_stream) : 
-			m_ofs(ofs), 
+		PrintLine(const T& v, /*std::ofstream& ofs,*/ bool write_to_stream) : 
+//			m_ofs(ofs), 
 			m_write_to_stream(write_to_stream)
 		{
 			std::ostringstream time;
@@ -60,14 +60,14 @@ public:
 			*this << v;
 		}
 
-		std::ofstream& m_ofs;
+//		std::ofstream& m_ofs;
 
 		const bool m_write_to_stream;
 	};
 
 	template <typename T>
 	PrintLine operator<< (const T& v) {
-		return PrintLine(v, m_ofs, Warning >= m_sev_stream);
+		return PrintLine(v, /*m_ofs,*/ Warning >= m_sev_stream);
 	}
 
 //	template <> // when it is uncommented, g++ cannot build this class.
@@ -82,14 +82,14 @@ public:
 private:
     static Log& instance() { static Log log; return log; }
 
-	std::ofstream m_ofs;
+//	std::ofstream m_ofs;
 
 	Severity m_sev_stream;
 };
 
 template <>
 inline Log::PrintLine Log::operator << <Log::Severity> (const Log::Severity& s) { // Severity should always be the first value to operator <<
-    return PrintLine("", m_ofs, s >= m_sev_stream);
+    return PrintLine("", /*m_ofs,*/ s >= m_sev_stream);
 }
 
 inline Log& log() { return Log::instance(); }
