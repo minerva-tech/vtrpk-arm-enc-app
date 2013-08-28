@@ -294,7 +294,7 @@ void Enc::enc_create()
 {
 	m_fxns = H264VENC_TI_IH264VENC;
 
-	load_params("./encoder.cfg");
+	load_params("/mnt/2/encoder.cfg");
 
 	dim_init();
 
