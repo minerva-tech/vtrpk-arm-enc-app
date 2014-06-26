@@ -221,6 +221,19 @@ void restartFpga()
 void initMD()
 {
 	restartFpga();
+
+	int fd;
+
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+		log() << "cannot open /dev/mem. su?";
+		return;
+    }
+
+    void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+
+	uint8_t* regs = (uint8_t*)map_base;
+	
+	*(uint16_t*)(regs + 0x020) = 0x0500; // !!!
 	
 	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
 
@@ -235,17 +248,6 @@ void initMD()
 		return;
 	}
 
-    int fd;
-
-    if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
-		log() << "cannot open /dev/mem. su?";
-		return;
-    }
-
-    void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
-
-	uint8_t* regs = (uint8_t*)map_base;
-	
 	*(uint16_t*)(regs + 0x014) = val1 & 0xffff;
 	*(uint16_t*)(regs + 0x016) = val1 >> 16;
 
