@@ -33,7 +33,7 @@ public:
 	virtual void Stop() {g_stop = true;}
 
 	virtual std::string GetEncCfg() {
-		std::ifstream cfg(std::string("/mnt/2/encoder.cfg"));
+		std::ifstream cfg(std::string("./encoder.cfg"));
 		if (!cfg)
 			return std::string();
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
@@ -41,7 +41,7 @@ public:
 	}
 	
 	virtual std::string GetMDCfg() {
-		std::ifstream cfg(std::string("/mnt/2/md.cfg"));
+		std::ifstream cfg(std::string("./md.cfg"));
 		if (!cfg)
 			return std::string();
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
@@ -49,7 +49,7 @@ public:
 	}
 	
 	virtual std::vector<uint8_t> GetROI() {
-		std::ifstream cfg(std::string("/mnt/2/md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
+		std::ifstream cfg(std::string("./md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
 		if (!cfg)
 			return std::vector<uint8_t>();
 		std::vector<uint8_t> str;
@@ -80,27 +80,27 @@ public:
 	}
 
 	virtual void SetEncCfg(const std::string& str) {
-		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, ""); // yes, MS_MGC_VAL is obsolete. But i don't believe linux at all.
-		std::ofstream cfg(std::string("/mnt/2/encoder.cfg"));
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, ""); // yes, MS_MGC_VAL is obsolete. But i don't believe linux at all.
+		std::ofstream cfg(std::string("./encoder.cfg"));
 		cfg << str;
 		cfg.close();
-		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 	virtual void SetMDCfg(const std::string& str) {
-		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
-		std::ofstream cfg(std::string("/mnt/2/md.cfg"));
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
+		std::ofstream cfg(std::string("./md.cfg"));
 		cfg << str;
 		cfg.close();
-		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 	virtual void SetROI(const std::vector<uint8_t>& str) {
 		if (str.size()<384*144/8) // dirty hack while we have no stable comm channel with error correction.
 			return;
-		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
-		std::ofstream cfg(std::string("/mnt/2/md_roi.dat"));
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
+		std::ofstream cfg(std::string("./md_roi.dat"));
 		cfg.write((char*)&str[0], str.size()*sizeof(str[0]));
 		cfg.close();
-		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 };
 
