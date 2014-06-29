@@ -39,6 +39,11 @@ int main(int argc, char **argv)
 	boost::system::error_code ec;
 
 	port.open(argv[1], ec);
+	
+	if (ec) {
+		printf("Error:%s\n", ec.message().c_str());
+		return 1;
+	}
 
 	const bool flow_control = true;
 
@@ -62,12 +67,18 @@ int main(int argc, char **argv)
 	const long long time_win = 1e6; // usec
 
 	const size_t max_rcv = atoi(argv[4])*time_win/8/1e6; // bytes
+
+	printf("max rcv per time frame: %i bytes\n", max_rcv);
 	
 	while (1) {
 		if (kbhit())
 			break;
 
 		const size_t rcv = port.read_some(asio::buffer(buf), ec);
+		
+		fwrite(&buf[0], 1, rcv, f_out);
+
+//		printf("received %i bytes\n", rcv);
 
 		if (ec)
 			printf("error : %s\n", ec.message().c_str());
@@ -84,6 +95,8 @@ int main(int argc, char **argv)
 		}
 
 		overall_rcv += rcv;
+		
+		printf("received %i bytes per %i us\n", overall_rcv, time_passed);
 
 		if (overall_rcv > max_rcv) { // sleep till end of time win.
 			const int hnd = port.native_handle();
@@ -94,9 +107,11 @@ int main(int argc, char **argv)
 			
 			const timespec time_till_next_time_win = {
 				(time_win - time_passed)/1000000,
-				(time_win - time_passed)%1000000,
+				(time_win - time_passed)%1000000*1000,
 			};
-			
+		
+			printf("waiting %i sec, %i ns\n", time_till_next_time_win.tv_sec, time_till_next_time_win.tv_nsec);
+	
 			nanosleep(&time_till_next_time_win, nullptr); // i don't care about &rem
 			
 			val = TIOCM_CTS;

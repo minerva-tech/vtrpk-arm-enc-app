@@ -96,6 +96,8 @@
     <File Name="enc.h"/>
     <File Name="main.cpp"/>
     <File Name="cmem.h"/>
+    <File Name="proto.cpp"/>
+    <File Name="proto.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

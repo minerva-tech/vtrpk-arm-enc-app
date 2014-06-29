@@ -1,15 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <CodeLite_Workspace Name="enc_console" Database="./enc_console.tags">
   <Project Name="enc_console" Path="enc_console.project" Active="Yes"/>
-  <Project Name="enc_sample" Path="../dm365/enc/h264enc/apps/client/test/src/enc_sample.project" Active="No"/>
+  <Project Name="recv_test" Path="recv_test/recv_test.project" Active="No"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Project Name="enc_console" ConfigName="Debug"/>
       <Project Name="enc_sample" ConfigName="Debug"/>
+      <Project Name="recv_test" ConfigName="Debug"/>
     </WorkspaceConfiguration>
     <WorkspaceConfiguration Name="Release" Selected="yes">
       <Project Name="enc_console" ConfigName="Release"/>
       <Project Name="enc_sample" ConfigName="Release"/>
+      <Project Name="recv_test" ConfigName="Release"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
 </CodeLite_Workspace>

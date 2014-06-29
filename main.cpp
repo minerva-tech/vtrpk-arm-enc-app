@@ -192,22 +192,22 @@ void restartFpga()
 	uint16_t* p = (uint16_t*)map_base;
 	for(int i = 0; i<regs_num; i++)
 		regs[i] = *p++;
-
-/*	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
-	fprintf(fexport, "92");
+/*
+	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
+	fprintf(fexport, "8");
 	fclose(fexport);
 	
-	FILE* fdir = fopen("/sys/class/gpio/gpio92/direction", "wt");
+	FILE* fdir = fopen("/sys/class/gpio/gpio8/direction", "wt");
 	fprintf(fdir, "out");
 	fclose(fdir);
 
-	FILE* fval = fopen("/sys/class/gpio/gpio92/value", "wb");
+	FILE* fval = fopen("/sys/class/gpio/gpio8/value", "wb");
 	fprintf(fval, "0\n");
 	fflush(fval);
 	boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
 	fprintf(fval, "1\n");
 	fclose(fval);
-	boost::this_thread::sleep_for(boost::chrono::milliseconds(750));
+	boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
 */
 	p = (uint16_t*)map_base;
 	log() << "Firmware version: " << std::hex << *(p+0x2e/2) << std::dec;
@@ -462,6 +462,8 @@ void run()
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
 
+//		log() << "Frame captured.";
+
 		size_t coded_size=0;
 
 		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
@@ -477,6 +479,8 @@ void run()
 		const ptrdiff_t info_size = cur - &info_out[0];
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
+
+//		log() << "Coded size: " << coded_size;
 
 		if (coded_size) {
 			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
