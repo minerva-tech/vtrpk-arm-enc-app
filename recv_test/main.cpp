@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	struct timespec clock_start;
 	clock_gettime(CLOCK_REALTIME, &clock_start); // anyway it's not portable due to ioctl
 	
-	const long long time_win = 1e6; // usec
+	const long long time_win = 20*1e6; // usec
 
 	const size_t max_rcv = atoi(argv[4])*time_win/8/1e6; // bytes
 
@@ -102,8 +102,12 @@ int main(int argc, char **argv)
 			const int hnd = port.native_handle();
 
 			// termios should be more portable, but there is still no such header in win (even while it's POSIX? Not sure right now), so, ioctl
-			int val = TIOCM_CTS;
-			ioctl(hnd, TIOCMBIC, &val);
+			int val = 0;
+			ioctl(hnd, TIOCMGET, &val);
+			val &= ~(TIOCM_CTS | TIOCM_RTS);
+			ioctl(hnd, TIOCMSET, &val);
+			
+			printf("err: %i\n", errno);
 			
 			const timespec time_till_next_time_win = {
 				(time_win - time_passed)/1000000,
@@ -114,8 +118,10 @@ int main(int argc, char **argv)
 	
 			nanosleep(&time_till_next_time_win, nullptr); // i don't care about &rem
 			
-			val = TIOCM_CTS;
-			ioctl(hnd, TIOCMBIS, &val);
+			val = 0;
+			ioctl(hnd, TIOCMGET, &val);
+			val |= TIOCM_CTS | TIOCM_RTS;
+			ioctl(hnd, TIOCMSET, &val);
 		}
 	}
 	

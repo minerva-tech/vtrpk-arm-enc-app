@@ -267,6 +267,8 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 {
 	if (e)
 		log() << Log::Error << "Transmission error occurred: " << e;
+		
+	log() << "Transmission finished";
 
 	{
 		lock_guard<mutex> _(m_transmit_lock);

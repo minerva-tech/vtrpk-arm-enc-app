@@ -233,7 +233,7 @@ void initMD()
 
 	uint8_t* regs = (uint8_t*)map_base;
 	
-	*(uint16_t*)(regs + 0x020) = 0x0500; // !!!
+//	*(uint16_t*)(regs + 0x020) = 0x0500; // !!!
 	
 	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
 
@@ -462,7 +462,7 @@ void run()
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
 
-//		log() << "Frame captured.";
+		log() << "Frame captured.";
 
 		size_t coded_size=0;
 
@@ -480,7 +480,7 @@ void run()
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
-//		log() << "Coded size: " << coded_size;
+		log() << "Coded size: " << coded_size;
 
 		if (coded_size) {
 			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
