@@ -34,12 +34,15 @@
  *  ======== config.bld ========
  */
 /* location of the Codec Sourcery Arm9 tools */
-var GCArmv5T = xdc.useModule('gnu.targets.arm.GCArmv5T');
+/*var GCArmv5T = xdc.useModule('gnu.targets.arm.GCArmv5T');*/
+var UCArm9 = xdc.useModule('gnu.targets.UCArm9');
 /*GCArmv5T.LONGNAME = 'bin/arm-none-linux-gnueabi-gcc';*/
-GCArmv5T.LONGNAME = 'bin/arm-unknown-linux-gnueabi-gcc';
+/*GCArmv5T.LONGNAME = 'bin/arm-unknown-linux-uclibcgnueabi-gcc';*/
+UCArm9.LONGNAME = 'bin/arm-unknown-linux-uclibcgnueabi-gcc';
 /*GCArmv5T.platform = "ti.platforms.evm3530";*/
 /*GCArmv5T.rootDir = "/home/kov/dm365/buildroot/output/host/usr";*/
-GCArmv5T.rootDir = "/home/a/x-tools/arm-unknown-linux-gnueabi";
+/*GCArmv5T.rootDir = "/home/a/Documents/VRTPK/vtrpk-build-tools/output/host/usr";*/
+UCArm9.rootDir = "/home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/buildroot/output/host/usr";
 /*GCArmv5T.rootDir = "/usr";*/
 
 /*
