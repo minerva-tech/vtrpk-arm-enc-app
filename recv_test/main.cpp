@@ -1,5 +1,6 @@
 #include <termios.h>
 #include <time.h>
+#include <linux/serial.h>
 
 #include <stdio.h>
 #include <boost/asio.hpp>
@@ -64,7 +65,7 @@ int main(int argc, char **argv)
 	struct timespec clock_start;
 	clock_gettime(CLOCK_REALTIME, &clock_start); // anyway it's not portable due to ioctl
 	
-	const long long time_win = 20*1e6; // usec
+	const long long time_win = 500 * 1e3; // usec
 
 	const size_t max_rcv = atoi(argv[4])*time_win/8/1e6; // bytes
 
@@ -90,16 +91,29 @@ int main(int argc, char **argv)
 											(clock_start.tv_nsec/1000 + clock_start.tv_sec*1000000);
 
 		if (time_passed >= time_win) {
+			printf("bitrate in current time slot: %i bps\n", overall_rcv*8*1000000 / time_passed);
 			clock_start = clock_cur;
 			overall_rcv = 0;
 		}
 
 		overall_rcv += rcv;
-		
-		printf("received %i bytes per %i us\n", overall_rcv, time_passed);
 
+//		printf("received %i bytes per %i us\n", overall_rcv, time_passed);
+/*
+		const int hnd = port.native_handle();
+
+		struct serial_struct serial_str;
+		ioctl(hnd, TIOCGSERIAL, &serial_str);
+			
+		printf("buf size: %i\n", serial_str.xmit_fifo_size);
+*/
 		if (overall_rcv > max_rcv) { // sleep till end of time win.
-			const int hnd = port.native_handle();
+/*			const int hnd = port.native_handle();
+
+			struct serial_struct serial_str;
+			ioctl(hnd, TIOCGSERIAL, &serial_str);
+			
+			printf("buf size: %i\n", serial_str.xmit_fifo_size);
 
 			// termios should be more portable, but there is still no such header in win (even while it's POSIX? Not sure right now), so, ioctl
 			int val = 0;
@@ -108,20 +122,21 @@ int main(int argc, char **argv)
 			ioctl(hnd, TIOCMSET, &val);
 			
 			printf("err: %i\n", errno);
-			
+*/			
 			const timespec time_till_next_time_win = {
 				(time_win - time_passed)/1000000,
 				(time_win - time_passed)%1000000*1000,
 			};
-		
+
 			printf("waiting %i sec, %i ns\n", time_till_next_time_win.tv_sec, time_till_next_time_win.tv_nsec);
-	
+
 			nanosleep(&time_till_next_time_win, nullptr); // i don't care about &rem
-			
+/*			
 			val = 0;
 			ioctl(hnd, TIOCMGET, &val);
 			val |= TIOCM_CTS | TIOCM_RTS;
 			ioctl(hnd, TIOCMSET, &val);
+*/
 		}
 	}
 	

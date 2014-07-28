@@ -24,6 +24,7 @@ extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long 
 
 volatile bool g_stop = false;
 int g_chroma_value = 0x80;
+bool g_dump_yuv = false;
 
 class ServerCmds : public IServerCmds
 {
@@ -233,7 +234,7 @@ void initMD()
 
 	uint8_t* regs = (uint8_t*)map_base;
 	
-//	*(uint16_t*)(regs + 0x020) = 0x0500; // !!!
+//	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
 	
 	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
 
@@ -426,8 +427,8 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 
 void run()
 {
-	const int w = 384;
-	const int h = 144;
+	const int w = 320;
+	const int h = 128;
 
 	const int to_skip = 5; // how much frames should be skipped after captured one to reduce framerate.
 
@@ -436,7 +437,7 @@ void run()
 
 	Enc enc;
 
-	Cap cap(384, 288);
+	Cap cap(320, 256);
 
 	cap.start_streaming();
 
@@ -459,10 +460,19 @@ void run()
 //	FILE* f_dump = fopen("dump.h264", "wb");
 //FILE* f_dump_info = fopen("dump.anal", "wb");
 
+	FILE* f_dump_yuv = NULL;
+
+	if (g_dump_yuv)
+		f_dump_yuv = fopen("dump.yuv", "wb");
+
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
 
 		log() << "Frame captured.";
+		
+		if (g_dump_yuv) {
+			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
+		}
 
 		size_t coded_size=0;
 
@@ -496,6 +506,9 @@ void run()
 			cap.putFrame(buf);
 		}
 	}
+
+	if (g_dump_yuv)
+		fclose(f_dump_yuv);
 	
 //	fclose(f_dump);
 //fclose(f_dump_info);
@@ -522,7 +535,8 @@ int main(int argc, char *argv[])
 		Enc::rman_init();
 
 		if (argc == 4)
-			g_chroma_value = atoi(argv[3]);
+			g_dump_yuv = true;
+		//	g_chroma_value = atoi(argv[3]);
 
 		while(1) {
 			try {
