@@ -28,10 +28,12 @@ struct XDM_Buf {
 
 class Enc {
 public:
-	Enc();
+	Enc(const std::string& config);
 	~Enc();
 
 	XDAS_Int8* encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size);
+	
+	void changeBitrate(int new_bitrate);
 
 	static void rman_init(); // unfortunately i wasn't able to init/exit RMAN each time when encoder restarted. So it's init once, when app is started. Yes, it's ugly.
 
@@ -40,8 +42,8 @@ private:
 	IH264VENC_Fxns			m_fxns;
 	H264VENC_Params			m_params;
 	H264VENC_DynamicParams	m_dynamicparams;
-	H264VENC_InArgs 		m_inargs;
-	H264VENC_OutArgs 		m_outargs;
+	H264VENC_InArgs 			m_inargs;
+	H264VENC_OutArgs 			m_outargs;
 
 	int 					m_uiNumFramesToBeEncoded;
 
@@ -61,9 +63,9 @@ private:
 	void cache_init();
 	void ires_init();
 	void mem_init();
-	void load_params(const std::string& fname);
+	void load_params(const std::string& config);
 	void dynamicparams_init();
-	void enc_create();
+	void enc_create(const std::string& config);
 	void dim_init();
 	void check_warnings();
 };

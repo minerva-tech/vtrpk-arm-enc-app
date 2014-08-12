@@ -49,6 +49,8 @@ extern "C" {
 #include "enc.h"
 #include "error_msg.h"
 
+#include "defines.h"
+
 #define _ENABLE_IRES_EDMA3
 
 
@@ -82,7 +84,7 @@ void ARM926_Dcache_Disable()
 	return;
 }
 
-Enc::Enc()
+Enc::Enc(const std::string& config)
 {
 //	init();
 
@@ -90,7 +92,7 @@ Enc::Enc()
 
 	ires_init();
 
-	enc_create();
+	enc_create(config);
 }
 
 Enc::~Enc()
@@ -144,10 +146,29 @@ XDAS_Int8* Enc::encFrame(XDAS_Int8* in, int width, int height, int stride, size_
 	return m_outargs.videncOutArgs.encodedBuf.buf;
 }
 
+void Enc::changeBitrate(int delta_bitrate)
+{	
+	if (abs(delta_bitrate) > BITRATE_BIAS) {
+		const int new_bitrate = m_dynamicparams.videncDynamicParams.targetBitRate+delta_bitrate;
+		
+		m_dynamicparams.videncDynamicParams.targetBitRate = new_bitrate;
+
+		H264VENC_Status status;
+		status.videncStatus.size = sizeof(IH264VENC_Status);
+
+		if(H264VENC_control(m_handle, XDM_SETPARAMS, &m_dynamicparams, &status) == XDM_EFAIL) { // TODO: Is it possible to change only one dynamic parameter? I believe yes, but have no doc here to check.
+			log() << "Error code : 0x" << std::hex << (int)status.videncStatus.extendedError << std::dec;
+			throw ex("Set Encoder parameters Command Failed " + printErrorMsg(status.videncStatus.extendedError));
+		}
+		
+		log() << "Due to data channel state, AVC target bitrate was changed to " << new_bitrate << " bps";
+	}
+}
+
 void Enc::copyInputBuf(XDAS_Int8* in, int width, int height, int stride)
 {
 	width 	= std::min(width,  m_uiExtWidth);
-	height 	= std::min(height, m_uiExtHeight);
+	height = std::min(height, m_uiExtHeight);
 
 	XDAS_Int8* Y  = m_inBuf.bufDesc[0].buf;
 	XDAS_Int8* UV = m_inBuf.bufDesc[1].buf;
@@ -290,11 +311,11 @@ void Enc::mem_init()
 	}
 }
 
-void Enc::enc_create()
+void Enc::enc_create(const std::string& config)
 {
 	m_fxns = H264VENC_TI_IH264VENC;
 
-	load_params("./encoder.cfg");
+	load_params(config);
 
 	dim_init();
 
@@ -555,7 +576,7 @@ void Enc::ires_init()
 #endif //DM365_IPC_INTC_ENABLE
 }
 
-void Enc::load_params(const std::string& fname)
+void Enc::load_params(const std::string& config)
 {
     /* Point the param pointer to default parameters from encoder */
     m_params = H264VENC_PARAMS;
@@ -858,16 +879,11 @@ void Enc::load_params(const std::string& fname)
     /*                    READ INPUT CONFIG FILE                          */
     /*--------------------------------------------------------------------*/
 
-    FILE* pfConfigParamsFile = fopen(fname.c_str(), "r");
-
-    if(!pfConfigParamsFile)
-    	throw ex("CODEC_DEBUG_ENABLE: ERROR! - Could Not open Config File");
-
 //    throw ex("CODEC_DEBUG_ENABLE: ERROR! - Could Not open Config File"); // test
 
     log() << "CODEC_DEBUG_ENABLE: Reading Configuration file";
 
-    if(!readparamfile(pfConfigParamsFile, sTokenMap))
+    if(!readparamfile(config, sTokenMap))
     	throw ex("CODEC_DEBUG_ENABLE: ERROR! - Unable to read Config File");
 
 #ifdef BASE_PARAMS

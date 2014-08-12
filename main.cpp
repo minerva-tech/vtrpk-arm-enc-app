@@ -13,6 +13,8 @@
 #include "cap.h"
 #include "enc.h"
 #include "proto.h"
+
+#include "defines.h"
 /*
 extern "C" {
 #include "tables.h"
@@ -34,30 +36,90 @@ public:
 	virtual void Stop() {g_stop = true;}
 
 	virtual std::string GetEncCfg() {
-		std::ifstream cfg(std::string("./encoder.cfg"));
+		std::ifstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return std::string();
+
+		eeprom.seekg(encoder_config_offset, std::ios_base::beg);
+
+		uint32_t size = 0;
+		eeprom.read((char*)&size, sizeof(size));
+		
+		if (size > encoder_config_max_size)
+			return std::string();
+
+		std::string str;
+		str.resize(size);
+
+		eeprom.read(&str[0], str.size()*sizeof(str[0]));
+
+		return str;
+
+/*		std::ifstream cfg(std::string("./encoder.cfg"));
 		if (!cfg)
 			return std::string();
-		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
-		return str;
+		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>())); // why?
+		return str;*/
 	}
 	
 	virtual std::string GetMDCfg() {
-		std::ifstream cfg(std::string("./md.cfg"));
+		std::ifstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return std::string();
+
+		eeprom.seekg(md_config_offset, std::ios_base::beg);
+
+		uint32_t size = 0;
+		eeprom.read((char*)&size, sizeof(size));
+
+		log() << "MD config size: " << size;
+
+		if (size > md_config_max_size)
+			return std::string();
+
+		std::string str;
+		str.resize(size);
+
+		eeprom.read(&str[0], str.size()*sizeof(str[0]));
+		
+		return str;
+
+/*		std::ifstream cfg(std::string("./md.cfg"));
 		if (!cfg)
 			return std::string();
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
-		return str;		
+		return str;*/
 	}
 	
 	virtual std::vector<uint8_t> GetROI() {
-		std::ifstream cfg(std::string("./md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
+		std::ifstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return std::vector<uint8_t>();
+
+		eeprom.seekg(roi_config_offset, std::ios_base::beg);
+
+		uint32_t size = 0;
+		eeprom.read((char*)&size, sizeof(size));
+		
+		if (size > roi_config_max_size)
+			return std::vector<uint8_t>();
+
+		std::vector<uint8_t> str;
+		str.resize(size);
+
+		eeprom.read((char*)&str[0], str.size()*sizeof(str[0]));
+		
+		return str;
+
+
+/*		std::ifstream cfg(std::string("./md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
 		if (!cfg)
 			return std::vector<uint8_t>();
 		std::vector<uint8_t> str;
 		str.resize(cfg.tellg());
 		cfg.seekg(std::ios_base::beg);
 		cfg.read((char*)&str[0], str.size()*sizeof(str[0]));
-		return str;
+		return str;*/
 	}
 	
 	virtual uint16_t GetRegister(uint8_t addr) {
@@ -81,27 +143,69 @@ public:
 	}
 
 	virtual void SetEncCfg(const std::string& str) {
+		if (str.size() > encoder_config_max_size)
+			return;
+			
+		std::ofstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return;
+
+		eeprom.seekp(encoder_config_offset, std::ios_base::beg);
+
+		const int size = str.size();
+		eeprom.write((char*)&size, sizeof(size));
+
+		eeprom.write(&str[0], str.size()*sizeof(str[0]));
+
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, ""); // yes, MS_MGC_VAL is obsolete. But i don't believe linux at all.
-		std::ofstream cfg(std::string("./encoder.cfg"));
+/*		std::ofstream cfg(std::string("./encoder.cfg"));
 		cfg << str;
-		cfg.close();
+		cfg.close();*/
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 	virtual void SetMDCfg(const std::string& str) {
+		if (str.size() > md_config_max_size)
+			return;
+		
+		std::ofstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return;
+
+		eeprom.seekp(md_config_offset, std::ios_base::beg);
+
+		const int size = str.size();
+		eeprom.write((char*)&size, sizeof(size));
+
+		eeprom.write(&str[0], str.size()*sizeof(str[0]));
+
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
-		std::ofstream cfg(std::string("./md.cfg"));
+/*		std::ofstream cfg(std::string("./md.cfg"));
 		cfg << str;
-		cfg.close();
+		cfg.close();*/
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 	virtual void SetROI(const std::vector<uint8_t>& str) {
-		if (str.size()<384*144/8) // dirty hack while we have no stable comm channel with error correction.
+		if (str.size() > roi_config_max_size)
+			return;
+		
+		std::ofstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return;
+
+		eeprom.seekp(roi_config_offset, std::ios_base::beg);
+
+		const int size = str.size();
+		eeprom.write((char*)&size, sizeof(size));
+
+		eeprom.write((char*)&str[0], str.size()*sizeof(str[0]));
+
+/*		if (str.size()<384*144/8) // dirty hack while we have no stable comm channel with error correction.
 			return;
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
 		std::ofstream cfg(std::string("./md_roi.dat"));
 		cfg.write((char*)&str[0], str.size()*sizeof(str[0]));
 		cfg.close();
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
+//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");*/
 	}
 };
 
@@ -236,7 +340,11 @@ void initMD()
 	
 //	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
 	
-	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
+//	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
+
+	ServerCmds tmp_cmds;
+	std::string md_cfg = tmp_cmds.GetMDCfg();
+	std::stringstream cfg(md_cfg);
 
 	int val1 = -1, val2 = -1, val3 = -1, val4 = -1, val5 = -1, val6 = -1, val7 = -1;
 
@@ -344,54 +452,6 @@ void readStartcode(const volatile uint16_t* reg, int thres)
 		log() << "Startcode wasn't found";
 }
 
-void fillInfoFromFifo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, int w, int s, int h)
-{
-	std::vector<uint8_t>::iterator it_info = info.begin();
-	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
-
-    int fd;
-
-    if ((fd = open("/dev/mem", O_RDONLY | O_SYNC)) == -1) {
-		log() << "cannot open /dev/mem. su?";
-		return;
-    }
-
-    void * volatile map_base = mmap(0, 1024, PROT_READ, MAP_SHARED, fd, 0x04000000);
-
-	const ptrdiff_t offset = 0x0030;
-
-	readStartcode((uint16_t*)((uint8_t*)map_base + offset), w*h*2/8+12);
-
-	for (int y=0; y<h*2; y+=2) {
-		for(int i=0; i<w/8; i+=2) {
-			const uint16_t val = *(volatile uint16_t*)((uint8_t*)map_base + offset);
-
-			if (val == 0xFAAC || val == 0xACFA)
-				log() << "FAAC!!!";
-
-			*(uint16_t*)&*it_info = val; // бгыыы
-			it_info += 2;
-
-//			*it_info++ = val & 0x0ff;
-//			*it_info++ = val >> 8;
-		}
-
-		for(int i=0; i<w/8; i+=2) {
-			const uint16_t val = *(volatile uint16_t*)((uint8_t*)map_base + offset);
-
-			if (val == 0xFAAC || val == 0xACFA)
-				log() << "FAAC!!!";
-		}
-	}
-
-    munmap((void*)map_base, 1024);
-    close(fd);
-
-//	while (it_info != info.end())
-//		*it_info++ = *it_info_mask++;
-//		*it_info++ &= *it_info_mask++;
-}
-
 void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h, int chroma_val)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
@@ -427,17 +487,22 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 
 void run()
 {
-	const int w = 320;
-	const int h = 128;
+	const int w = TARGET_WIDTH;
+	const int h = TARGET_HEIGHT;
 
-	const int to_skip = 5; // how much frames should be skipped after captured one to reduce framerate.
+	const int to_skip = 0; // how much frames should be skipped after captured one to reduce framerate.
+	
+	const int transmittion_rate_check_interval = 2; // amount of frames to send before checking average transmittion rate.
 
 	while(g_stop)
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
 
-	Enc enc;
+	ServerCmds tmp_cmds;
+	std::string enc_cfg = tmp_cmds.GetEncCfg();
 
-	Cap cap(320, 256);
+	Enc enc(enc_cfg);
+
+	Cap cap(SRC_WIDTH, SRC_HEIGHT);
 
 	cap.start_streaming();
 
@@ -464,6 +529,11 @@ void run()
 
 	if (g_dump_yuv)
 		f_dump_yuv = fopen("dump.yuv", "wb");
+
+	int frames_before_rate_check = transmittion_rate_check_interval;
+	struct timespec clock_cur;
+	clock_gettime(CLOCK_REALTIME, &clock_cur);
+	int start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
 
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
@@ -505,6 +575,29 @@ void run()
 			v4l2_buffer buf = cap.getFrame();
 			cap.putFrame(buf);
 		}
+
+		if (--frames_before_rate_check == 0) {
+			int t_rate = Comm::instance().getTransmissionRate();
+			log() << "transmission rate : " << t_rate;
+
+			struct timespec clock_cur;
+			clock_gettime(CLOCK_REALTIME, &clock_cur);
+			const int t_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
+
+			int buffered_size = Comm::instance().getBufferedSize();
+
+			const int d_video_rate = t_rate - buffered_size*1000 / t_time_ms;
+
+			log() << "Data bufferized : " << buffered_size << " Time : " << t_time_ms << " Video rate delta : " << d_video_rate;
+
+		//	enc.changeBitrate(d_video_rate);
+
+			Comm::instance().resetTransmissionRate();
+			frames_before_rate_check = transmittion_rate_check_interval;
+
+			clock_gettime(CLOCK_REALTIME, &clock_cur);
+			start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
+		}			
 	}
 
 	if (g_dump_yuv)
@@ -544,6 +637,10 @@ int main(int argc, char *argv[])
 			}
 			catch (ex& e) {
 				log() << e.str();
+				g_stop = true;
+			}
+			catch(std::exception& e) {
+				log() << "std::exception: " << e.what();
 				g_stop = true;
 			}
 		}

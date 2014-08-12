@@ -29,6 +29,8 @@
 #include "log_to_file.h"
 #include "cap.h"
 
+#include "defines.h"
+
 #define ALIGN(x, y)	(((x + (y-1))/y)*y)
 
 const int CODE = V4L2_MBUS_FMT_YUYV8_2X8;
@@ -524,7 +526,7 @@ void Cap::set_formats()
 
 	log() << "setting format on source-pad of rsz entity.";
 
-	f = fmt(P_RSZ_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, V4L2_MBUS_FMT_NV12_1X20, 320, 128, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+	f = fmt(P_RSZ_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, V4L2_MBUS_FMT_NV12_1X20, TARGET_WIDTH, TARGET_HEIGHT, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_rsz_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", f.pad);
@@ -537,8 +539,8 @@ void Cap::set_formats()
 	memset(&v4l2_fmt, 0, sizeof(v4l2_fmt));
 
 	v4l2_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	v4l2_fmt.fmt.pix.width = 320;
-	v4l2_fmt.fmt.pix.height = 128;
+	v4l2_fmt.fmt.pix.width = TARGET_WIDTH;
+	v4l2_fmt.fmt.pix.height = TARGET_HEIGHT;
 	//v4l2_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_UYVY;
 	v4l2_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_NV12;
 	v4l2_fmt.fmt.pix.field = V4L2_FIELD_NONE;

@@ -225,14 +225,16 @@ XDAS_Int32 GetConfigFileContent (FILE *fname, xdc_Char* buf)
 *@note
 */
 /*===========================================================================*/
-XDAS_Int32 readparamfile(FILE * fname, const sTokenMapping* tokenMap)
+XDAS_Int32 readparamfile(const std::string& config, const sTokenMapping* tokenMap)
 {
     xdc_Char *FileBuffer = new xdc_Char[CFG_FILE_MAX_SIZE];
     XDAS_Int32 retVal = 1;
 
     /* read the content in a buffer */
-    if(GetConfigFileContent(fname, FileBuffer) >= 0)
-        ParseContent(FileBuffer,strlen(FileBuffer), tokenMap);
+//    if(GetConfigFileContent(config, FileBuffer) >= 0)
+	memcpy(FileBuffer, config.c_str(), std::min(config.size(), (size_t)CFG_FILE_MAX_SIZE));
+
+	ParseContent(FileBuffer,strlen(FileBuffer), tokenMap);
 
     log() << "delete config file buffer";
 

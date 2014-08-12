@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	const bool flow_control = true;
+	const bool flow_control = false;
 
 	port.set_option(asio::serial_port::baud_rate(atoi(argv[2])));
 	port.set_option(asio::serial_port::character_size(8));
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	struct timespec clock_start;
 	clock_gettime(CLOCK_REALTIME, &clock_start); // anyway it's not portable due to ioctl
 	
-	const long long time_win = 500 * 1e3; // usec
+	const long long time_win = 10000 * 1e3; // usec
 
 	const size_t max_rcv = atoi(argv[4])*time_win/8/1e6; // bytes
 
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 		struct timespec clock_cur;
 		clock_gettime(CLOCK_REALTIME, &clock_cur);
 		
-		const long long time_passed = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) -  // to usec
+		const long long time_passed = 	(clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) -  // to usec
 											(clock_start.tv_nsec/1000 + clock_start.tv_sec*1000000);
 
 		if (time_passed >= time_win) {
@@ -108,21 +108,28 @@ int main(int argc, char **argv)
 		printf("buf size: %i\n", serial_str.xmit_fifo_size);
 */
 		if (overall_rcv > max_rcv) { // sleep till end of time win.
-/*			const int hnd = port.native_handle();
+			const int hnd = port.native_handle();
 
-			struct serial_struct serial_str;
-			ioctl(hnd, TIOCGSERIAL, &serial_str);
+//			struct serial_struct serial_str;
+//			ioctl(hnd, TIOCGSERIAL, &serial_str);
 			
-			printf("buf size: %i\n", serial_str.xmit_fifo_size);
+//			printf("buf size: %i\n", serial_str.xmit_fifo_size);
 
 			// termios should be more portable, but there is still no such header in win (even while it's POSIX? Not sure right now), so, ioctl
 			int val = 0;
-			ioctl(hnd, TIOCMGET, &val);
+			int ret = ioctl(hnd, TIOCMGET, &val);
+			if (ret == -1)
+				printf("ioctl error\n");
+//			val |= TIOCM_CTS | TIOCM_RTS;
 			val &= ~(TIOCM_CTS | TIOCM_RTS);
-			ioctl(hnd, TIOCMSET, &val);
+			ret = ioctl(hnd, TIOCMSET, &val);
+			if (ret == -1)
+				printf("ioctl error\n");
+			ioctl(hnd, TIOCMGET, &val);
+			printf("TIOCM_CTS set(%x)\n",val);
 			
 			printf("err: %i\n", errno);
-*/			
+			
 			const timespec time_till_next_time_win = {
 				(time_win - time_passed)/1000000,
 				(time_win - time_passed)%1000000*1000,
@@ -131,12 +138,18 @@ int main(int argc, char **argv)
 			printf("waiting %i sec, %i ns\n", time_till_next_time_win.tv_sec, time_till_next_time_win.tv_nsec);
 
 			nanosleep(&time_till_next_time_win, nullptr); // i don't care about &rem
-/*			
+			
 			val = 0;
-			ioctl(hnd, TIOCMGET, &val);
+			ret = ioctl(hnd, TIOCMGET, &val);
+			if (ret == -1)
+				printf("ioctl error\n");
 			val |= TIOCM_CTS | TIOCM_RTS;
-			ioctl(hnd, TIOCMSET, &val);
-*/
+//			val &= ~(TIOCM_CTS | TIOCM_RTS);
+			ret = ioctl(hnd, TIOCMSET, &val);
+			if (ret == -1)
+				printf("ioctl error\n");
+			ioctl(hnd, TIOCMGET, &val);
+			printf("TIOCM_CTS reset (%x)\n", val);
 		}
 	}
 	

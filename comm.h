@@ -95,6 +95,10 @@ public:
 	void transmit_and_close();
 
 	std::vector<std::pair<std::string, uint32_t> > getStat();
+	
+	int getTransmissionRate();
+	int getBufferedSize();
+	void resetTransmissionRate();
 
 private:
 //	static Comm* m_this;
@@ -140,6 +144,11 @@ private:
 //	std::vector<Pkt>::iterator m_out_cur;
 //	int m_out_ff_idx;
 	bool m_sending_in_progress;
+	
+	long long m_send_start_us;
+	long long m_sending_time_us;
+	size_t m_send_size;
+	size_t m_buffered_size;
 
 	Buf m_in_buf[2]; // it's not necessary indeed. single buffer is enough. and async_read_some() goes till current reading pointer
 	int m_in_ff_idx;

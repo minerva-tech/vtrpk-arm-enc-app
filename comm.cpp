@@ -99,6 +99,8 @@ Comm::Comm() :
 	m_out_buf(out_buf_size),
 	m_start(boost::chrono::steady_clock::now()),
 	m_sending_in_progress(false),
+	m_sending_time_us(0),
+	m_send_size(0),
 	m_in_ff_idx(0),
 	m_cur(m_in_buf[m_in_ff_idx].begin()),
 	m_remains(0)
@@ -217,6 +219,8 @@ void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 {
 	const uint8_t* pend = p+size;
 
+	m_buffered_size += size;
+
 	while (p != pend) {
 
 		if (m_out_buf.full())
@@ -257,6 +261,10 @@ void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 		m_out_buf.push_back(Pkt(id, size, p));
 
 		if (!m_sending_in_progress) {
+			struct timespec clock_cur;
+			clock_gettime(CLOCK_REALTIME, &clock_cur);
+			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
+
 			m_sending_in_progress = true;
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		}
@@ -267,6 +275,12 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 {
 	if (e)
 		log() << Log::Error << "Transmission error occurred: " << e;
+
+	m_send_size += size;
+
+	struct timespec clock_cur;
+	clock_gettime(CLOCK_REALTIME, &clock_cur);
+	m_sending_time_us += (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) - m_send_start_us;
 		
 	log() << "Transmission finished";
 
@@ -275,11 +289,35 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 
 		m_out_buf.taken(size);
 
-		if (!m_out_buf.empty())
+		if (!m_out_buf.empty()) {
+			struct timespec clock_cur;
+			clock_gettime(CLOCK_REALTIME, &clock_cur); // TODO: boost::chrono. Now it can't be built in MSVC.
+			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
+
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
-		else
+		} else {
 			m_sending_in_progress = false;
+		}
 	}
+}
+
+int Comm::getTransmissionRate()
+{
+	return m_send_size*8e6 / m_sending_time_us;
+}
+
+int Comm::getBufferedSize()
+{
+	return m_buffered_size*8;
+}
+
+void Comm::resetTransmissionRate()
+{
+	m_send_size = 0;
+	m_sending_time_us = 0;
+	m_buffered_size = 0;
+	
+	return;
 }
 
 /*
@@ -403,7 +441,7 @@ std::vector<std::pair<std::string, uint32_t> > Comm::getStat()
 
 	times.push_back(std::pair<std::string, uint32_t>("Command bitrate: ", 		(m_recv_amount[0]+0.5)/count));
 	times.push_back(std::pair<std::string, uint32_t>("Video bitrate: ", 		(m_recv_amount[1]+0.5)/count));
-	times.push_back(std::pair<std::string, uint32_t>("Detector bitrate: ", 		(m_recv_amount[2]+0.5)/count));
+	times.push_back(std::pair<std::string, uint32_t>("Detector bitrate: ", 	(m_recv_amount[2]+0.5)/count));
 	times.push_back(std::pair<std::string, uint32_t>("Auxiliary bitrate: ", 	(m_recv_amount[3]+0.5)/count));
 
 	memset(m_recv_amount, 0, sizeof(m_recv_amount));

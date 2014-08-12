@@ -9,6 +9,7 @@
 #define READ_PARAMS_H_
 
 #include <stdio.h>
+#include <string>
 
 const int CFG_MAX_ITEMS_TO_PARSE = 1000;
 const int CFG_FILE_MAX_SIZE = 20000;
@@ -21,6 +22,6 @@ struct sTokenMapping
 };
 
 //XDAS_Int32 ParseContent (xdc_Char *buf, XDAS_Int32 bufsize);
-XDAS_Int32 readparamfile(FILE * fname, const sTokenMapping* tokenMap);
+XDAS_Int32 readparamfile(const std::string& config, const sTokenMapping* tokenMap);
 
 #endif /* READ_PARAMS_H_ */

@@ -11,9 +11,10 @@
 #include <ctype.h>
 #include <string.h>
 #include "jbig85.h"
+#include "defines.h"
 
-#define FRAME_WIDTH 384
-#define FRAME_HEGHT 288
+//#define FRAME_WIDTH 320
+//#define FRAME_HEGHT 256
 
 
 /*
