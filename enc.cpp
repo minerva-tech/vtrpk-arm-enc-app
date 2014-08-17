@@ -146,11 +146,18 @@ XDAS_Int8* Enc::encFrame(XDAS_Int8* in, int width, int height, int stride, size_
 	return m_outargs.videncOutArgs.encodedBuf.buf;
 }
 
+static int range(int v, int l, int r) {
+	return v<l?l:v>r?r:v;
+}
+
 void Enc::changeBitrate(int delta_bitrate)
 {	
 	if (abs(delta_bitrate) > BITRATE_BIAS) {
-		const int new_bitrate = m_dynamicparams.videncDynamicParams.targetBitRate+delta_bitrate;
-		
+		delta_bitrate = range(delta_bitrate, -BITRATE_STEP, +BITRATE_STEP);
+		int new_bitrate = m_dynamicparams.videncDynamicParams.targetBitRate+delta_bitrate;
+
+		new_bitrate = range(new_bitrate, BITRATE_MIN, BITRATE_MAX);
+
 		m_dynamicparams.videncDynamicParams.targetBitRate = new_bitrate;
 
 		H264VENC_Status status;

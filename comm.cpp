@@ -2,6 +2,8 @@
 
 #include "pchbarrier.h"
 
+#include <linux/serial.h>
+
 //#include "logview.h" // todo: as comm.cpp will be used everywhere, qt dependencies should be removed from log.
 #include "log_to_file.h"
 #include "comm.h"
@@ -163,6 +165,13 @@ bool Comm::open(const std::string& port, int baud_rate, bool flow_control)
 
 	m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
 
+	const int hnd = m_port.native_handle();
+
+	struct serial_struct serial_str;
+	ioctl(hnd, TIOCGSERIAL, &serial_str);
+		
+	log() << "Xmit buf size: " << serial_str.xmit_fifo_size;
+
 	return true;
 }
 
@@ -262,11 +271,17 @@ void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 
 		if (!m_sending_in_progress) {
 			struct timespec clock_cur;
-			clock_gettime(CLOCK_REALTIME, &clock_cur);
+			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
+
+//			log() << "sending start us " << m_send_start_us;
+			log() << "Start sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec;
 
 			m_sending_in_progress = true;
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
+			
+//			const int hnd = m_port.native_handle();
+//			tcflush(hnd, TCOFLUSH);
 		}
 //	}
 }
@@ -279,10 +294,12 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 	m_send_size += size;
 
 	struct timespec clock_cur;
-	clock_gettime(CLOCK_REALTIME, &clock_cur);
+	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	m_sending_time_us += (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) - m_send_start_us;
-		
-	log() << "Transmission finished";
+	
+//	log() << "Transmission finished, finish time: " << (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) << " size: " << size;
+	log() << "End sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec << " size: " << size;
+	log() << "rate: " << size*8e6 / ((clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) - m_send_start_us);
 
 	{
 		lock_guard<mutex> _(m_transmit_lock);
@@ -291,11 +308,16 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 
 		if (!m_out_buf.empty()) {
 			struct timespec clock_cur;
-			clock_gettime(CLOCK_REALTIME, &clock_cur); // TODO: boost::chrono. Now it can't be built in MSVC.
+			clock_gettime(CLOCK_MONOTONIC, &clock_cur); // TODO: boost::chrono. Now it can't be built without posix.
 			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
+			
+//			log() << "sending start us " << m_send_start_us;
+			log() << "Start cont. sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec;
 
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		} else {
+			m_send_start_us = 0;
+			
 			m_sending_in_progress = false;
 		}
 	}
@@ -306,9 +328,14 @@ int Comm::getTransmissionRate()
 	return m_send_size*8e6 / m_sending_time_us;
 }
 
-int Comm::getBufferedSize()
+int Comm::getTransmissionTime()
 {
-	return m_buffered_size*8;
+	return m_sending_time_us/1e3;
+}
+
+int Comm::getBufferSize()
+{
+	return m_out_buf.size()*sizeof(m_out_buf.m_buf[0])*8;
 }
 
 void Comm::resetTransmissionRate()

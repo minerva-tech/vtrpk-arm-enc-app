@@ -338,7 +338,7 @@ void initMD()
 
 	uint8_t* regs = (uint8_t*)map_base;
 	
-//	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
+	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
 	
 //	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
 
@@ -492,7 +492,8 @@ void run()
 
 	const int to_skip = 0; // how much frames should be skipped after captured one to reduce framerate.
 	
-	const int transmittion_rate_check_interval = 2; // amount of frames to send before checking average transmittion rate.
+	const int transmittion_rate_check_interval = 80; // amount of frames to send before checking average transmittion rate.
+//	const int target_buf_size_bytes = 7500;
 
 	while(g_stop)
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
@@ -532,13 +533,13 @@ void run()
 
 	int frames_before_rate_check = transmittion_rate_check_interval;
 	struct timespec clock_cur;
-	clock_gettime(CLOCK_REALTIME, &clock_cur);
+	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	int start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
-
+	
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
 
-		log() << "Frame captured.";
+//		log() << "Frame captured.";
 		
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
@@ -581,28 +582,29 @@ void run()
 			log() << "transmission rate : " << t_rate;
 
 			struct timespec clock_cur;
-			clock_gettime(CLOCK_REALTIME, &clock_cur);
-			const int t_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
+			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
+			const int w_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
 
-			int buffered_size = Comm::instance().getBufferedSize();
+			const int buffer_fullness = Comm::instance().getBufferSize();
+			const int t_time_ms = Comm::instance().getTransmissionTime();
 
-			const int d_video_rate = t_rate - buffered_size*1000 / t_time_ms;
+			const int d_video_rate = ((w_time_ms-t_time_ms)*t_rate - buffer_fullness*1000) / w_time_ms;
 
-			log() << "Data bufferized : " << buffered_size << " Time : " << t_time_ms << " Video rate delta : " << d_video_rate;
+			log() << "Data bufferized: " << buffer_fullness << " Time w: " << w_time_ms << " Time t: " << t_time_ms << " Video rate delta: " << d_video_rate;
 
-		//	enc.changeBitrate(d_video_rate);
+			enc.changeBitrate(d_video_rate);
 
 			Comm::instance().resetTransmissionRate();
 			frames_before_rate_check = transmittion_rate_check_interval;
 
-			clock_gettime(CLOCK_REALTIME, &clock_cur);
+			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 			start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
 		}			
 	}
 
 	if (g_dump_yuv)
 		fclose(f_dump_yuv);
-	
+
 //	fclose(f_dump);
 //fclose(f_dump_info);
 }

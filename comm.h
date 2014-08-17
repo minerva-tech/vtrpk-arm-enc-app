@@ -9,6 +9,8 @@ const int LSB_MAX_VAL_PLUS_1 = 16;
 
 const int CHUNK_SIZE = 128;
 
+const size_t MAX_TRANSMISSION_CHUNK_SIZE = 20; // Packets, not bytes
+
 const int PREAMBLE = 0x02;
 
 using namespace boost;
@@ -59,7 +61,7 @@ friend struct boost::interprocess::ipcdetail::placement_destroy; // with even mi
 
 public:
 	enum Comment { //!< bit flags
-		Invalid		= 0,
+		Invalid	= 0,
 		Normal		= 1,
 		CrcError	= 2,
 		PacketLost	= 4
@@ -85,7 +87,6 @@ public:
 
 	void setCallback(const Callback& c, int port) { m_callback[port] = c; }
 
-	Comm();
 	~Comm();
 	
 //	FILE* fout;
@@ -97,11 +98,14 @@ public:
 	std::vector<std::pair<std::string, uint32_t> > getStat();
 	
 	int getTransmissionRate();
-	int getBufferedSize();
+	int getTransmissionTime();
+	int getBufferSize();
 	void resetTransmissionRate();
 
 private:
 //	static Comm* m_this;
+
+	Comm();
 
 #if INTERPROCESS_SINGLETON
 	void get();
@@ -223,6 +227,8 @@ inline asio::mutable_buffers_1 CircBuf<T>::get_chunk() const
 		size = m_w - m_r;
 	else
 		size = m_buf_end - m_r;
+		
+	size = std::min(size, MAX_TRANSMISSION_CHUNK_SIZE);
 
 	return asio::buffer(m_r, size * sizeof(T));
 }
