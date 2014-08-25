@@ -28,6 +28,10 @@ volatile bool g_stop = false;
 int g_chroma_value = 0x80;
 bool g_dump_yuv = false;
 
+int g_transmission_rate_check_interval = 32;
+int g_sensitivity = 1;
+int g_dead_zone = 1000;
+
 class ServerCmds : public IServerCmds
 {
 public:
@@ -338,7 +342,7 @@ void initMD()
 
 	uint8_t* regs = (uint8_t*)map_base;
 	
-	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
+//	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
 	
 //	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
 
@@ -492,8 +496,8 @@ void run()
 
 	const int to_skip = 0; // how much frames should be skipped after captured one to reduce framerate.
 	
-	const int transmittion_rate_check_interval = 80; // amount of frames to send before checking average transmittion rate.
-//	const int target_buf_size_bytes = 7500;
+	const int transmittion_rate_check_interval = g_transmission_rate_check_interval; // amount of frames to send before checking average transmittion rate.
+	const int target_buf_size_bytes = 7500;
 
 	while(g_stop)
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
@@ -535,6 +539,7 @@ void run()
 	struct timespec clock_cur;
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	int start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
+	int buf_size_prev = -1;
 	
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
@@ -561,7 +566,7 @@ void run()
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
-		log() << "Coded size: " << coded_size;
+//		log() << "Coded size: " << coded_size;
 
 		if (coded_size) {
 			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
@@ -585,12 +590,24 @@ void run()
 			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 			const int w_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
 
-			const int buffer_fullness = Comm::instance().getBufferSize();
-			const int t_time_ms = Comm::instance().getTransmissionTime();
+			const int buf_size = Comm::instance().getBufferSize();
+//			const int t_time_ms = Comm::instance().getTransmissionTime();
 
-			const int d_video_rate = ((w_time_ms-t_time_ms)*t_rate - buffer_fullness*1000) / w_time_ms;
+//			const int d_video_rate = ((w_time_ms-t_time_ms)*t_rate - buffer_fullness*1000) / w_time_ms;
+			int d_video_rate = 0;// (target_buf_size_bytes*8 - buf_size)*1000 / w_time_ms;
+			int buf_size_next = 0;
 
-			log() << "Data bufferized: " << buffer_fullness << " Time w: " << w_time_ms << " Time t: " << t_time_ms << " Video rate delta: " << d_video_rate;
+			if (buf_size_prev >= 0) {
+				buf_size_next = 2*buf_size - buf_size_prev;
+				if (abs(target_buf_size_bytes*8 - buf_size_next) < g_dead_zone)
+					d_video_rate = 0;
+				else
+					d_video_rate = (target_buf_size_bytes*8 - buf_size_next)*1000 / w_time_ms / g_sensitivity;
+			}			
+
+			buf_size_prev = buf_size;
+			
+			log() << "Data bufferized: " << buf_size << " Buf size next: " << buf_size_next << " Time w: " << w_time_ms /* << " Time t: " << t_time_ms */ << " Video rate delta: " << d_video_rate;
 
 			enc.changeBitrate(d_video_rate);
 
@@ -613,7 +630,7 @@ int main(int argc, char *argv[])
 {
 	try {
 		if (argc < 3) {
-			std::cout << "a.out <baud_rate> <flow_control>" << std::endl;
+			std::cout << "a.out <baud_rate> <flow_control> <time window (frames)> <1-fast, 10-slow reaction to channel bandwidth change (default 1, and i strongly recommend to stay with it)> <dead zone (bps) (due to some consideration it probably shouldn't be less than cpb buffer size)>" << std::endl;
 			return 0;
 		}
 
@@ -629,9 +646,16 @@ int main(int argc, char *argv[])
 
 		Enc::rman_init();
 
-		if (argc == 4)
-			g_dump_yuv = true;
-		//	g_chroma_value = atoi(argv[3]);
+//		if (argc == 4)
+//			g_dump_yuv = true;
+//		g_chroma_value = atoi(argv[3]);
+		
+		if (argc > 3)
+			g_transmission_rate_check_interval = atoi(argv[3]);
+		if (argc > 4)
+			g_sensitivity = atoi(argv[4]);
+		if (argc > 5)
+			g_dead_zone = atoi(argv[5]);
 
 		while(1) {
 			try {

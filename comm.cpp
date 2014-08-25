@@ -275,7 +275,7 @@ void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
 
 //			log() << "sending start us " << m_send_start_us;
-			log() << "Start sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec;
+//			log() << "Start sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec;
 
 			m_sending_in_progress = true;
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
@@ -298,8 +298,8 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 	m_sending_time_us += (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) - m_send_start_us;
 	
 //	log() << "Transmission finished, finish time: " << (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) << " size: " << size;
-	log() << "End sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec << " size: " << size;
-	log() << "rate: " << size*8e6 / ((clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) - m_send_start_us);
+//	log() << "End sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec << " size: " << size;
+//	log() << "rate: " << size*8e6 / ((clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000) - m_send_start_us);
 
 	{
 		lock_guard<mutex> _(m_transmit_lock);
@@ -312,7 +312,7 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
 			
 //			log() << "sending start us " << m_send_start_us;
-			log() << "Start cont. sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec;
+//			log() << "Start cont. sec: " << clock_cur.tv_sec << " nsec: " << clock_cur.tv_nsec;
 
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
 		} else {
