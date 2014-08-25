@@ -48,7 +48,7 @@ public:
 
 		uint32_t size = 0;
 		eeprom.read((char*)&size, sizeof(size));
-		
+
 		if (size > encoder_config_max_size)
 			return std::string();
 
@@ -65,7 +65,7 @@ public:
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>())); // why?
 		return str;*/
 	}
-	
+
 	virtual std::string GetMDCfg() {
 		std::ifstream eeprom(eeprom_filename);
 		if (!eeprom)
@@ -85,7 +85,7 @@ public:
 		str.resize(size);
 
 		eeprom.read(&str[0], str.size()*sizeof(str[0]));
-		
+
 		return str;
 
 /*		std::ifstream cfg(std::string("./md.cfg"));
@@ -94,7 +94,7 @@ public:
 		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
 		return str;*/
 	}
-	
+
 	virtual std::vector<uint8_t> GetROI() {
 		std::ifstream eeprom(eeprom_filename);
 		if (!eeprom)
@@ -104,7 +104,7 @@ public:
 
 		uint32_t size = 0;
 		eeprom.read((char*)&size, sizeof(size));
-		
+
 		if (size > roi_config_max_size)
 			return std::vector<uint8_t>();
 
@@ -112,7 +112,7 @@ public:
 		str.resize(size);
 
 		eeprom.read((char*)&str[0], str.size()*sizeof(str[0]));
-		
+
 		return str;
 
 
@@ -125,7 +125,7 @@ public:
 		cfg.read((char*)&str[0], str.size()*sizeof(str[0]));
 		return str;*/
 	}
-	
+
 	virtual uint16_t GetRegister(uint8_t addr) {
 		int fd;
 
@@ -143,13 +143,13 @@ public:
 		munmap((void*)map_base, 1024);
 		close(fd);
 
-		return val;		
+		return val;
 	}
 
 	virtual void SetEncCfg(const std::string& str) {
 		if (str.size() > encoder_config_max_size)
 			return;
-			
+
 		std::ofstream eeprom(eeprom_filename);
 		if (!eeprom)
 			return;
@@ -167,10 +167,11 @@ public:
 		cfg.close();*/
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
+
 	virtual void SetMDCfg(const std::string& str) {
 		if (str.size() > md_config_max_size)
 			return;
-		
+
 		std::ofstream eeprom(eeprom_filename);
 		if (!eeprom)
 			return;
@@ -188,10 +189,11 @@ public:
 		cfg.close();*/
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
+
 	virtual void SetROI(const std::vector<uint8_t>& str) {
 		if (str.size() > roi_config_max_size)
 			return;
-		
+
 		std::ofstream eeprom(eeprom_filename);
 		if (!eeprom)
 			return;
@@ -217,24 +219,24 @@ void setReg(uint8_t addr, uint16_t val)
 {
 	int fd;
 
-    if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
 		log() << "cannot open /dev/mem. su?";
 		return;
-    }
+	}
 
-    void* map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+	void* map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
 
 	uint16_t* regs = (uint16_t*)map_base;
-	
+
 	regs[addr/2] = val;
 
 	munmap((void*)map_base, 1024);
-    close(fd);
+	close(fd);
 }
 
 void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
 {
-	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] << 
+	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] <<
 	" " << (int)payload[2] << " " << (int)payload[3] << " " << (int)payload[4] << " " << (int)payload[5] <<
 	" " << (int)payload[6] << " " << (int)payload[7] << " " << (int)payload[8] << " " << (int)payload[9] <<
 	" " << (int)payload[10] << " " << (int)payload[11] << " " << (int)payload[12] << std::dec;
@@ -258,32 +260,32 @@ void dumpRegs()
 {
 	int fd;
 
-    if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
 		log() << "cannot open /dev/mem. su?";
 		return;
-    }
+	}
 
-    void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+	void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
 
 	uint8_t* regs = (uint8_t*)map_base;
-	
+
 	for (int i=0; i<0x30; i+=2) {
 		log() << std::hex << "reg 0x" << i << " : 0x" << *(uint16_t*)(regs+i);
 	}
 
 	log() << "end dump" << std::dec;
 
-    munmap((void*)map_base, 1024);
-    close(fd);
+	munmap((void*)map_base, 1024);
+	close(fd);
 }
 
 void restartFpga()
 {
 	int fd;
-    if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
 		log() << "cannot open /dev/mem. su?";
 		return;
-    }
+	}
 
 /*FPGA RESET:
 # cd /sys/class/gpio
@@ -305,7 +307,7 @@ void restartFpga()
 	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
 	fprintf(fexport, "8");
 	fclose(fexport);
-	
+
 	FILE* fdir = fopen("/sys/class/gpio/gpio8/direction", "wt");
 	fprintf(fdir, "out");
 	fclose(fdir);
@@ -323,8 +325,8 @@ void restartFpga()
 	for(int i = 0; i<regs_num; i++)
 		*p++ = regs[i];
 
-    munmap((void*)map_base, 1024);
-    close(fd);
+	munmap((void*)map_base, 1024);
+	close(fd);
 }
 
 void initMD()
@@ -336,14 +338,14 @@ void initMD()
 	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
 		log() << "cannot open /dev/mem. su?";
 		return;
-    }
+	}
 
-    void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+	void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
 
 	uint8_t* regs = (uint8_t*)map_base;
-	
+
 //	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
-	
+
 //	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
 
 	ServerCmds tmp_cmds;
@@ -354,7 +356,7 @@ void initMD()
 
 	cfg >> val1 >> val2 >> val3 >> val4 >> val5 >> val6 >> val7;
 
-	log() << "MD config : " << val1 << ", " << val2 << ", " << val3 << ", " << val4 << ", " << val5; 
+	log() << "MD config : " << val1 << ", " << val2 << ", " << val3 << ", " << val4 << ", " << val5;
 
 	if (val1 < 0 || val2 < 0 || val3 < 0 || val4 < 0 || val5 < 0) {
 		dumpRegs();
@@ -369,56 +371,60 @@ void initMD()
 
 	*(uint16_t*)(regs + 0x000) = val3 & 0xffff;
 	*(uint16_t*)(regs + 0x002) = val3 >> 16;
-	
+
 	*(uint16_t*)(regs + 0x004) = val4 & 0xffff;
 	*(uint16_t*)(regs + 0x006) = val4 >> 16;
-	
+
 	*(uint16_t*)(regs + 0x00c) = val5 & 0xffff;
 	*(uint16_t*)(regs + 0x00e) = val5 >> 16;
-	
+
 	*(uint16_t*)(regs + 0x008) = val6 & 0xffff;
 	*(uint16_t*)(regs + 0x00a) = val6 >> 16;
-	
+
 	*(uint16_t*)(regs + 0x010) = val7 & 0xffff;
 	*(uint16_t*)(regs + 0x012) = val7 >> 16;
 
 	log() << "Time thres: 0x" << std::hex << val1 <<
-			"), spat thres: 0x" << val2 << 
+			"), spat thres: 0x" << val2 <<
 			"), top temp: 0x" << val3 <<
-			"), bot temp: 0x" << val4 << 
+			"), bot temp: 0x" << val4 <<
 			"), noise: 0x" << val5 <<
-			"), noise2: 0x" << val6 << 
+			"), noise2: 0x" << val6 <<
 			"), inoise: 0x" << val7 << std::dec;
 
-    munmap((void*)map_base, 1024);
-    close(fd);
-	
+	munmap((void*)map_base, 1024);
+	close(fd);
+
 	dumpRegs();
 }
 
 void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 {
-	std::ifstream cfg(std::string("/mnt/2/md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
-	const std::streampos size = cfg.tellg();
+//	std::ifstream cfg(std::string("/mnt/2/md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
+//	const std::streampos size = cfg.tellg();
+
+	ServerCmds tmp_cmds;
+	std::vector<uint8_t> roi = tmp_cmds.GetROI();
+
+	info_mask.resize(s*h/8);
 
 //	if (size <= 0) {
-	if (size < s*h/8) { // dirty hack while we have no stable comm channel with error correction.		
-		info_mask.resize(s*h/8);
+	if (roi.size() < s*h/8) { // dirty hack while we have no stable comm channel with error correction.
 		memset(&info_mask[0], 0xff, info_mask.size());
 		return;
 	}
 
-	assert(size == s*h/8);
+//	assert(size == s*h/8);
 
-	info_mask.resize(cfg.tellg());
-	cfg.seekg(std::ios_base::beg);
-	cfg.read((char*)&info_mask[0], info_mask.size()*sizeof(info_mask[0]));
-	
+//	cfg.seekg(std::ios_base::beg);
+//	cfg.read((char*)&info_mask[0], info_mask.size()*sizeof(info_mask[0]));
+	std::copy(roi.begin(), roi.begin()+s*h/8, info_mask.begin());
+
 	for(int i=0; i<info_mask.size(); i++) {
 		if (info_mask[i] != 0)
 			return;
 	}
-	
+
 	// as info_mask has nothing but zeroes, fill it with ones
 	memset(&info_mask[0], 0xff, info_mask.size());
 }
@@ -428,7 +434,7 @@ const char STARTCODE[12] = "FRAME START";
 void readStartcode(const volatile uint16_t* reg, int thres)
 {
 	bool startcode_at_begin = true;
-	
+
 	int startcode_off = 0;
 	int was_read = 0;
 
@@ -449,10 +455,10 @@ void readStartcode(const volatile uint16_t* reg, int thres)
 
 	if (!startcode_at_begin)
 		log() << "No startcode was found at the place where it should be. Was thrown " << was_read*2 << " bytes.";
-	
+
 	if (startcode_off == 12)
 		log() << "Startcode was found";
-	else	
+	else
 		log() << "Startcode wasn't found";
 }
 
@@ -481,7 +487,7 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 		}
 		it_info_mask += s/8;
 	}
-	
+
 	memset(&info[(h-2)*s/2/8], 0, w/2*2/8); // set last two lines to zeroes
 
 //	while (it_info != info.end())
@@ -495,7 +501,7 @@ void run()
 	const int h = TARGET_HEIGHT;
 
 	const int to_skip = 0; // how much frames should be skipped after captured one to reduce framerate.
-	
+
 	const int transmittion_rate_check_interval = g_transmission_rate_check_interval; // amount of frames to send before checking average transmittion rate.
 	const int target_buf_size_bytes = 7500;
 
@@ -540,12 +546,12 @@ void run()
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	int start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
 	int buf_size_prev = -1;
-	
+
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
 
 //		log() << "Frame captured.";
-		
+
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
@@ -603,10 +609,10 @@ void run()
 					d_video_rate = 0;
 				else
 					d_video_rate = (target_buf_size_bytes*8 - buf_size_next)*1000 / w_time_ms / g_sensitivity;
-			}			
+			}
 
 			buf_size_prev = buf_size;
-			
+
 			log() << "Data bufferized: " << buf_size << " Buf size next: " << buf_size_next << " Time w: " << w_time_ms /* << " Time t: " << t_time_ms */ << " Video rate delta: " << d_video_rate;
 
 			enc.changeBitrate(d_video_rate);
@@ -616,7 +622,7 @@ void run()
 
 			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 			start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
-		}			
+		}
 	}
 
 	if (g_dump_yuv)
@@ -649,7 +655,7 @@ int main(int argc, char *argv[])
 //		if (argc == 4)
 //			g_dump_yuv = true;
 //		g_chroma_value = atoi(argv[3]);
-		
+
 		if (argc > 3)
 			g_transmission_rate_check_interval = atoi(argv[3]);
 		if (argc > 4)
@@ -674,7 +680,7 @@ int main(int argc, char *argv[])
 	catch (ex& e) {
 		log() << e.str();
 	}
-	
+
 	::system("sync");
 
 	return 0;
