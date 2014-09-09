@@ -189,6 +189,7 @@ namespace Auxiliary {
 			Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
 
 			size -= to_send;
+			p += to_send;
 		}
 	}
 

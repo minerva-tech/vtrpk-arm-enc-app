@@ -140,9 +140,9 @@ public:
 
 		uint8_t id;
 		eeprom >> id;
-		
+
 		id = std::min((uint8_t)3, id);
-		
+
 		return id;
 	}
 
@@ -233,7 +233,7 @@ public:
 		cfg.close();
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");*/
 	}
-	
+
 	virtual void SetCameraID(uint8_t id) {
 		std::ofstream eeprom(eeprom_filename);
 		if (!eeprom)
@@ -522,9 +522,9 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 			for (int i=0; i<pels_left; i++) {
 				if (i == 8)
 					it_info_mask++;
-				if (p[i] > 0x80 && *it_info_mask & 1<<7-i%8)
+				if ( (p[i] < 0xC0) && (p[i] > 0x80) && *it_info_mask & 1<<7-i%8)
 					b |= 1 << 7-i/2;
-				p[i] = chroma_val;
+				//p[i] = chroma_val;
 			}
 
 			it_info_mask++;
@@ -651,7 +651,7 @@ void run()
 		if (--frames_before_rate_check <= 0 && Comm::instance().isTransmissionAllowed()) {
 			int t_rate = Comm::instance().getTransmissionRate();
 			log() << "Size of data transmitted in time window " << Comm::instance().getBufferedDataSize() << " transmission rate : " << t_rate;
-			
+
 			struct timespec clock_cur;
 			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 			const int w_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
@@ -689,7 +689,7 @@ void run()
 			start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
 		}
 	}
-	
+
 	if (g_dump_yuv)
 		fclose(f_dump_yuv);
 
@@ -706,7 +706,7 @@ int main(int argc, char *argv[])
 			"<dead zone (bytes) (due to some consideration it probably shouldn't be less than cpb buffer size)>\n"
 			"<buffer size(packets, not bytes. packet is 15 bytes)>\n"
 			"<target buffer size(bytes, not packets)>\n"
-			"<bitrate change max step, positive one>\n" 
+			"<bitrate change max step, positive one>\n"
 			"<bitrate change max step, negative one>\n"<< std::endl;
 			return 0;
 		}
@@ -718,7 +718,7 @@ int main(int argc, char *argv[])
 
 		ServerCmds cmds;
 		Server server(&cmds);
-		
+
 		Comm::instance().setCameraID(cmds.GetCameraID());
 
 		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(flir)), 3);
@@ -745,7 +745,7 @@ int main(int argc, char *argv[])
 			g_bitrate_step_p = atoi(argv[8]);
 		if (argc > 9)
 			g_bitrate_step_n = atoi(argv[9]);
-			
+
 		Comm::instance().setTxBufferSize(g_tx_buffer_size);
 
 		while(1) {
