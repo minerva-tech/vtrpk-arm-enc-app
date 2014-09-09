@@ -94,6 +94,7 @@ Comm& Comm::instance() {
 
 Comm::Comm() :
 	m_port(m_io_service),
+	m_camera_id(0),
 //	m_work(m_io_service),
 #if INTERPROCESS_SINGLETON
 	m_owners(0),
@@ -101,6 +102,7 @@ Comm::Comm() :
 	m_out_buf(out_buf_size),
 	m_start(boost::chrono::steady_clock::now()),
 	m_sending_in_progress(false),
+	m_no_actual_transmitting(false),
 	m_sending_time_us(0),
 	m_send_size(0),
 	m_in_ff_idx(0),
@@ -256,6 +258,18 @@ void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 	}
 }
 
+void Comm::transmit(uint8_t port, size_t size, const uint8_t* p) {
+	transmit(m_camera_id, port, size, p);
+}
+
+void Comm::setCameraID(int id) {
+	m_camera_id = id;
+}
+
+int Comm::cameraID() const {
+	return m_camera_id;
+}
+
 void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 {
 //	log() << "out buf size : " << m_out_buf.size();
@@ -268,6 +282,9 @@ void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 //		lock_guard<mutex> _(m_transmit_lock);
 
 		m_out_buf.push_back(Pkt(id, size, p));
+
+		if (m_no_actual_transmitting)
+			return;
 
 		if (!m_sending_in_progress) {
 			struct timespec clock_cur;
@@ -306,7 +323,7 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 
 		m_out_buf.taken(size);
 
-		if (!m_out_buf.empty()) {
+		if (!m_out_buf.empty() && !m_no_actual_transmitting) {
 			struct timespec clock_cur;
 			clock_gettime(CLOCK_MONOTONIC, &clock_cur); // TODO: boost::chrono. Now it can't be built without posix.
 			m_send_start_us = (clock_cur.tv_nsec/1000 + clock_cur.tv_sec*1000000);
@@ -323,17 +340,32 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 	}
 }
 
-int Comm::getTransmissionRate()
+void Comm::allowTransmission(bool val)
+{
+	m_no_actual_transmitting = !val;
+}
+
+bool Comm::isTransmissionAllowed() const
+{
+	return !m_no_actual_transmitting;
+}
+
+int Comm::getBufferedDataSize() const
+{
+	return m_buffered_size;
+}
+
+int Comm::getTransmissionRate() const
 {
 	return m_send_size*8e6 / m_sending_time_us;
 }
 
-int Comm::getTransmissionTime()
+int Comm::getTransmissionTime() const
 {
 	return m_sending_time_us/1e3;
 }
 
-int Comm::getBufferSize()
+int Comm::getBufferSize() const
 {
 	return m_out_buf.size()*sizeof(m_out_buf.m_buf[0])*8;
 }

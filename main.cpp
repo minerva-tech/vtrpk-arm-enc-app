@@ -13,6 +13,7 @@
 #include "cap.h"
 #include "enc.h"
 #include "proto.h"
+#include "flir.h"
 
 #include "defines.h"
 /*
@@ -31,12 +32,16 @@ bool g_dump_yuv = false;
 int g_transmission_rate_check_interval = 32;
 int g_sensitivity = 1;
 int g_dead_zone = 1000;
+int g_tx_buffer_size = 1000;
+int g_tx_buffer_target = 7500;
+int g_bitrate_step_p = 2000;
+int g_bitrate_step_n = -2000;
 
 class ServerCmds : public IServerCmds
 {
 public:
-	virtual bool Hello() {return true;}
-	virtual void Start() {g_stop = false;}
+	virtual bool Hello(int id) {return true;}
+	virtual void Start() {log()<<"start";g_stop = false;}
 	virtual void Stop() {g_stop = true;}
 
 	virtual std::string GetEncCfg() {
@@ -126,6 +131,21 @@ public:
 		return str;*/
 	}
 
+	virtual uint8_t GetCameraID() {
+		std::ifstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return 0;
+
+		eeprom.seekg(cam_id_config_offset, std::ios_base::beg);
+
+		uint8_t id;
+		eeprom >> id;
+		
+		id = std::min((uint8_t)3, id);
+		
+		return id;
+	}
+
 	virtual uint16_t GetRegister(uint8_t addr) {
 		int fd;
 
@@ -213,6 +233,20 @@ public:
 		cfg.close();
 //		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");*/
 	}
+	
+	virtual void SetCameraID(uint8_t id) {
+		std::ofstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return;
+
+		eeprom.seekp(cam_id_config_offset, std::ios_base::beg);
+
+		eeprom << id;
+
+		Comm::instance().setCameraID(id);
+
+		log() << "New camera ID received : " << (int)id;
+	}
 };
 
 void setReg(uint8_t addr, uint16_t val)
@@ -234,7 +268,7 @@ void setReg(uint8_t addr, uint16_t val)
 	close(fd);
 }
 
-void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
+void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir)
 {
 	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] <<
 	" " << (int)payload[2] << " " << (int)payload[3] << " " << (int)payload[4] << " " << (int)payload[5] <<
@@ -243,16 +277,27 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
 
 	log() << "addr:" << std::hex << (int)&payload[0] << std::dec;
 
+	if (camera != Comm::instance().cameraID()) {
+		log() << "Aux packet rejected, wrong camera ID: " << Comm::instance().cameraID() << " (my camera id: " << camera << " )";
+		return;
+	}
+
 	if (comment & ~Comm::Normal)
 		log() << "Aux packet was received, flags: " << comment;
 
-	log() << std::hex << "Type: " << Auxiliary::Type(payload);
-	log() << "Should be: " << Auxiliary::RegisterValType << std::dec;
+//	log() << std::hex << "Type: " << Auxiliary::Type(payload);
+//	log() << "Should be: " << Auxiliary::RegisterValType << std::dec;
 
 	if (Auxiliary::Type(payload) == Auxiliary::RegisterValType) {
 		Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
 		log() << "Set reg 0x" << std::hex << (int)reg.addr << " to 0x" << reg.val << std::dec;
 		setReg(reg.addr, reg.val);
+	}
+
+	if (Auxiliary::Type(payload) == Auxiliary::CameraRegisterValType) {
+		Auxiliary::CameraRegisterValData data = Auxiliary::CameraRegisterVal(payload);
+
+		flir.send(data.val);
 	}
 }
 
@@ -503,10 +548,14 @@ void run()
 	const int to_skip = 0; // how much frames should be skipped after captured one to reduce framerate.
 
 	const int transmittion_rate_check_interval = g_transmission_rate_check_interval; // amount of frames to send before checking average transmittion rate.
-	const int target_buf_size_bytes = 7500;
+	const int target_buf_size_bytes = g_tx_buffer_target;
+	bool buffer_initialization = true;
 
-	while(g_stop)
+	Comm::instance().allowTransmission(true);
+
+	while(g_stop) {
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+	}
 
 	ServerCmds tmp_cmds;
 	std::string enc_cfg = tmp_cmds.GetEncCfg();
@@ -546,6 +595,10 @@ void run()
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	int start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
 	int buf_size_prev = -1;
+	int sum_frames_size = 0;
+	int current_rate = 0;
+
+	Comm::instance().allowTransmission(false); // It will be enabled when buffer will be half-full.
 
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
@@ -574,24 +627,31 @@ void run()
 
 //		log() << "Coded size: " << coded_size;
 
+		sum_frames_size += coded_size;
+
 		if (coded_size) {
-			Comm::instance().transmit(0, 1, coded_size, (uint8_t*)bs);
+			Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
 
 //			fwrite((uint8_t*)bs, 1, coded_size, f_dump);
 		}
 
 		if (info_size)
-			Comm::instance().transmit(0, 2, info_size, &info_out[0]);
+			Comm::instance().transmit(2, info_size, &info_out[0]);
 
 		for (int i=0; i<to_skip; i++) {
 			v4l2_buffer buf = cap.getFrame();
 			cap.putFrame(buf);
 		}
 
-		if (--frames_before_rate_check == 0) {
-			int t_rate = Comm::instance().getTransmissionRate();
-			log() << "transmission rate : " << t_rate;
+		log() << "Encoded frame size: " << coded_size << " info size: " << info_size << " buffer size: " << Comm::instance().getBufferSize()/8 << " ts: " << buf.timestamp.tv_sec << "s " << buf.timestamp.tv_usec << " us";
 
+		if (!Comm::instance().isTransmissionAllowed() && Comm::instance().getBufferSize() >= target_buf_size_bytes*8)
+			Comm::instance().allowTransmission(true);
+
+		if (--frames_before_rate_check <= 0 && Comm::instance().isTransmissionAllowed()) {
+			int t_rate = Comm::instance().getTransmissionRate();
+			log() << "Size of data transmitted in time window " << Comm::instance().getBufferedDataSize() << " transmission rate : " << t_rate;
+			
 			struct timespec clock_cur;
 			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 			const int w_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
@@ -601,21 +661,26 @@ void run()
 
 //			const int d_video_rate = ((w_time_ms-t_time_ms)*t_rate - buffer_fullness*1000) / w_time_ms;
 			int d_video_rate = 0;// (target_buf_size_bytes*8 - buf_size)*1000 / w_time_ms;
-			int buf_size_next = 0;
+			int buf_size_predicted = 0;
 
 			if (buf_size_prev >= 0) {
-				buf_size_next = 2*buf_size - buf_size_prev;
-				if (abs(target_buf_size_bytes*8 - buf_size_next) < g_dead_zone)
+				buf_size_predicted = 2*buf_size - buf_size_prev;
+				if (abs(target_buf_size_bytes*8 - buf_size_predicted) < g_dead_zone*8)
 					d_video_rate = 0;
 				else
-					d_video_rate = (target_buf_size_bytes*8 - buf_size_next)*1000 / w_time_ms / g_sensitivity;
+					d_video_rate = (target_buf_size_bytes*8 - buf_size_predicted)*1000 / w_time_ms / g_sensitivity;
 			}
 
 			buf_size_prev = buf_size;
 
-			log() << "Data bufferized: " << buf_size << " Buf size next: " << buf_size_next << " Time w: " << w_time_ms /* << " Time t: " << t_time_ms */ << " Video rate delta: " << d_video_rate;
+			log() << "CPB fullness (assuming it starts from 0): " << current_rate*w_time_ms/8000-sum_frames_size << " bytes (sum frames size: " << sum_frames_size << ", bitrate: " << current_rate << " )";
+			log() << "CPB fullness " << (current_rate*w_time_ms/1000-sum_frames_size*8)/(double)current_rate << " seconds on current rate";
 
-			enc.changeBitrate(d_video_rate);
+			sum_frames_size = 0;
+
+			log() << "Data bufferized: " << buf_size/8 << " Buf size predicted: " << buf_size_predicted/8 << " Time w: " << w_time_ms /* << " Time t: " << t_time_ms */ << " Video rate delta: " << d_video_rate;
+
+			current_rate = enc.changeBitrate(d_video_rate, g_bitrate_step_p, g_bitrate_step_n);
 
 			Comm::instance().resetTransmissionRate();
 			frames_before_rate_check = transmittion_rate_check_interval;
@@ -624,7 +689,7 @@ void run()
 			start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
 		}
 	}
-
+	
 	if (g_dump_yuv)
 		fclose(f_dump_yuv);
 
@@ -636,17 +701,27 @@ int main(int argc, char *argv[])
 {
 	try {
 		if (argc < 3) {
-			std::cout << "a.out <baud_rate> <flow_control> <time window (frames)> <1-fast, 10-slow reaction to channel bandwidth change (default 1, and i strongly recommend to stay with it)> <dead zone (bps) (due to some consideration it probably shouldn't be less than cpb buffer size)>" << std::endl;
+			std::cout << "a.out <baud_rate> <flow_control> <time window (frames)>\n"
+			"<1-fast, 10-slow reaction to channel bandwidth change (default 1, and i strongly recommend to stay with it)>\n"
+			"<dead zone (bytes) (due to some consideration it probably shouldn't be less than cpb buffer size)>\n"
+			"<buffer size(packets, not bytes. packet is 15 bytes)>\n"
+			"<target buffer size(bytes, not packets)>\n"
+			"<bitrate change max step, positive one>\n" 
+			"<bitrate change max step, negative one>\n"<< std::endl;
 			return 0;
 		}
 
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
+		Flir flir("/dev/ttyS0");
+
 		ServerCmds cmds;
 		Server server(&cmds);
+		
+		Comm::instance().setCameraID(cmds.GetCameraID());
 
-		Comm::instance().setCallback(auxiliaryCb, 3);
+		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(flir)), 3);
 
 		CMEM_init();
 
@@ -662,6 +737,16 @@ int main(int argc, char *argv[])
 			g_sensitivity = atoi(argv[4]);
 		if (argc > 5)
 			g_dead_zone = atoi(argv[5]);
+		if (argc > 6)
+			g_tx_buffer_size = atoi(argv[6]);
+		if (argc > 7)
+			g_tx_buffer_target = atoi(argv[7]);
+		if (argc > 8)
+			g_bitrate_step_p = atoi(argv[8]);
+		if (argc > 9)
+			g_bitrate_step_n = atoi(argv[9]);
+			
+		Comm::instance().setTxBufferSize(g_tx_buffer_size);
 
 		while(1) {
 			try {

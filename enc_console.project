@@ -102,6 +102,8 @@
     <File Name="jbig85.h"/>
     <File Name="pbmtojbg85.c"/>
     <File Name="defines.h"/>
+    <File Name="flir.cpp"/>
+    <File Name="flir.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

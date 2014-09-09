@@ -150,11 +150,11 @@ static int range(int v, int l, int r) {
 	return v<l?l:v>r?r:v;
 }
 
-void Enc::changeBitrate(int delta_bitrate)
+int Enc::changeBitrate(int delta_bitrate, int max_pos_step, int max_neg_step)
 {	
 	if (abs(delta_bitrate) > BITRATE_BIAS) {
-		delta_bitrate = range(delta_bitrate, -BITRATE_STEP, +BITRATE_STEP);
-		int new_bitrate = m_dynamicparams.videncDynamicParams.targetBitRate+delta_bitrate;
+		delta_bitrate = range(delta_bitrate, -abs(max_neg_step), abs(max_pos_step));
+		int new_bitrate = m_dynamicparams.videncDynamicParams.targetBitRate + delta_bitrate;
 
 		new_bitrate = range(new_bitrate, BITRATE_MIN, BITRATE_MAX);
 
@@ -169,7 +169,11 @@ void Enc::changeBitrate(int delta_bitrate)
 		}
 		
 		log() << "Due to data channel state, AVC target bitrate was changed to " << new_bitrate << " bps";
+		
+		return new_bitrate;
 	}
+	
+	return m_dynamicparams.videncDynamicParams.targetBitRate;
 }
 
 void Enc::copyInputBuf(XDAS_Int8* in, int width, int height, int stride)

@@ -38,7 +38,8 @@ OBJ = main.o \
       read_params.o \
       error_msg.o \
       cap.o \
-      proto.o
+      proto.o \
+	  flir.o
 
 BOOST_MODULES_TYPE = 
 

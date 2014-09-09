@@ -33,7 +33,7 @@ public:
 
 	XDAS_Int8* encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size);
 	
-	void changeBitrate(int new_bitrate);
+	int changeBitrate(int new_bitrate, int max_pos_step, int max_neg_step);
 
 	static void rman_init(); // unfortunately i wasn't able to init/exit RMAN each time when encoder restarted. So it's init once, when app is started. Yes, it's ugly.
 

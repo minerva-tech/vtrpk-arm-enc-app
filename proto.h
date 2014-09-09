@@ -4,7 +4,7 @@
 class IServerCmds
 {
 public:
-	virtual bool Hello() = 0;
+	virtual bool Hello(int id) = 0;
 	virtual void Start() = 0;
 	virtual void Stop() = 0;
 
@@ -12,10 +12,12 @@ public:
 	virtual std::string GetMDCfg() = 0;
 	virtual std::vector<uint8_t> GetROI() = 0;
 	virtual uint16_t GetRegister(uint8_t addr) = 0;
+	virtual uint8_t GetCameraID() = 0;
 
 	virtual void SetEncCfg(const std::string&) = 0;
 	virtual void SetMDCfg(const std::string&) = 0;
 	virtual void SetROI(const std::vector<uint8_t>&) = 0;
+	virtual void SetCameraID(uint8_t id) = 0;
 };
 
 class Server
@@ -29,7 +31,8 @@ public:
 		RequestEncConfig,
 		RequestMDConfig,
 		RequestROI,
-		RequestRegister
+		RequestRegister,
+		SetID
 	};
 
 	Server(IServerCmds* callbacks);
@@ -40,7 +43,7 @@ public:
 	static void SendEncCfg(const std::string&);
 	static void SendMDCfg(const std::string&);
 	static void SendROI(const std::vector<uint8_t>&);
-
+	
 private:
 	struct Message;
 
@@ -95,7 +98,7 @@ class Client {
 	public:
 		Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false) {}
 
-		virtual bool Hello() {m_hello_received = true; return false;}
+		virtual bool Hello(int id) {m_hello_received = true; return false;}
 		virtual void Start() {assert(0);}
 		virtual void Stop() {assert(0);}
 
@@ -103,10 +106,12 @@ class Client {
 		virtual std::string GetMDCfg() {assert(0); return std::string();}
 		virtual std::vector<uint8_t> GetROI() {assert(0); return std::vector<uint8_t>();}
 		virtual uint16_t GetRegister(uint8_t addr) { assert(0); return 0; }
+		virtual uint8_t GetCameraID() { assert(0); return 0; }
 
 		virtual void SetEncCfg(const std::string& cfg) {m_enc_cfg = cfg; m_enc_cfg_received = true;}
 		virtual void SetMDCfg(const std::string& cfg) {m_md_cfg = cfg; m_md_cfg_received = true;}
 		virtual void SetROI(const std::vector<uint8_t>& roi) {m_roi = roi; m_roi_received = true;}
+		virtual void SetCameraID(uint8_t id) {}
 
 		bool m_hello_received;
 		bool m_enc_cfg_received;
@@ -130,7 +135,8 @@ namespace Auxiliary {
 	enum AuxiliaryType {
 		InvalidType = 0,
 		TimestampType,
-		RegisterValType
+		RegisterValType,
+		CameraRegisterValType
 	};
 
 	template <typename T>
@@ -147,6 +153,10 @@ namespace Auxiliary {
 	struct RegisterValData {
 		uint32_t addr;
 		uint32_t val;
+	};
+
+	struct CameraRegisterValData {
+		uint8_t val[8];
 	};
 
 	static_assert(sizeof(Pkt<TimestampData>) <= Comm::mss, "Size of single auxiliary data packet shouldnt exceed Comm::mss");
@@ -166,6 +176,20 @@ namespace Auxiliary {
 		pkt.data.addr = addr;
 		pkt.data.val = val;
 		Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
+	}
+
+	inline void SendCameraRegisterVal(uint8_t* p, size_t size) {
+		while (size>0) {
+			Pkt<CameraRegisterValData> pkt;
+			pkt.type = CameraRegisterValType;
+
+			const size_t to_send = std::min(size, sizeof(pkt.data.val));
+			memcpy(pkt.data.val, p, to_send);
+
+			Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
+
+			size -= to_send;
+		}
 	}
 
 	inline AuxiliaryType Type(const uint8_t* data) {
@@ -188,6 +212,14 @@ namespace Auxiliary {
 		assert(Type(buf) == RegisterValType);
 		RegisterValData data;
 		const uint8_t* p = (uint8_t*)&((Pkt<RegisterValData>*)buf)->data;
+		memcpy(&data, p, sizeof(data)); // unaligned
+		return data;
+	}
+	
+	inline CameraRegisterValData CameraRegisterVal(const uint8_t* buf) {
+		assert(Type(buf) == CameraRegisterValType);
+		CameraRegisterValData data;
+		const uint8_t* p = (uint8_t*)&((Pkt<CameraRegisterValData>*)buf)->data;
 		memcpy(&data, p, sizeof(data)); // unaligned
 		return data;
 	}

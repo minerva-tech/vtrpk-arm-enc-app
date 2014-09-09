@@ -22,6 +22,8 @@ struct CircBuf
 { // Why not boost::circular_buffer? i don't know.
 	CircBuf(size_t size);
 
+	void setSize(size_t size); // TODO: For debug purposes only!
+
 	void reset();
 
 	void push_back(T&& pkt);
@@ -84,8 +86,14 @@ public:
 	static const int mss = 12; //< Maximum payload size for single packet
 
 	void transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p);
+	void transmit(uint8_t port, size_t size, const uint8_t* p);
+	
+	void setCameraID(int id);
+	int cameraID() const;
 
 	void setCallback(const Callback& c, int port) { m_callback[port] = c; }
+	
+	void setTxBufferSize(size_t size) { m_out_buf.setSize(size); } // TODO: For debug purposes only!
 
 	~Comm();
 	
@@ -97,9 +105,13 @@ public:
 
 	std::vector<std::pair<std::string, uint32_t> > getStat();
 	
-	int getTransmissionRate();
-	int getTransmissionTime();
-	int getBufferSize();
+	void allowTransmission(bool);
+	bool isTransmissionAllowed() const;
+	
+	int getBufferedDataSize() const;
+	int getTransmissionRate() const;
+	int getTransmissionTime() const;
+	int getBufferSize() const;
 	void resetTransmissionRate();
 
 private:
@@ -135,6 +147,8 @@ private:
 //	asio::io_service::work m_work;
 
 	asio::serial_port m_port;
+	
+	int m_camera_id;
 
 	int m_in_count_lsb[CAMERAS_N];
 	int m_out_count_lsb[CAMERAS_N];
@@ -148,7 +162,8 @@ private:
 //	std::vector<Pkt>::iterator m_out_cur;
 //	int m_out_ff_idx;
 	bool m_sending_in_progress;
-	
+	bool m_no_actual_transmitting;
+
 	long long m_send_start_us;
 	long long m_sending_time_us;
 	size_t m_send_size;
@@ -185,6 +200,16 @@ inline CircBuf<T>::CircBuf(size_t size) :
 	m_r(&m_buf[0]),
 	m_empty(true)
 { }
+
+template <typename T>
+inline void CircBuf<T>::setSize(size_t size)
+{
+	m_buf.reset(new T[size]);
+	m_buf_end = &m_buf[0] + size;
+	m_w = &m_buf[0];
+	m_r = &m_buf[0];
+	m_empty = true;
+}
 
 template <typename T>
 inline void CircBuf<T>::reset()

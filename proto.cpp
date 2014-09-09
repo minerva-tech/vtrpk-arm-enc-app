@@ -26,6 +26,13 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 {
 	const Message* msg = reinterpret_cast<const Message*>(payload);
 
+	log() << "camera in packet: " << (int)camera << " my camera id: " << Comm::instance().cameraID();
+
+	if (camera!=Comm::instance().cameraID() && (msg->type()!=Command || msg->payload[0]!=Hello)) { // TODO: All connected cameras will answer to Hello command. May be it's wrong behavior. 
+		log() << "Command wasn't accepted (camera in packet: " << (int)camera << " my camera id: " << Comm::instance().cameraID();
+		return;
+	}
+
 	switch (msg->type()) {
 	case Command:
 		execute(msg->payload[0], msg->payload[1]);
@@ -47,10 +54,12 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 
 void Server::execute(uint8_t command, uint8_t arg)
 {
+	log() << "command received";
+	
 	switch (command) {
 	case Hello:
-		if (m_callbacks->Hello())
-			boost::thread(boost::bind(&Server::SendCommand, Hello, 0));
+		if (m_callbacks->Hello(arg))
+			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
 		break;
 	case Start:
 		m_callbacks->Start();
@@ -69,6 +78,9 @@ void Server::execute(uint8_t command, uint8_t arg)
 		break;
 	case RequestRegister:
 		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
+		break;
+	case SetID:
+		m_callbacks->SetCameraID(arg);
 		break;
 	default:
 		log() << "Invalid command";
@@ -118,7 +130,7 @@ void Server::SendCfg(const CfgContainer& cfg, MessageTypes msg_type)
 	}
 
 	if (msgs.size())
-		Comm::instance().transmit(0, 0, msgs.size()*sizeof(msgs[0]), reinterpret_cast<const uint8_t*>(&msgs[0]));
+		Comm::instance().transmit(0, msgs.size()*sizeof(msgs[0]), reinterpret_cast<const uint8_t*>(&msgs[0]));
 
 	return;
 }
@@ -163,7 +175,7 @@ void Server::SendCommand(Commands cmd, uint8_t arg)
 	Server::Message msg(Command, true, 1);
 	msg.payload[0] = cmd;
 	msg.payload[1] = arg;
-	Comm::instance().transmit(0, 0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
+	Comm::instance().transmit(0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
 }
 
 bool Client::Handshake()
