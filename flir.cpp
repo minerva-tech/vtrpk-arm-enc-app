@@ -28,6 +28,7 @@ Flir::Flir(const std::string& port) :
 	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); 
 	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
 
+	send(0x0, NULL, 0);
 	const uint8_t XP_mode[] = {0x03, 0x03};
 	send(0x12, XP_mode, 2);
 	const uint8_t LVDS_mode[] = {0x05, 0x00};

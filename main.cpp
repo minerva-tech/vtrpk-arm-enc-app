@@ -29,13 +29,7 @@ volatile bool g_stop = false;
 int g_chroma_value = 0x80;
 bool g_dump_yuv = false;
 
-int g_transmission_rate_check_interval = 32;
-int g_sensitivity = 1;
-int g_dead_zone = 1000;
 int g_tx_buffer_size = 1000;
-int g_tx_buffer_target = 7500;
-int g_bitrate_step_p = 2000;
-int g_bitrate_step_n = -2000;
 
 class ServerCmds : public IServerCmds
 {
@@ -63,12 +57,6 @@ public:
 		eeprom.read(&str[0], str.size()*sizeof(str[0]));
 
 		return str;
-
-/*		std::ifstream cfg(std::string("./encoder.cfg"));
-		if (!cfg)
-			return std::string();
-		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>())); // why?
-		return str;*/
 	}
 
 	virtual std::string GetMDCfg() {
@@ -92,12 +80,6 @@ public:
 		eeprom.read(&str[0], str.size()*sizeof(str[0]));
 
 		return str;
-
-/*		std::ifstream cfg(std::string("./md.cfg"));
-		if (!cfg)
-			return std::string();
-		std::string str(std::istreambuf_iterator<char>(cfg), (std::istreambuf_iterator<char>()));
-		return str;*/
 	}
 
 	virtual std::vector<uint8_t> GetROI() {
@@ -119,16 +101,6 @@ public:
 		eeprom.read((char*)&str[0], str.size()*sizeof(str[0]));
 
 		return str;
-
-
-/*		std::ifstream cfg(std::string("./md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
-		if (!cfg)
-			return std::vector<uint8_t>();
-		std::vector<uint8_t> str;
-		str.resize(cfg.tellg());
-		cfg.seekg(std::ios_base::beg);
-		cfg.read((char*)&str[0], str.size()*sizeof(str[0]));
-		return str;*/
 	}
 
 	virtual uint8_t GetCameraID() {
@@ -180,12 +152,6 @@ public:
 		eeprom.write((char*)&size, sizeof(size));
 
 		eeprom.write(&str[0], str.size()*sizeof(str[0]));
-
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, ""); // yes, MS_MGC_VAL is obsolete. But i don't believe linux at all.
-/*		std::ofstream cfg(std::string("./encoder.cfg"));
-		cfg << str;
-		cfg.close();*/
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 
 	virtual void SetMDCfg(const std::string& str) {
@@ -202,12 +168,6 @@ public:
 		eeprom.write((char*)&size, sizeof(size));
 
 		eeprom.write(&str[0], str.size()*sizeof(str[0]));
-
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
-/*		std::ofstream cfg(std::string("./md.cfg"));
-		cfg << str;
-		cfg.close();*/
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");
 	}
 
 	virtual void SetROI(const std::vector<uint8_t>& str) {
@@ -224,14 +184,6 @@ public:
 		eeprom.write((char*)&size, sizeof(size));
 
 		eeprom.write((char*)&str[0], str.size()*sizeof(str[0]));
-
-/*		if (str.size()<384*144/8) // dirty hack while we have no stable comm channel with error correction.
-			return;
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT, "");
-		std::ofstream cfg(std::string("./md_roi.dat"));
-		cfg.write((char*)&str[0], str.size()*sizeof(str[0]));
-		cfg.close();
-//		mount("", "/mnt/2", "", MS_MGC_VAL | MS_REMOUNT | MS_RDONLY, "");*/
 	}
 
 	virtual void SetCameraID(uint8_t id) {
@@ -389,10 +341,6 @@ void initMD()
 
 	uint8_t* regs = (uint8_t*)map_base;
 
-//	*(uint16_t*)(regs + 0x020) = 0x6500; // !!!
-
-//	std::ifstream cfg(std::string("/mnt/2/md.cfg"));
-
 	ServerCmds tmp_cmds;
 	std::string md_cfg = tmp_cmds.GetMDCfg();
 	std::stringstream cfg(md_cfg);
@@ -445,24 +393,16 @@ void initMD()
 
 void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 {
-//	std::ifstream cfg(std::string("/mnt/2/md_roi.dat"), std::ios_base::binary | std::ios_base::ate);
-//	const std::streampos size = cfg.tellg();
-
 	ServerCmds tmp_cmds;
 	std::vector<uint8_t> roi = tmp_cmds.GetROI();
 
 	info_mask.resize(s*h/8);
 
-//	if (size <= 0) {
 	if (roi.size() < s*h/8) { // dirty hack while we have no stable comm channel with error correction.
 		memset(&info_mask[0], 0xff, info_mask.size());
 		return;
 	}
 
-//	assert(size == s*h/8);
-
-//	cfg.seekg(std::ios_base::beg);
-//	cfg.read((char*)&info_mask[0], info_mask.size()*sizeof(info_mask[0]));
 	std::copy(roi.begin(), roi.begin()+s*h/8, info_mask.begin());
 
 	for(int i=0; i<info_mask.size(); i++) {
@@ -473,7 +413,7 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	// as info_mask has nothing but zeroes, fill it with ones
 	memset(&info_mask[0], 0xff, info_mask.size());
 }
-
+/*
 const char STARTCODE[12] = "FRAME START";
 
 void readStartcode(const volatile uint16_t* reg, int thres)
@@ -506,7 +446,7 @@ void readStartcode(const volatile uint16_t* reg, int thres)
 	else
 		log() << "Startcode wasn't found";
 }
-
+*/
 void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h, int chroma_val)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
@@ -540,17 +480,22 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 //		*it_info++ &= *it_info_mask++;
 }
 
+struct adapt_bitrate_desc_t {
+	int to_skip;
+	int switch_up_from_here;
+	int switch_down_from_here;
+};
+
+adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
+
 void run()
 {
 	const int w = TARGET_WIDTH;
 	const int h = TARGET_HEIGHT;
 
-	const int to_skip = 0; // how much frames should be skipped after captured one to reduce framerate.
-
-	const int transmittion_rate_check_interval = g_transmission_rate_check_interval; // amount of frames to send before checking average transmittion rate.
-	const int target_buf_size_bytes = g_tx_buffer_target;
-	bool buffer_initialization = true;
-
+	int adapt_bitrate_pos = 0;
+	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip; // how much video frames should be skipped according to current channel state
+	
 	Comm::instance().allowTransmission(true);
 
 	while(g_stop) {
@@ -575,8 +520,6 @@ void run()
 	std::vector<uint8_t> info_out;
 	info_out.resize(w*h/8);
 
-//	bs_t info_bs;
-
 	initMD();
 
 	v4l2_buffer buf = cap.getFrame(); // skip first frame as it contains garbage
@@ -590,44 +533,37 @@ void run()
 	if (g_dump_yuv)
 		f_dump_yuv = fopen("dump.yuv", "wb");
 
-	int frames_before_rate_check = transmittion_rate_check_interval;
-	struct timespec clock_cur;
-	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
-	int start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
-	int buf_size_prev = -1;
-	int sum_frames_size = 0;
-	int current_rate = 0;
-
-	Comm::instance().allowTransmission(false); // It will be enabled when buffer will be half-full.
-
 	while(!g_stop) {
 		v4l2_buffer buf = cap.getFrame();
-
-//		log() << "Frame captured.";
 
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
 
-		size_t coded_size=0;
-
 		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
-		XDAS_Int8* bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
+		size_t coded_size=0;
+
+		XDAS_Int8* bs = NULL;
+
+		if (!to_skip) {
+			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
+			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
+			log() << "Frame encoded";
+		} else {
+			if (to_skip>0) // to_skip == -1 means no video is sent at all
+				to_skip--; 
+
+			log() << "Frame skipped";
+		}
 
 		cap.putFrame(buf);
-
-//fwrite((uint8_t*)&info[0], 1, w/2*h/2/8, f_dump_info);
 
 		const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
 
 		const ptrdiff_t info_size = cur - &info_out[0];
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
-
-//		log() << "Coded size: " << coded_size;
-
-		sum_frames_size += coded_size;
 
 		if (coded_size) {
 			Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
@@ -638,55 +574,15 @@ void run()
 		if (info_size)
 			Comm::instance().transmit(2, info_size, &info_out[0]);
 
-		for (int i=0; i<to_skip; i++) {
-			v4l2_buffer buf = cap.getFrame();
-			cap.putFrame(buf);
+		const int buf_size = Comm::instance().getBufferSize();
+		log() << "buffer size " << buf_size;
+		if (buf_size > g_adapt_bitrate_desc[adapt_bitrate_pos].switch_up_from_here) {
+			adapt_bitrate_pos++;
+			log() << "switched to " << adapt_bitrate_pos;
 		}
-
-		log() << "Encoded frame size: " << coded_size << " info size: " << info_size << " buffer size: " << Comm::instance().getBufferSize()/8 << " ts: " << buf.timestamp.tv_sec << "s " << buf.timestamp.tv_usec << " us";
-
-		if (!Comm::instance().isTransmissionAllowed() && Comm::instance().getBufferSize() >= target_buf_size_bytes*8)
-			Comm::instance().allowTransmission(true);
-
-		if (--frames_before_rate_check <= 0 && Comm::instance().isTransmissionAllowed()) {
-			int t_rate = Comm::instance().getTransmissionRate();
-			log() << "Size of data transmitted in time window " << Comm::instance().getBufferedDataSize() << " transmission rate : " << t_rate;
-
-			struct timespec clock_cur;
-			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
-			const int w_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6 - start_time_ms;
-
-			const int buf_size = Comm::instance().getBufferSize();
-//			const int t_time_ms = Comm::instance().getTransmissionTime();
-
-//			const int d_video_rate = ((w_time_ms-t_time_ms)*t_rate - buffer_fullness*1000) / w_time_ms;
-			int d_video_rate = 0;// (target_buf_size_bytes*8 - buf_size)*1000 / w_time_ms;
-			int buf_size_predicted = 0;
-
-			if (buf_size_prev >= 0) {
-				buf_size_predicted = 2*buf_size - buf_size_prev;
-				if (abs(target_buf_size_bytes*8 - buf_size_predicted) < g_dead_zone*8)
-					d_video_rate = 0;
-				else
-					d_video_rate = (target_buf_size_bytes*8 - buf_size_predicted)*1000 / w_time_ms / g_sensitivity;
-			}
-
-			buf_size_prev = buf_size;
-
-			log() << "CPB fullness (assuming it starts from 0): " << current_rate*w_time_ms/8000-sum_frames_size << " bytes (sum frames size: " << sum_frames_size << ", bitrate: " << current_rate << " )";
-			log() << "CPB fullness " << (current_rate*w_time_ms/1000-sum_frames_size*8)/(double)current_rate << " seconds on current rate";
-
-			sum_frames_size = 0;
-
-			log() << "Data bufferized: " << buf_size/8 << " Buf size predicted: " << buf_size_predicted/8 << " Time w: " << w_time_ms /* << " Time t: " << t_time_ms */ << " Video rate delta: " << d_video_rate;
-
-			current_rate = enc.changeBitrate(d_video_rate, g_bitrate_step_p, g_bitrate_step_n);
-
-			Comm::instance().resetTransmissionRate();
-			frames_before_rate_check = transmittion_rate_check_interval;
-
-			clock_gettime(CLOCK_MONOTONIC, &clock_cur);
-			start_time_ms = clock_cur.tv_sec*1000 + clock_cur.tv_nsec/1e6;
+		if (buf_size < g_adapt_bitrate_desc[adapt_bitrate_pos].switch_down_from_here) {
+			adapt_bitrate_pos--;
+			log() << "switched to " << adapt_bitrate_pos;
 		}
 	}
 
@@ -701,13 +597,7 @@ int main(int argc, char *argv[])
 {
 	try {
 		if (argc < 3) {
-			std::cout << "a.out <baud_rate> <flow_control> <time window (frames)>\n"
-			"<1-fast, 10-slow reaction to channel bandwidth change (default 1, and i strongly recommend to stay with it)>\n"
-			"<dead zone (bytes) (due to some consideration it probably shouldn't be less than cpb buffer size)>\n"
-			"<buffer size(packets, not bytes. packet is 15 bytes)>\n"
-			"<target buffer size(bytes, not packets)>\n"
-			"<bitrate change max step, positive one>\n"
-			"<bitrate change max step, negative one>\n"<< std::endl;
+			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)>\n" << std::endl;
 			return 0;
 		}
 
@@ -726,25 +616,9 @@ int main(int argc, char *argv[])
 		CMEM_init();
 
 		Enc::rman_init();
-
-//		if (argc == 4)
-//			g_dump_yuv = true;
-//		g_chroma_value = atoi(argv[3]);
-
-		if (argc > 3)
-			g_transmission_rate_check_interval = atoi(argv[3]);
-		if (argc > 4)
-			g_sensitivity = atoi(argv[4]);
-		if (argc > 5)
-			g_dead_zone = atoi(argv[5]);
-		if (argc > 6)
-			g_tx_buffer_size = atoi(argv[6]);
-		if (argc > 7)
-			g_tx_buffer_target = atoi(argv[7]);
-		if (argc > 8)
-			g_bitrate_step_p = atoi(argv[8]);
-		if (argc > 9)
-			g_bitrate_step_n = atoi(argv[9]);
+		
+		if (argc==4)
+			g_tx_buffer_size = atoi(argv[3]);
 
 		Comm::instance().setTxBufferSize(g_tx_buffer_size);
 

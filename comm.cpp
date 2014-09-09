@@ -367,7 +367,7 @@ int Comm::getTransmissionTime() const
 
 int Comm::getBufferSize() const
 {
-	return m_out_buf.size()*sizeof(m_out_buf.m_buf[0])*8;
+	return m_out_buf.size()*100/out_buf_size;
 }
 
 void Comm::resetTransmissionRate()
