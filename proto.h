@@ -167,7 +167,7 @@ namespace Auxiliary {
 		pkt.type = TimestampType;
 		pkt.data.sec  = sec;
 		pkt.data.usec = usec;
-		Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
+		Comm::instance().transmit(Port, sizeof(pkt), (uint8_t*)&pkt);
 	}
 
 	inline void SendRegisterVal(uint8_t addr, uint16_t val) {
@@ -175,7 +175,7 @@ namespace Auxiliary {
 		pkt.type = RegisterValType;
 		pkt.data.addr = addr;
 		pkt.data.val = val;
-		Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
+		Comm::instance().transmit(Port, sizeof(pkt), (uint8_t*)&pkt);
 	}
 
 	inline void SendCameraRegisterVal(uint8_t* p, size_t size) {
@@ -186,7 +186,7 @@ namespace Auxiliary {
 			const size_t to_send = std::min(size, sizeof(pkt.data.val));
 			memcpy(pkt.data.val, p, to_send);
 
-			Comm::instance().transmit(0, Port, sizeof(pkt), (uint8_t*)&pkt);
+			Comm::instance().transmit(Port, sizeof(pkt), (uint8_t*)&pkt);
 
 			size -= to_send;
 			p += to_send;

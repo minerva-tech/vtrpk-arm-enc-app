@@ -155,7 +155,7 @@ void Server::SendEncCfg(const std::string& cfg)
 	}
 
 	if (msgs.size())
-		Comm::instance().transmit(0, 0, msgs.size()*sizeof(msgs[0]), reinterpret_cast<const uint8_t*>(&msgs[0]));
+		Comm::instance().transmit(0, msgs.size()*sizeof(msgs[0]), reinterpret_cast<const uint8_t*>(&msgs[0]));
 
 	return;*/
 }

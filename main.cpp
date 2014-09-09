@@ -297,7 +297,7 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir
 	if (Auxiliary::Type(payload) == Auxiliary::CameraRegisterValType) {
 		Auxiliary::CameraRegisterValData data = Auxiliary::CameraRegisterVal(payload);
 
-		flir.send(data.val);
+		flir.send(data.val, sizeof(data.val));
 	}
 }
 
