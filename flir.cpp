@@ -27,14 +27,14 @@ Flir::Flir(const std::string& port) :
 	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::none));
 	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); 
 	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
-
+/*
 	send(0x0, NULL, 0);
 	const uint8_t XP_mode[] = {0x03, 0x03};
 	send(0x12, XP_mode, 2);
 	const uint8_t LVDS_mode[] = {0x05, 0x00};
 	send(0x12, LVDS_mode, 2);
 	const uint8_t CMOS_mode[] = {0x06, 0x01};
-	send(0x12, CMOS_mode, 2);
+	send(0x12, CMOS_mode, 2);*/
 
 	m_port.async_read_some(asio::buffer(m_buf), 
 		bind(&Flir::recv_cb, this, m_buf.begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
@@ -122,6 +122,8 @@ void Flir::send(uint8_t cmd, const uint8_t* args, size_t arg_size)
 
 void Flir::recv_cb(uint8_t* p, const system::error_code& err, std::size_t size)
 {
+    log() << "Camera has answered, size: " << size;
+
 	Auxiliary::SendCameraRegisterVal(p, size);
 
 	m_port.async_read_some(asio::buffer(m_buf), 

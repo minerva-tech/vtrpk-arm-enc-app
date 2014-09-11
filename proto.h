@@ -141,7 +141,8 @@ namespace Auxiliary {
 
 	template <typename T>
 	struct Pkt {
-		uint32_t	type;
+		uint16_t	type;
+		uint16_t	size;
 		T			data;
 	};
 
@@ -185,6 +186,7 @@ namespace Auxiliary {
 
 			const size_t to_send = std::min(size, sizeof(pkt.data.val));
 			memcpy(pkt.data.val, p, to_send);
+			pkt.size = to_send;
 
 			Comm::instance().transmit(Port, sizeof(pkt), (uint8_t*)&pkt);
 
@@ -194,11 +196,19 @@ namespace Auxiliary {
 	}
 
 	inline AuxiliaryType Type(const uint8_t* data) {
-		int type;
+		uint16_t type;
 		const uint8_t* p = (uint8_t*)&((Pkt<uint32_t>*)data)->type;
 		memcpy(&type, p, sizeof(type)); // unaligned
 //		memcpy(&type, (uint8_t*)&((Pkt<uint32_t>*)data)->type, sizeof(type)); // doesn't work with gcc 4.7.2
 		return (AuxiliaryType)type;
+	}
+
+	inline uint16_t Size(const uint8_t* data) {
+		uint16_t size;
+		const uint8_t* p = (uint8_t*)&((Pkt<uint32_t>*)data)->size;
+		memcpy(&size, p, sizeof(size)); // unaligned
+//		memcpy(&type, (uint8_t*)&((Pkt<uint32_t>*)data)->type, sizeof(type)); // doesn't work with gcc 4.7.2
+		return size;
 	}
 
 	inline TimestampData Timestamp(const uint8_t* buf) {
@@ -216,7 +226,7 @@ namespace Auxiliary {
 		memcpy(&data, p, sizeof(data)); // unaligned
 		return data;
 	}
-	
+
 	inline CameraRegisterValData CameraRegisterVal(const uint8_t* buf) {
 		assert(Type(buf) == CameraRegisterValType);
 		CameraRegisterValData data;

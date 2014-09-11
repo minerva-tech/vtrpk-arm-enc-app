@@ -252,7 +252,7 @@ inline asio::mutable_buffers_1 CircBuf<T>::get_chunk() const
 		size = m_w - m_r;
 	else
 		size = m_buf_end - m_r;
-		
+
 	size = std::min(size, MAX_TRANSMISSION_CHUNK_SIZE);
 
 	return asio::buffer(m_r, size * sizeof(T));

@@ -249,7 +249,9 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir
 	if (Auxiliary::Type(payload) == Auxiliary::CameraRegisterValType) {
 		Auxiliary::CameraRegisterValData data = Auxiliary::CameraRegisterVal(payload);
 
-		flir.send(data.val, sizeof(data.val));
+        log() << "sending data to camera, size : " << Auxiliary::Size(payload);
+
+		flir.send(data.val, Auxiliary::Size(payload));
 	}
 }
 
@@ -581,6 +583,8 @@ void run()
 			log() << "switched to " << adapt_bitrate_pos;
 		}
 		if (buf_size < g_adapt_bitrate_desc[adapt_bitrate_pos].switch_down_from_here) {
+            if (to_skip<0)
+                to_skip = 0;
 			adapt_bitrate_pos--;
 			log() << "switched to " << adapt_bitrate_pos;
 		}

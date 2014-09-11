@@ -296,7 +296,7 @@ void Comm::transmit_pkt(uint8_t id, size_t size, const uint8_t* p)
 
 			m_sending_in_progress = true;
 			asio::async_write(m_port, m_out_buf.get_chunk(), bind(&Comm::transmitted, this, asio::placeholders::error, asio::placeholders::bytes_transferred));
-			
+
 //			const int hnd = m_port.native_handle();
 //			tcflush(hnd, TCOFLUSH);
 		}
