@@ -526,6 +526,10 @@ void run()
 
 	v4l2_buffer buf = cap.getFrame(); // skip first frame as it contains garbage
 	cap.putFrame(buf);
+	
+	struct timespec clock_cur;
+	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
+	printf("Teplovisor app first frame captured time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
 
 //	FILE* f_dump = fopen("dump.h264", "wb");
 //FILE* f_dump_info = fopen("dump.anal", "wb");
@@ -599,6 +603,10 @@ void run()
 
 int main(int argc, char *argv[])
 {
+	struct timespec clock_cur;
+	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
+	printf("Teplovisor app starting time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
+	
 	try {
 		if (argc < 3) {
 			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)>\n" << std::endl;

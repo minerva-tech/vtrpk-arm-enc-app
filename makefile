@@ -112,15 +112,15 @@ CPPFLAGS_X86 += $(BOOST_CPPFLAGS) -O2
 #LDFLAGS += $(BOOST_LDFLAGS) -lpthread -static
 
 #LDFLAGS += -L /home/kov/dm365/boost/boost_1_48_0/stage/lib_armv5t $(BOOST_LDFLAGS) $(ALG_LIB1) $(ALG_LIB2) $(XDC_LINKER_FILE) -lpthread -static
-LDFLAGS += -L $(BOOSTROOT)/stage/lib_armv5t $(BOOST_LDFLAGS) $(ALG_LIB1) $(ALG_LIB2) $(XDC_LINKER_FILE) -pthread -static
+LDFLAGS += -L $(BOOSTROOT)/stage/lib_armv5t $(BOOST_LDFLAGS) $(ALG_LIB1) $(ALG_LIB2) $(XDC_LINKER_FILE) -pthread -static -Xlinker -Map -Xlinker teplovisor.map
 
 #LDFLAGS_X86 += -L /home/kov/dm365/boost/boost_1_48_0/stage/lib $(BOOST_LDFLAGS) -lpthread -static
 LDFLAGS_X86 += $(BOOST_LDFLAGS) -lpthread -static
 #LDFLAGS += -L /home/a/Documents/boost_1_48_0/stage/lib $(BOOST_LDFLAGS) -lpthread -static
 
-console: $(CONFIGPKG) $(OBJ)
-	$(LINK) -o console $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o pbmtojbg85.o jbig85.o jbig_ar.o $(LDFLAGS)
-	$(STRIP) console --strip-unneeded
+teplovisor: $(CONFIGPKG) $(OBJ)
+	$(LINK) -o teplovisor $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o pbmtojbg85.o jbig85.o jbig_ar.o $(LDFLAGS)
+	$(STRIP) teplovisor --strip-unneeded
 
 $(CONFIGPKG):
 	$(CONFIGURO) -c $(MVTOOL_DIR) -o $(CONFIGPKG) -t $(XDCTARGET) -p $(XDCPLATFORM) -b ./config.bld ./$(CONFIGPKG).cfg
@@ -141,4 +141,4 @@ $(CONFIGPKG):
 	$(CPPC) $(CPPFLAGS) -c $<
 
 clean:
-	rm *.o console
+	rm *.o teplovisor

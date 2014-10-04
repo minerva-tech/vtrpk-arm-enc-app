@@ -1,9 +1,12 @@
 #ifndef LOG_H
 #define LOG_H
 
-#pragma warning(disable : 4995)
+#define LOG_IS_TURNED_ON 0
 
+#pragma warning(disable : 4995)
 #include <boost/date_time.hpp>
+
+#if LOG_IS_TURNED_ON
 
 class Log {
 	friend Log& log();
@@ -55,7 +58,7 @@ public:
 			m_write_to_stream(write_to_stream)
 		{
 			std::ostringstream time;
-			time << "[" << boost::posix_time::second_clock::local_time().time_of_day() << "] ";
+			time << "[" << boost::posix_time::microsec_clock::local_time().time_of_day() << "] ";
 			*this << time.str();
 			*this << v;
 		}
@@ -94,4 +97,45 @@ inline Log::PrintLine Log::operator << <Log::Severity> (const Log::Severity& s) 
 
 inline Log& log() { return Log::instance(); }
 
+#else // LOG_IS_TURNED_ON
+
+class Log {
+friend Log& log();
+
+public:
+	enum Severity {
+		Dump = 0,
+		Debug,
+		Warning,
+		Error,
+		Critical
+	};
+
+	class PrintLine {
+	public:
+	//	Log::PrintLine& operator << (const void*) { return *this; }
+		template <typename T>
+		PrintLine& operator << (const T& v) {
+			return *this;
+		}	
+	};
+
+	static Log& instance() { static Log log; return log; }
+
+//	Log::PrintLine& operator << (const void*) { return this->pl; }
+	template <typename T>
+  	PrintLine& operator << (const T& v) {
+		return this->pl;
+	}	
+
+private:
+
+	PrintLine pl;
+};
+
+inline Log& log() { return Log::instance(); }
+
+#endif // LOG_IS_TURNED_ON
+
 #endif // LOG_H
+

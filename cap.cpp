@@ -415,7 +415,7 @@ void Cap::set_capture_inputs()
 			break;
 
 		log() << "[" << index << "]." << input.name;
-		sleep(1); // ehm. ok.
+//		sleep(1); // ehm. ok.
 
 		memset(&input, 0, sizeof(input));
 		index++;
