@@ -22,19 +22,20 @@ Flir::Flir(const std::string& port) :
 		return;
 	}
 
-	m_port.set_option(asio::serial_port::baud_rate(57600)); 
+	//m_port.set_option(asio::serial_port::baud_rate(921600/*57600*/));
 	m_port.set_option(asio::serial_port::character_size(8));
 	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::none));
 	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); 
 	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
-/*
+    m_port.set_option(asio::serial_port::baud_rate(921600/*57600*/));
+
 	send(0x0, NULL, 0);
 	const uint8_t XP_mode[] = {0x03, 0x03};
 	send(0x12, XP_mode, 2);
 	const uint8_t LVDS_mode[] = {0x05, 0x00};
 	send(0x12, LVDS_mode, 2);
 	const uint8_t CMOS_mode[] = {0x06, 0x01};
-	send(0x12, CMOS_mode, 2);*/
+	send(0x12, CMOS_mode, 2);
 
 	m_port.async_read_some(asio::buffer(m_buf), 
 		bind(&Flir::recv_cb, this, m_buf.begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));

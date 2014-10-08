@@ -488,6 +488,36 @@ struct adapt_bitrate_desc_t {
 	int switch_down_from_here;
 };
 
+static void LED_RXD(int on)
+{
+    FILE* fled = fopen("/sys/class/leds/rxd/brightness", "wt");
+    if(NULL==fled) log()<< " - LED RXD open failed";
+
+    if(on)
+        fprintf(fled, "1");
+    else
+        fprintf(fled, "0");
+
+	fflush(fled);
+    fclose(fled);
+    //boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
+}
+
+static void LED_ERR(int on)
+{
+    FILE* fled = fopen("/sys/class/leds/error/brightness", "wt");
+    if(NULL==fled) log()<< " - LED ERR open failed";
+
+    if(on)
+        fprintf(fled, "1");
+    else
+        fprintf(fled, "0");
+
+	fflush(fled);
+    fclose(fled);
+    //boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
+}
+
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
 void run()
@@ -540,7 +570,11 @@ void run()
 		f_dump_yuv = fopen("dump.yuv", "wb");
 
 	while(!g_stop) {
+        // Startup time measure point #1
+        LED_RXD(1);
+
 		v4l2_buffer buf = cap.getFrame();
+
 
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
@@ -560,7 +594,7 @@ void run()
 			if (to_skip>0) // to_skip == -1 means no video is sent at all
 				to_skip--; 
 
-			log() << "Frame skipped";
+			log() << "     VRTPK App: Frame skipped";
 		}
 
 		cap.putFrame(buf);
@@ -570,6 +604,9 @@ void run()
 		const ptrdiff_t info_size = cur - &info_out[0];
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
+
+        // Startup time measure point #2
+        LED_ERR(0);
 
 		if (coded_size) {
 			Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
@@ -608,6 +645,9 @@ int main(int argc, char *argv[])
 	printf("Teplovisor app starting time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
 	
 	try {
+
+        LED_ERR(1);
+
 		if (argc < 3) {
 			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)>\n" << std::endl;
 			return 0;
