@@ -21,6 +21,7 @@
 #include <linux/v4l2-subdev.h>
 #include <media/davinci/videohd.h> //NAG
 
+#include <boost/thread.hpp>
 #include <boost/lexical_cast.hpp>
 
 #include "common.h"
@@ -621,6 +622,7 @@ v4l2_buffer Cap::getFrame()
 				log() << "EIO was received in Cap::getFrame. Were some frames lost?";
 			else
 				throw ex("Failed to DQ buffer from capture device. errno = " + boost::lexical_cast<std::string>(errno));
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
 	} while (ret < 0);
 
 	const long long curr_time = buf.timestamp.tv_sec*1000000 + buf.timestamp.tv_usec;

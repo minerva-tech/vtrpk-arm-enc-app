@@ -104,6 +104,7 @@
     <File Name="defines.h"/>
     <File Name="flir.cpp"/>
     <File Name="flir.h"/>
+    <File Name="iobserver.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

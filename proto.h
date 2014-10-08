@@ -1,6 +1,8 @@
 #ifndef PROTO_H_
 #define PROTO_H_
 
+#include "iobserver.h"
+
 class IServerCmds
 {
 public:
@@ -44,6 +46,8 @@ public:
 	static void SendMDCfg(const std::string&);
 	static void SendROI(const std::vector<uint8_t>&);
 	
+	static void SendID(int id);
+	
 private:
 	struct Message;
 
@@ -75,30 +79,31 @@ private:
 	std::string m_md_cfg;
 	std::vector<uint8_t> m_roi;
 
-	static const int msg_type_to_config_idx[NumberOfMessageTypes];
+//	static const int msg_type_to_config_idx[NumberOfMessageTypes];
+	bool m_first_packet_was_received[NumberOfMessageTypes];
 };
 
 struct Server::Message
 {
-	static const size_t mts = Comm::mss-1;
+	static const size_t mts;// = Comm::mss-1;
 
-	Message(uint8_t type, bool last_pkt, uint8_t size) : header((type & 7) << 5 | (size & 0xf) << 1 | last_pkt==1) { }
+	Message(uint8_t type, bool first_pkt, uint8_t size) : header((type & 7) << 5 | (size & 0xf) << 1 | first_pkt==1) { }
 	int type() const {return header >> 5;}
 	int size() const {return header >> 1 & 0xf;}
-	bool last_pkt() const {return header & 1;}
+	bool first_pkt() const {return header & 1;}
+	bool last_pkt() const {return size() != sizeof(payload);}
 
 	uint8_t header;
-	uint8_t payload[mts];
+	uint8_t payload[Comm::mss-1];
 };
 
 class Client {
-	static const boost::chrono::seconds timeout;
 
 	class Cmds : public IServerCmds {
 	public:
 		Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false) {}
 
-		virtual bool Hello(int id) {m_hello_received = true; return false;}
+		virtual bool Hello(int id) {m_hello_received = true; m_camera_id = id; return false;}
 		virtual void Start() {assert(0);}
 		virtual void Stop() {assert(0);}
 
@@ -117,16 +122,20 @@ class Client {
 		bool m_enc_cfg_received;
 		bool m_md_cfg_received;
 		bool m_roi_received;
+		int  m_camera_id;
 		std::string m_enc_cfg;
 		std::string m_md_cfg;
 		std::vector<uint8_t> m_roi;
 	};
 
 public:
-	static bool Handshake();
-	static std::string GetEncCfg();
-	static std::string GetMDCfg();
-	static std::vector<uint8_t> GetROI();
+	static const boost::chrono::seconds timeout;
+	static const boost::chrono::seconds get_enc_cfg_timeout;
+
+	static int Handshake(IObserver* observer = NULL);
+	static std::string GetEncCfg(IObserver* observer = NULL);
+	static std::string GetMDCfg(IObserver* observer = NULL);
+	static std::vector<uint8_t> GetROI(IObserver* observer = NULL);
 };
 
 namespace Auxiliary {

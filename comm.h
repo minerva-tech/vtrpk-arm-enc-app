@@ -93,7 +93,7 @@ public:
 
 	void setCallback(const Callback& c, int port) { m_callback[port] = c; }
 	
-	void setTxBufferSize(size_t size) { m_out_buf.setSize(size); } // TODO: For debug purposes only!
+	void setTxBufferSize(size_t size) { m_out_buf.setSize(size); out_buf_size = size; } // TODO: For debug purposes only!
 
 	~Comm();
 	
@@ -156,7 +156,7 @@ private:
 	boost::chrono::steady_clock::time_point m_start;
 	uint32_t m_recv_amount[4];
 
-	static const int out_buf_size = 1000; //!< Number of packets, not bytes
+	static int out_buf_size; //!< Number of packets, not bytes
 	CircBuf<Pkt> m_out_buf; // i'm not sure that it's really necessary. Simple and error-free way is to use deque<Pkt>, and call async_write for single element in a time. As we have bitrate 115200 top, async write will be called 960 times a second tops. But such simple way is not enough fun.
 //	std::vector<Pkt> m_out_buf[2];
 //	std::vector<Pkt>::iterator m_out_cur;

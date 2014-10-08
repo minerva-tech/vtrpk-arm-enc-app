@@ -92,6 +92,8 @@ Comm& Comm::instance() {
 }
 #endif // #if INTERPROCESS_SINGLETON
 
+int Comm::out_buf_size = 1000;
+
 Comm::Comm() :
 	m_port(m_io_service),
 	m_camera_id(0),
