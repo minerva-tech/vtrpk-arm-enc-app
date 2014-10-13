@@ -34,7 +34,7 @@ int g_tx_buffer_size = 1000;
 class ServerCmds : public IServerCmds
 {
 public:
-	virtual bool Hello(int id) {return true;}
+	virtual bool Hello(int id) {Comm::instance().drop_unsent();return true;}
 	virtual void Start() {log()<<"start";g_stop = false;}
 	virtual void Stop() {g_stop = true;}
 

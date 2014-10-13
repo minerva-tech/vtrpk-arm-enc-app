@@ -1,7 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-#define LOG_IS_TURNED_ON 0
+#define LOG_IS_TURNED_ON 1
 
 #pragma warning(disable : 4995)
 #include <boost/date_time.hpp>

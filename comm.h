@@ -25,6 +25,8 @@ struct CircBuf
 	void setSize(size_t size); // TODO: For debug purposes only!
 
 	void reset();
+	
+	void drop_unsent();
 
 	void push_back(T&& pkt);
 
@@ -32,9 +34,9 @@ struct CircBuf
 	bool empty() const;
 	size_t size() const;
 
-	T* get_chunk(size_t* size) const;
+//	T* get_chunk(size_t* size) const;
 	asio::mutable_buffers_1 get_chunk() const;
-	T* get_free_chunk(size_t* size) const;
+//	T* get_free_chunk(size_t* size) const;
 
 	void taken(size_t size);
 	void filled(size_t size);
@@ -44,6 +46,7 @@ struct CircBuf
 
 	T* m_w;
 	T* m_r;
+	mutable T* m_re;
 
 	bool m_empty;
 };
@@ -104,6 +107,8 @@ public:
 	void transmit_and_close();
 
 	std::vector<std::pair<std::string, uint32_t> > getStat();
+	
+	void drop_unsent();
 	
 	void allowTransmission(bool);
 	bool isTransmissionAllowed() const;
@@ -198,6 +203,7 @@ inline CircBuf<T>::CircBuf(size_t size) :
 	m_buf_end(&m_buf[0] + size),
 	m_w(&m_buf[0]),
 	m_r(&m_buf[0]),
+	m_re(&m_buf[0]),
 	m_empty(true)
 { }
 
@@ -208,13 +214,25 @@ inline void CircBuf<T>::setSize(size_t size)
 	m_buf_end = &m_buf[0] + size;
 	m_w = &m_buf[0];
 	m_r = &m_buf[0];
+	m_re = &m_buf[0];
 	m_empty = true;
 }
 
 template <typename T>
 inline void CircBuf<T>::reset()
 {
-	m_w = m_r = &m_buf[0];
+	m_w = m_r = m_re = &m_buf[0];
+	m_empty = true;
+}
+
+template <typename T>
+inline void CircBuf<T>::drop_unsent()
+{
+	if (full() && m_re == m_w)
+		return; // not possible. Buffer is full, and m_read_end is equal to current m_write pointer. It means that i have nothing to drop, but if i'll try it, m_empty will be set to true which is wrong.
+
+	m_w = m_re;
+	m_empty = m_r == m_w;
 }
 
 template <typename T>
@@ -229,7 +247,7 @@ inline void CircBuf<T>::push_back(T&& val)
 	if (m_w == m_buf_end)
 		m_w = &m_buf[0];
 }
-
+/*
 template <typename T>
 inline T* CircBuf<T>::get_chunk(size_t* size) const
 {
@@ -238,10 +256,12 @@ inline T* CircBuf<T>::get_chunk(size_t* size) const
 	else
 		*size = m_buf_end - m_r;
 
+	m_next_r = m_r+*size;
+
 	*size *= sizeof(T);
 
 	return m_r;
-}
+}*/
 
 template <typename T>
 inline asio::mutable_buffers_1 CircBuf<T>::get_chunk() const
@@ -255,9 +275,13 @@ inline asio::mutable_buffers_1 CircBuf<T>::get_chunk() const
 
 	size = std::min(size, MAX_TRANSMISSION_CHUNK_SIZE);
 
+	m_re = m_r + size;
+	if (m_re == m_buf_end)
+		m_re = &m_buf[0];
+
 	return asio::buffer(m_r, size * sizeof(T));
 }
-
+/*
 template <typename T>
 inline T* CircBuf<T>::get_free_chunk(size_t* size) const
 {
@@ -270,7 +294,7 @@ inline T* CircBuf<T>::get_free_chunk(size_t* size) const
 
 	return m_w;
 }
-
+*/
 template <typename T>
 inline void CircBuf<T>::taken(size_t size)
 {

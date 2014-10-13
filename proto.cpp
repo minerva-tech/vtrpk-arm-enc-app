@@ -28,10 +28,10 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 {
 	const Message* msg = reinterpret_cast<const Message*>(payload);
 
-	log() << "camera in packet: " << (int)camera << " my camera id: " << Comm::instance().cameraID();
+//	log() << "camera in packet: " << (int)camera << " my camera id: " << Comm::instance().cameraID();
 
 	if (camera!=Comm::instance().cameraID() && (msg->type()!=Command || msg->payload[0]!=Hello)) { // TODO: All connected cameras will answer to Hello command. May be it's wrong behavior. 
-		log() << "Command wasn't accepted (camera in packet: " << (int)camera << " my camera id: " << Comm::instance().cameraID();
+		log() << "Command wasn't accepted (camera in packet: " << (int)camera << " my camera id: " << (int)Comm::instance().cameraID();
 		return;
 	}
 
@@ -56,7 +56,7 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 
 void Server::execute(uint8_t command, uint8_t arg)
 {
-	log() << "command received";
+	log() << "command was received : " << (int)command;
 	
 	switch (command) {
 	case Hello:
@@ -178,6 +178,8 @@ void Server::SendID(int id)
 
 void Server::SendCommand(Commands cmd, uint8_t arg)
 {
+	log() << "Command send : " << (int)cmd;
+	
 	Server::Message msg(Command, true, 1);
 	msg.payload[0] = cmd;
 	msg.payload[1] = arg;

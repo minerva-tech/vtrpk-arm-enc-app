@@ -195,7 +195,7 @@ void Comm::close()
 		log() << "Port closing error : " << ec.message();
 
 	m_io_service.stop();
-	
+
 	m_thread.join();
 
 	m_io_service.reset();
@@ -342,6 +342,12 @@ void Comm::transmitted(const system::error_code& e, size_t size)
 	}
 }
 
+void Comm::drop_unsent() 
+{
+	lock_guard<mutex> _(m_transmit_lock);
+	m_out_buf.drop_unsent();
+}
+
 void Comm::allowTransmission(bool val)
 {
 	m_no_actual_transmitting = !val;
@@ -395,8 +401,10 @@ void Comm::recv_pkt(const Pkt* pkt)
 {
 	int comment = Invalid;
 
-	if (!pkt->crc_valid())
+	if (!pkt->crc_valid()) {
 		comment |= CrcError;
+		log() << "CrcError";
+	}
 
 	if (pkt->count_lsb() != m_in_count_lsb[pkt->camera()])
 		comment |= PacketLost;
