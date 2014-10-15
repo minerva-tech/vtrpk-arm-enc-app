@@ -12,6 +12,7 @@ const int BITRATE_MIN  = 1000;
 const int BITRATE_MAX  =64000;
 
 const char eeprom_filename[] = "/sys/devices/platform/spi_davinci.4/spi4.0/eeprom";
+const char version_info_filename[] = "/etc/version_info";
 
 enum {
 	cam_id_config_offset = 0,

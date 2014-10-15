@@ -32,6 +32,8 @@ BOOST_MODULES = \
 #  serialization \
 #  regex
 
+BUILD_NUMBER_FILE = build-number.txt
+
 OBJ = main.o \
       enc.o \
       comm.o \
@@ -111,14 +113,18 @@ CPPFLAGS_X86 += $(BOOST_CPPFLAGS) -O2
 #CPPFLAGS += $(BOOST_CPPFLAGS) -O2 -std=c++0x -mcpu=arm9tdmi
 #LDFLAGS += $(BOOST_LDFLAGS) -lpthread -static
 
+BUILD_NUMBER_LDFLAGS  = -Xlinker --defsym -Xlinker __BUILD_DATE=$$(date +'%Y%m%d')
+BUILD_NUMBER_LDFLAGS += -Xlinker --defsym -Xlinker __BUILD_NUMBER=$$(cat $(BUILD_NUMBER_FILE))
+
 #LDFLAGS += -L /home/kov/dm365/boost/boost_1_48_0/stage/lib_armv5t $(BOOST_LDFLAGS) $(ALG_LIB1) $(ALG_LIB2) $(XDC_LINKER_FILE) -lpthread -static
-LDFLAGS += -L $(BOOSTROOT)/stage/lib_armv5t $(BOOST_LDFLAGS) $(ALG_LIB1) $(ALG_LIB2) $(XDC_LINKER_FILE) -pthread -static -Xlinker -Map -Xlinker teplovisor.map
+LDFLAGS += -L $(BOOSTROOT)/stage/lib_armv5t $(BOOST_LDFLAGS) $(ALG_LIB1) $(ALG_LIB2) $(XDC_LINKER_FILE) $(BUILD_NUMBER_LDFLAGS) -pthread -static -Xlinker -Map -Xlinker teplovisor.map
 
 #LDFLAGS_X86 += -L /home/kov/dm365/boost/boost_1_48_0/stage/lib $(BOOST_LDFLAGS) -lpthread -static
 LDFLAGS_X86 += $(BOOST_LDFLAGS) -lpthread -static
 #LDFLAGS += -L /home/a/Documents/boost_1_48_0/stage/lib $(BOOST_LDFLAGS) -lpthread -static
 
 teplovisor: $(CONFIGPKG) $(OBJ)
+	@echo $$(($$(cat $(BUILD_NUMBER_FILE)) + 1)) > $(BUILD_NUMBER_FILE)
 	$(LINK) -o teplovisor $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o pbmtojbg85.o jbig85.o jbig_ar.o $(LDFLAGS)
 	$(STRIP) teplovisor --strip-unneeded
 

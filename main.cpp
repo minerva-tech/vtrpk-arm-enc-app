@@ -31,6 +31,9 @@ bool g_dump_yuv = false;
 
 int g_tx_buffer_size = 1000;
 
+extern char __BUILD_DATE;
+extern char __BUILD_NUMBER;
+
 class ServerCmds : public IServerCmds
 {
 public:
@@ -101,6 +104,33 @@ public:
 		eeprom.read((char*)&str[0], str.size()*sizeof(str[0]));
 
 		return str;
+	}
+	
+	virtual std::string GetVersionInfo() {
+		std::string ver;
+
+		std::ifstream version_file(version_info_filename);
+		if (!version_file) {
+			ver = "No system version info.";
+		} else {
+			version_file.seekg(0, std::ios_base::end);
+			const uint32_t size = version_file.tellg();
+			version_file.seekg(0, std::ios_base::beg);
+
+			log() << "Version Info size: " << size;
+
+			ver.resize(size);
+
+			version_file.read(&ver[0], ver.size()*sizeof(ver[0]));
+		}
+		
+		char tepl_ver[128];
+
+		sprintf(tepl_ver, "\nTeplovisor build %u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE);
+
+		ver += tepl_ver;
+
+		return ver;
 	}
 
 	virtual uint8_t GetCameraID() {
@@ -184,6 +214,11 @@ public:
 		eeprom.write((char*)&size, sizeof(size));
 
 		eeprom.write((char*)&str[0], str.size()*sizeof(str[0]));
+	}
+	
+	virtual void SetVersionInfo(const std::string& str)
+	{
+		// nothing to do.
 	}
 
 	virtual void SetCameraID(uint8_t id) {

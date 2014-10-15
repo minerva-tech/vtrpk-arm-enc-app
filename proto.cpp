@@ -49,7 +49,10 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 	case MDConfig:
 		getEncCfgChunk(msg, m_md_cfg, boost::bind(&IServerCmds::SetMDCfg, m_callbacks, _1));
 		break;
-	}
+    case VersionInfo:
+        getEncCfgChunk(msg, m_version_info, boost::bind(&IServerCmds::SetVersionInfo, m_callbacks, _1));
+        break;
+    }
 
 	return;
 }
@@ -60,9 +63,8 @@ void Server::execute(uint8_t command, uint8_t arg)
 	
 	switch (command) {
 	case Hello:
-		if (m_callbacks->Hello(arg)) {
+		if (m_callbacks->Hello(arg))
 			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
-		}
 		break;
 	case Start:
 		m_callbacks->Start();
@@ -79,7 +81,10 @@ void Server::execute(uint8_t command, uint8_t arg)
 	case RequestROI:
 		boost::thread(boost::bind(&Server::SendROI, m_callbacks->GetROI()));
 		break;
-	case RequestRegister:
+    case RequestVersionInfo:
+        boost::thread(boost::bind(&Server::SendVersionInfo, m_callbacks->GetVersionInfo()));
+        break;
+    case RequestRegister:
 		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
 		break;
 	case SetID:
@@ -171,6 +176,11 @@ void Server::SendROI(const std::vector<uint8_t>& roi)
 	SendCfg(roi, ROIConfig);
 }
 
+void Server::SendVersionInfo(const std::string& version_info)
+{
+    SendCfg(version_info, VersionInfo);
+}
+
 void Server::SendID(int id)
 {
     SendCommand(SetID, id);
@@ -178,8 +188,6 @@ void Server::SendID(int id)
 
 void Server::SendCommand(Commands cmd, uint8_t arg)
 {
-	log() << "Command send : " << (int)cmd;
-	
 	Server::Message msg(Command, true, 1);
 	msg.payload[0] = cmd;
 	msg.payload[1] = arg;
@@ -255,4 +263,21 @@ std::vector<uint8_t> Client::GetROI(IObserver* observer)
     }
 
     return cmds.m_roi;
+}
+
+std::string Client::GetVersionInfo(IObserver* observer)
+{
+    Cmds cmds;
+    Server server(&cmds);
+
+    server.SendCommand(Server::RequestVersionInfo);
+
+    chrono::steady_clock::time_point start = chrono::steady_clock::now();
+    while(!cmds.m_roi_received && chrono::steady_clock::now() - start < timeout) {
+        if (observer)
+            observer->progress();
+        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    }
+
+    return cmds.m_version_info;
 }
