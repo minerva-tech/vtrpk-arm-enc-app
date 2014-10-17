@@ -134,8 +134,8 @@ public:
 
 			uint32_t flir_data[4];
 			m_flir->get_serials(flir_data);
-			sprintf(t, "Camera serial %x\n", flir_data[0]); ver += t;
-			sprintf(t, "Sensor serial %x\n", flir_data[1]); ver += t;
+			sprintf(t, "Camera serial %u\n", flir_data[0]); ver += t;
+			sprintf(t, "Sensor serial %u\n", flir_data[1]); ver += t;
 			sprintf(t, "SW version %x\n", flir_data[2]); ver += t;
 			sprintf(t, "HW version %x\n", flir_data[3]); ver += t;
 		}

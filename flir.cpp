@@ -151,8 +151,9 @@ void Flir::recv_cb(uint8_t* p, const system::error_code& err, std::size_t size)
 
 void Flir::get_serials(uint32_t data[4])
 {
+	memset(data, 0, 16);
+
 	if (!m_port.is_open()) {
-		memset(data, 0, 16);
 		return;
 	}
 	
@@ -160,9 +161,15 @@ void Flir::get_serials(uint32_t data[4])
 	send(0x04, NULL, 0);
 	wait_for_answer();
 
+	data[0] = m_serials[0];
+	data[1] = m_serials[1];
+
 	m_answered = false;
 	send(0x05, NULL, 0);
 	wait_for_answer();
+
+	data[2] = m_versions[0];
+	data[3] = m_versions[1];
 }
 
 uint32_t Flir::detect_baudrate()
