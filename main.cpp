@@ -37,6 +37,8 @@ extern char __BUILD_NUMBER;
 class ServerCmds : public IServerCmds
 {
 public:
+	ServerCmds(Flir* flir = NULL) : m_flir(flir) {}
+
 	virtual bool Hello(int id) {Comm::instance().drop_unsent();return true;}
 	virtual void Start() {log()<<"start";g_stop = false;}
 	virtual void Stop() {g_stop = true;}
@@ -111,7 +113,7 @@ public:
 
 		std::ifstream version_file(version_info_filename);
 		if (!version_file) {
-			ver = "No system version info.";
+			ver = "No system version info.\n";
 		} else {
 			version_file.seekg(0, std::ios_base::end);
 			const uint32_t size = version_file.tellg();
@@ -124,11 +126,19 @@ public:
 			version_file.read(&ver[0], ver.size()*sizeof(ver[0]));
 		}
 		
-		char tepl_ver[128];
+		if (m_flir) {
+			char t[128];
+			sprintf(t, "Teplovisor build %u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
 
-		sprintf(tepl_ver, "\nTeplovisor build %u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE);
+			sprintf(t, "FPGA revision %x\n", GetRegister(0x2e)); ver += t;
 
-		ver += tepl_ver;
+			uint32_t flir_data[4];
+			m_flir->get_serials(flir_data);
+			sprintf(t, "Camera serial %x\n", flir_data[0]); ver += t;
+			sprintf(t, "Sensor serial %x\n", flir_data[1]); ver += t;
+			sprintf(t, "SW version %x\n", flir_data[2]); ver += t;
+			sprintf(t, "HW version %x\n", flir_data[3]); ver += t;
+		}
 
 		return ver;
 	}
@@ -234,6 +244,9 @@ public:
 
 		log() << "New camera ID received : " << (int)id;
 	}
+	
+private:
+	Flir* m_flir;
 };
 
 void setReg(uint8_t addr, uint16_t val)
@@ -610,7 +623,6 @@ void run()
 
 		v4l2_buffer buf = cap.getFrame();
 
-
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
@@ -693,7 +705,7 @@ int main(int argc, char *argv[])
 
 		Flir flir("/dev/ttyS0");
 
-		ServerCmds cmds;
+		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 		Server server(&cmds);
 
 		Comm::instance().setCameraID(cmds.GetCameraID());
@@ -703,7 +715,7 @@ int main(int argc, char *argv[])
 		CMEM_init();
 
 		Enc::rman_init();
-		
+
 		if (argc==4)
 			g_tx_buffer_size = atoi(argv[3]);
 

@@ -10,6 +10,8 @@
 
 using namespace boost;
 
+const uint32_t baudrates[] = {921600, 460800, 115200, 57600, /*28800,*/ 19200, 9600}; // 28800 cannot be set somehow. You can try "stty -F /dev/ttyS0 28800"
+
 Flir::Flir(const std::string& port) :
 	m_port(m_io_service)
 {
@@ -22,25 +24,43 @@ Flir::Flir(const std::string& port) :
 		return;
 	}
 
-	//m_port.set_option(asio::serial_port::baud_rate(921600/*57600*/));
 	m_port.set_option(asio::serial_port::character_size(8));
 	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::none));
 	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); 
 	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
-    m_port.set_option(asio::serial_port::baud_rate(921600/*57600*/));
 
-	send(0x0, NULL, 0);
+	m_port.async_read_some(asio::buffer(m_buf), 
+		bind(&Flir::recv_cb, this, m_buf.begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+
+	m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
+
+	const uint32_t baudrate = detect_baudrate();
+
+	if (baudrate == 0) {
+		log() << "FLIR doesn't answer at any baudrate.";
+		m_port.close();
+		m_io_service.stop();
+		m_thread.join();
+		return;
+	}
+
+	if (baudrate != baudrates[0]) {
+		const uint8_t BAUD_RATE[] = {0x00, 0x07};
+		send(0x07, BAUD_RATE, 2);
+		
+		const uint32_t baudrate = detect_baudrate();
+		
+		if (baudrate != baudrates[0])
+			log() << "Cannot set baudrate for FLIR.";
+			return;
+	}
+
 	const uint8_t XP_mode[] = {0x03, 0x03};
 	send(0x12, XP_mode, 2);
 	const uint8_t LVDS_mode[] = {0x05, 0x00};
 	send(0x12, LVDS_mode, 2);
 	const uint8_t CMOS_mode[] = {0x06, 0x01};
 	send(0x12, CMOS_mode, 2);
-
-	m_port.async_read_some(asio::buffer(m_buf), 
-		bind(&Flir::recv_cb, this, m_buf.begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
-
-	m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
 }
 
 Flir::~Flir()
@@ -61,18 +81,6 @@ Flir::~Flir()
 
 	m_io_service.reset();	
 }
-/*
-void Flir::send(uint8_t data[8])
-{
-	if (data[0] == 0x6e && data[4] == 0x79) {
-		log() << "Command SHUTTER_POSITION was received, and it could be an error, and this command is dangerous, so it was rejected."; 
-		return;
-	}
-
-	asio::write(m_port, asio::buffer(data, 8));
-
-	return;
-}*/
 
 void Flir::send(const uint8_t* data, size_t size)
 {
@@ -123,10 +131,64 @@ void Flir::send(uint8_t cmd, const uint8_t* args, size_t arg_size)
 
 void Flir::recv_cb(uint8_t* p, const system::error_code& err, std::size_t size)
 {
-    log() << "Camera has answered, size: " << size;
+	log() << "Camera has answered, size: " << size;
+
+	m_answered = p[0] == 0x6e && p[1] == 0x00; // Used for detect_baudrate;
+	
+	if (m_answered && p[3]==0x04) { // SERIAL_NUMBER
+		m_serials[0] = p[8] <<24 | p[9] << 16 | p[10]<< 8 | p[11];
+		m_serials[1] = p[12]<<24 | p[13]<< 16 | p[14]<< 8 | p[15];
+	} else if (m_answered && p[3]==0x05) { // GET_REVISION
+		m_versions[0] = p[8] <<24 | p[9] << 16 | p[10]<< 8 | p[11];
+		m_versions[1] = p[12]<<24 | p[13]<< 16 | p[14]<< 8 | p[15];
+	}
 
 	Auxiliary::SendCameraRegisterVal(p, size);
 
 	m_port.async_read_some(asio::buffer(m_buf), 
 		bind(&Flir::recv_cb, this, m_buf.begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+}
+
+void Flir::get_serials(uint32_t data[4])
+{
+	if (!m_port.is_open()) {
+		memset(data, 0, 16);
+		return;
+	}
+	
+	m_answered = false;
+	send(0x04, NULL, 0);
+	wait_for_answer();
+
+	m_answered = false;
+	send(0x05, NULL, 0);
+	wait_for_answer();
+}
+
+uint32_t Flir::detect_baudrate()
+{
+	m_answered = false;
+	
+	for (int i=0; i<sizeof(baudrates)/sizeof(baudrates[0]); i++) {
+		log() << "test FLIR connection at " << baudrates[i];
+		
+		m_port.set_option(asio::serial_port::baud_rate(baudrates[i]));
+
+		send(0x0, NULL, 0);
+
+		wait_for_answer();
+
+		if (m_answered)
+			return baudrates[i];
+	}
+	
+	return 0;
+}
+
+void Flir::wait_for_answer() const
+{
+	uint32_t tries=0;
+	const uint32_t timeout = 100;
+	while(!m_answered && tries++<timeout)
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
 }
