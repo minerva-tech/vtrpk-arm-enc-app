@@ -50,9 +50,12 @@ Flir::Flir(const std::string& port) :
 		
 		const uint32_t baudrate = detect_baudrate();
 		
-		if (baudrate != baudrates[0])
+		if (baudrate != baudrates[0]) {
 			log() << "Cannot set baudrate for FLIR.";
 			return;
+		} else {
+			send(0x01, NULL, 0);
+		}
 	}
 
 	const uint8_t XP_mode[] = {0x03, 0x03};
