@@ -12,8 +12,8 @@ public:
 	void get_serials(uint32_t data[4]);
 	
 private:
-	uint32_t detect_baudrate();
-	void wait_for_answer() const;
+	uint32_t detect_baudrate(bool boot=false);
+	void wait_for_answer(uint32_t timeout=100) const;
 
 	boost::thread m_thread;
 	boost::asio::io_service m_io_service;

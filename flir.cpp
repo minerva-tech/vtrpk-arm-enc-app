@@ -34,7 +34,7 @@ Flir::Flir(const std::string& port) :
 
 	m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
 
-	const uint32_t baudrate = detect_baudrate();
+	const uint32_t baudrate = detect_baudrate(true);
 
 	if (baudrate == 0) {
 		log() << "FLIR doesn't answer at any baudrate.";
@@ -47,9 +47,9 @@ Flir::Flir(const std::string& port) :
 	if (baudrate != baudrates[0]) {
 		const uint8_t BAUD_RATE[] = {0x00, 0x07};
 		send(0x07, BAUD_RATE, 2);
-		
+
 		const uint32_t baudrate = detect_baudrate();
-		
+
 		if (baudrate != baudrates[0]) {
 			log() << "Cannot set baudrate for FLIR.";
 			return;
@@ -175,13 +175,24 @@ void Flir::get_serials(uint32_t data[4])
 	data[3] = m_versions[1];
 }
 
-uint32_t Flir::detect_baudrate()
+uint32_t Flir::detect_baudrate(bool boot)
 {
 	m_answered = false;
+
+	if (boot) {
+		m_port.set_option(asio::serial_port::baud_rate(baudrates[0]));
+		for (int i=0; i<30; i++) {
+			log() << "Test FLIR connection at " << baudrates[0];
+			send(0x0, NULL, 0);
+			wait_for_answer(1);
+			if (m_answered)
+				return baudrates[0];
+		}
+	}
 	
 	for (int i=0; i<sizeof(baudrates)/sizeof(baudrates[0]); i++) {
 		log() << "test FLIR connection at " << baudrates[i];
-		
+
 		m_port.set_option(asio::serial_port::baud_rate(baudrates[i]));
 
 		send(0x0, NULL, 0);
@@ -195,10 +206,9 @@ uint32_t Flir::detect_baudrate()
 	return 0;
 }
 
-void Flir::wait_for_answer() const
+void Flir::wait_for_answer(uint32_t timeout) const
 {
 	uint32_t tries=0;
-	const uint32_t timeout = 100;
 	while(!m_answered && tries++<timeout)
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(1));
 }
