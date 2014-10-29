@@ -124,18 +124,20 @@ public:
 			ver.resize(size);
 
 			version_file.read(&ver[0], ver.size()*sizeof(ver[0]));
+
+            ver += "\n";
 		}
 		
 		if (m_flir) {
 			char t[128];
 			sprintf(t, "\"Teplovisor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
 
-			sprintf(t, "FPGA revision\t\t\t%x\n", GetRegister(0x2e)); ver += t;
+			sprintf(t, "FPGA revision\t\t%x\n", GetRegister(0x2e)); ver += t;
 
 			uint32_t flir_data[4];
 			m_flir->get_serials(flir_data);
-			sprintf(t, "Camera serial number\t\t%u\n", flir_data[0]); ver += t;
-			sprintf(t, "Sensor serial number\t\t%u\n", flir_data[1]); ver += t;
+			sprintf(t, "Camera serial number\t%u\n", flir_data[0]); ver += t;
+			sprintf(t, "Sensor serial number\t%u\n", flir_data[1]); ver += t;
 			sprintf(t, "Camera SW version\t\t%u\n", flir_data[2]); ver += t;
 			sprintf(t, "Camera HW version\t\t%u\n", flir_data[3]); ver += t;
 		}
