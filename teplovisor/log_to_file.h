@@ -1,12 +1,12 @@
 #ifndef LOG_H
 #define LOG_H
 
-#define LOG_IS_TURNED_ON 1
+#define LOG_ENABLE 0
 
 #pragma warning(disable : 4995)
 #include <boost/date_time.hpp>
 
-#if LOG_IS_TURNED_ON
+#if LOG_ENABLE
 
 class Log {
 	friend Log& log();
@@ -97,7 +97,7 @@ inline Log::PrintLine Log::operator << <Log::Severity> (const Log::Severity& s) 
 
 inline Log& log() { return Log::instance(); }
 
-#else // LOG_IS_TURNED_ON
+#else // LOG_ENABLE
 
 class Log {
 friend Log& log();
@@ -135,7 +135,7 @@ private:
 
 inline Log& log() { return Log::instance(); }
 
-#endif // LOG_IS_TURNED_ON
+#endif // LOG_ENABLE
 
 #endif // LOG_H
 
