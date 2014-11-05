@@ -1,6 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
+
 #define LOG_ENABLE 0
 
 #pragma warning(disable : 4995)
