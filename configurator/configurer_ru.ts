@@ -2,11 +2,39 @@
 <!DOCTYPE TS>
 <TS version="2.0" language="ru_RU">
 <context>
+    <name>CamRegisterEdit</name>
+    <message>
+        <location filename="camregisteredit.ui" line="17"/>
+        <source>Dialog</source>
+        <translation>Регистры FLIR</translation>
+    </message>
+    <message>
+        <location filename="camregisteredit.ui" line="42"/>
+        <source>Send</source>
+        <translation>Отправить</translation>
+    </message>
+    <message>
+        <location filename="camregisteredit.ui" line="65"/>
+        <source>Clear</source>
+        <translation>Очистить</translation>
+    </message>
+    <message>
+        <location filename="camregisteredit.ui" line="88"/>
+        <source>Command</source>
+        <translation>Команда</translation>
+    </message>
+    <message>
+        <location filename="camregisteredit.ui" line="101"/>
+        <source>Argument</source>
+        <translation>Аргумент</translation>
+    </message>
+</context>
+<context>
     <name>CfgEditor</name>
     <message>
         <location filename="cfgeditor.ui" line="23"/>
         <source>Form</source>
-        <translation type="unfinished"></translation>
+        <translation>Параметры енкодера</translation>
     </message>
     <message>
         <location filename="cfgeditor.ui" line="31"/>
@@ -29,15 +57,13 @@
         <translation>Установить Config</translation>
     </message>
     <message>
-        <location filename="cfgeditor.cpp" line="36"/>
-        <location filename="cfgeditor.cpp" line="59"/>
         <source>Cannot establish connection with a device</source>
-        <translation>Невозможно связаться с Тепловизором</translation>
+        <translation type="obsolete">Невозможно связаться с Тепловизором</translation>
     </message>
     <message>
-        <location filename="cfgeditor.cpp" line="42"/>
+        <location filename="cfgeditor.cpp" line="31"/>
         <source>Downloading encoder config</source>
-        <translation type="unfinished"></translation>
+        <translation>Идет скачивание параметров енкодера</translation>
     </message>
 </context>
 <context>
@@ -95,7 +121,7 @@
         <translation>Установить</translation>
     </message>
     <message>
-        <location filename="detparams.cpp" line="82"/>
+        <location filename="detparams.cpp" line="78"/>
         <source>Downloading MD parameters</source>
         <translation>Идет скачивание параметров детектора движения</translation>
     </message>
@@ -105,7 +131,7 @@
     <message>
         <location filename="editdetpresets.ui" line="26"/>
         <source>Dialog</source>
-        <translation type="unfinished">Параметры Профиля Детектора Движения</translation>
+        <translation>Параметры Профиля Детектора Движения</translation>
     </message>
     <message>
         <location filename="editdetpresets.ui" line="57"/>
@@ -138,7 +164,7 @@
     <message>
         <location filename="logview.ui" line="14"/>
         <source>Dialog</source>
-        <translation>Параметры Профиля Детектора Движения</translation>
+        <translation>Журнал</translation>
     </message>
 </context>
 <context>
@@ -149,80 +175,92 @@
         <translation>Конфигуратор</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="77"/>
+        <location filename="mainwindow.ui" line="81"/>
         <source>Motion Detector</source>
         <translation>Детектор Движения</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="99"/>
-        <location filename="mainwindow.ui" line="540"/>
+        <location filename="mainwindow.ui" line="103"/>
+        <location filename="mainwindow.ui" line="551"/>
         <source>Edit</source>
         <translation>Изменить</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="112"/>
+        <location filename="mainwindow.ui" line="116"/>
         <source>Apply</source>
         <translation>Применить</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="132"/>
+        <location filename="mainwindow.ui" line="136"/>
         <source>Codec</source>
         <translation>Видео-компрессор</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="144"/>
+        <location filename="mainwindow.ui" line="148"/>
         <source>Edit Config</source>
         <translation>Настройки</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="234"/>
+        <location filename="mainwindow.ui" line="244"/>
         <source>Start</source>
         <translation>Пуск</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="250"/>
+        <location filename="mainwindow.ui" line="266"/>
         <source>Stop</source>
         <translation>Стоп</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="179"/>
+        <location filename="mainwindow.ui" line="183"/>
         <source>Get ROI</source>
         <translation>Показать</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="161"/>
+        <location filename="mainwindow.ui" line="165"/>
         <source>ROI</source>
         <translation>Зона наблюдения</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="198"/>
+        <location filename="mainwindow.ui" line="202"/>
         <source>Set ROI</source>
         <translation>Изменить</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="212"/>
+        <location filename="mainwindow.ui" line="215"/>
         <source>Clear ROI</source>
         <translation>Скрыть</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="285"/>
+        <location filename="mainwindow.ui" line="289"/>
+        <source>Camera ID</source>
+        <translation>Камера</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.ui" line="327"/>
+        <source>Thresholds</source>
+        <translation>Пороги</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.ui" line="349"/>
         <source>Marker</source>
         <translation>Выделение цели</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="310"/>
         <source>Brightness</source>
-        <translation>Яркость</translation>
+        <translation type="obsolete">Яркость</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="334"/>
         <source>-</source>
-        <translation>-</translation>
+        <translation type="obsolete">-</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="363"/>
         <source>+</source>
-        <translation>+</translation>
+        <translation type="obsolete">+</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.ui" line="403"/>
+        <source>Connect</source>
+        <translation>Подключить</translation>
     </message>
     <message>
         <location filename="mainwindow.ui" line="426"/>
@@ -231,7 +269,7 @@
     </message>
     <message>
         <location filename="mainwindow.ui" line="430"/>
-        <location filename="mainwindow.ui" line="467"/>
+        <location filename="mainwindow.ui" line="469"/>
         <source>Language Select</source>
         <translation>Выбор языка</translation>
     </message>
@@ -243,68 +281,92 @@
     <message>
         <location filename="mainwindow.ui" line="456"/>
         <source>Registers</source>
-        <translation></translation>
+        <translation>Регистры</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="472"/>
+        <location filename="mainwindow.ui" line="477"/>
         <source>Erase Config</source>
-        <translation></translation>
+        <translation>Очистить настройки</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="480"/>
+        <location filename="mainwindow.ui" line="485"/>
         <source>English</source>
         <translation></translation>
     </message>
     <message utf8="true">
-        <location filename="mainwindow.ui" line="488"/>
+        <location filename="mainwindow.ui" line="493"/>
         <source>Русский</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="493"/>
+        <location filename="mainwindow.ui" line="501"/>
         <source>Show</source>
         <translation>Показать</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="498"/>
+        <location filename="mainwindow.ui" line="509"/>
         <source>Set</source>
         <translation>Установить</translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="506"/>
+        <location filename="mainwindow.ui" line="517"/>
         <source>COM1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="514"/>
+        <location filename="mainwindow.ui" line="525"/>
         <source>COM2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="522"/>
+        <location filename="mainwindow.ui" line="533"/>
         <source>COM3</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="530"/>
+        <location filename="mainwindow.ui" line="541"/>
         <source>COM4</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="mainwindow.ui" line="535"/>
+        <location filename="mainwindow.ui" line="546"/>
         <source>Port Config</source>
         <translation>Настройки порта</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="34"/>
+        <location filename="mainwindow.ui" line="562"/>
+        <source>Camera</source>
+        <translation>Регистры FLIR</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.ui" line="570"/>
+        <source>About</source>
+        <translation>О программе</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.cpp" line="188"/>
         <source>Establishing connection with a device</source>
         <translation>Устанавливается соединение с Тепловизором</translation>
     </message>
     <message>
-        <location filename="mainwindow.cpp" line="41"/>
-        <location filename="mainwindow.cpp" line="338"/>
+        <location filename="mainwindow.cpp" line="199"/>
         <source>Cannot establish connection with a device</source>
         <translation>Невозможно связаться с Тепловизором</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.cpp" line="547"/>
+        <source>Downloading version info</source>
+        <translation>Получение информации о версиях</translation>
+    </message>
+    <message>
+        <location filename="mainwindow.cpp" line="556"/>
+        <source>VRTPK firmware version	</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="mainwindow.cpp" line="556"/>
+        <source>Configurator build		</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -312,7 +374,7 @@
     <message>
         <location filename="portconfig.ui" line="23"/>
         <source>Dialog</source>
-        <translation>Параметры Профиля Детектора Движения</translation>
+        <translation>Параметры последовательного порта</translation>
     </message>
     <message>
         <location filename="portconfig.ui" line="42"/>
@@ -322,7 +384,7 @@
     <message>
         <location filename="portconfig.ui" line="56"/>
         <source>Baud Rate</source>
-        <translation></translation>
+        <translation>Скорость (бод)</translation>
     </message>
     <message>
         <location filename="portconfig.ui" line="70"/>
@@ -333,37 +395,48 @@
 <context>
     <name>QDSWidget</name>
     <message>
-        <location filename="dswidget.cpp" line="211"/>
+        <location filename="dswidget.cpp" line="309"/>
         <source>Video: </source>
         <translation>Видео:</translation>
     </message>
     <message>
-        <location filename="dswidget.cpp" line="212"/>
+        <location filename="dswidget.cpp" line="309"/>
+        <location filename="dswidget.cpp" line="310"/>
+        <source> bit/sec</source>
+        <translation>бит/с</translation>
+    </message>
+    <message>
+        <location filename="dswidget.cpp" line="310"/>
         <source>Telemetry:</source>
         <translation>Аналитика:</translation>
     </message>
     <message>
-        <location filename="dswidget.cpp" line="213"/>
+        <location filename="dswidget.cpp" line="311"/>
         <source> Hz</source>
         <translation> Гц</translation>
     </message>
     <message>
-        <location filename="dswidget.cpp" line="213"/>
+        <location filename="dswidget.cpp" line="311"/>
         <source>Frame rate:</source>
         <translation>Частота кадров:</translation>
     </message>
     <message>
-        <location filename="dswidget.cpp" line="340"/>
+        <location filename="dswidget.cpp" line="453"/>
         <source>Downloading ROI</source>
         <translation>Загрузка ROI</translation>
     </message>
     <message>
-        <location filename="dswidget.cpp" line="573"/>
+        <location filename="dswidget.cpp" line="714"/>
+        <source>Invert ROI</source>
+        <translation>Инверсия ROI</translation>
+    </message>
+    <message>
+        <location filename="dswidget.cpp" line="716"/>
         <source>Finish ROI</source>
         <translation>Завершить ROI</translation>
     </message>
     <message>
-        <location filename="dswidget.cpp" line="575"/>
+        <location filename="dswidget.cpp" line="718"/>
         <source>Delete ROI</source>
         <translation>Удалить ROI</translation>
     </message>
@@ -375,13 +448,18 @@
         <source>Fatal error</source>
         <translation></translation>
     </message>
+    <message>
+        <location filename="mainwindow.cpp" line="179"/>
+        <source>Cannot establish connection with a device</source>
+        <translation>Невозможно связаться с Тепловизором</translation>
+    </message>
 </context>
 <context>
     <name>RegisterEdit</name>
     <message>
         <location filename="registeredit.ui" line="26"/>
         <source>Dialog</source>
-        <translation>Параметры Профиля Детектора Движения</translation>
+        <translation type="unfinished">Регистры FPGA</translation>
     </message>
     <message>
         <location filename="registeredit.ui" line="66"/>
@@ -391,18 +469,16 @@
     <message>
         <location filename="registeredit.ui" line="80"/>
         <source>Get Value</source>
-        <translation></translation>
+        <translation>Получить значение</translation>
     </message>
     <message>
         <location filename="registeredit.ui" line="87"/>
         <source>Set Value</source>
-        <translation></translation>
+        <translation>Установить значение</translation>
     </message>
     <message>
-        <location filename="registeredit.cpp" line="40"/>
-        <location filename="registeredit.cpp" line="74"/>
         <source>Cannot establish connection with a device</source>
-        <translation>Невозможно связаться с Тепловизором</translation>
+        <translation type="obsolete">Невозможно связаться с Тепловизором</translation>
     </message>
 </context>
 </TS>

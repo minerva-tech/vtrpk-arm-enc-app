@@ -49,7 +49,7 @@ HEADERS  += mainwindow.h \
 
 INCLUDEPATH += ../filter/ball
 
-INCLUDEPATH += ../boost_1_48_0
+INCLUDEPATH += ../../boost_1_48_0
 
 TRANSLATIONS += configurer_ru.ts
 
@@ -62,7 +62,7 @@ FORMS    += mainwindow.ui \
     registeredit.ui \
     camregisteredit.ui
 
-LIBS += -L../boost_1_48_0/stage/lib
+LIBS += -L../../boost_1_48_0/stage/lib
 
 LIBS += Strmiids.lib ole32.lib gdi32.lib user32.lib
 
