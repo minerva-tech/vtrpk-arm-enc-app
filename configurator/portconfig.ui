@@ -20,7 +20,7 @@
    </sizepolicy>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>COM port settings</string>
   </property>
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">

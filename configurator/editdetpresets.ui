@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>Motion Detector Presets</string>
   </property>
   <widget class="QListView" name="listView">
    <property name="geometry">
@@ -41,7 +41,7 @@
     <number>100</number>
    </property>
   </widget>
-  <widget class="QWidget" name="">
+  <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
      <x>270</x>

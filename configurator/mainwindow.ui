@@ -29,7 +29,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Das Configurar</string>
+   <string>Configurer</string>
   </property>
   <property name="windowIcon">
    <iconset>
@@ -418,7 +418,7 @@
      <x>0</x>
      <y>0</y>
      <width>590</width>
-     <height>21</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuSettings">
@@ -441,8 +441,8 @@
      <rect>
       <x>397</x>
       <y>99</y>
-      <width>135</width>
-      <height>94</height>
+      <width>107</width>
+      <height>82</height>
      </rect>
     </property>
     <property name="title">

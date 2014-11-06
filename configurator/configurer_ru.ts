@@ -4,8 +4,12 @@
 <context>
     <name>CamRegisterEdit</name>
     <message>
-        <location filename="camregisteredit.ui" line="17"/>
         <source>Dialog</source>
+        <translation type="obsolete">Регистры FLIR</translation>
+    </message>
+    <message>
+        <location filename="camregisteredit.ui" line="17"/>
+        <source>FLIR registers</source>
         <translation>Регистры FLIR</translation>
     </message>
     <message>
@@ -32,8 +36,12 @@
 <context>
     <name>CfgEditor</name>
     <message>
-        <location filename="cfgeditor.ui" line="23"/>
         <source>Form</source>
+        <translation type="obsolete">Параметры енкодера</translation>
+    </message>
+    <message>
+        <location filename="cfgeditor.ui" line="23"/>
+        <source>Codec parameter settings</source>
         <translation>Параметры енкодера</translation>
     </message>
     <message>
@@ -69,8 +77,12 @@
 <context>
     <name>DetParams</name>
     <message>
-        <location filename="detparams.ui" line="14"/>
         <source>Dialog</source>
+        <translation type="obsolete">Параметры Профиля Детектора Движения</translation>
+    </message>
+    <message>
+        <location filename="detparams.ui" line="14"/>
+        <source>Motion Detector Parameters</source>
         <translation>Параметры Профиля Детектора Движения</translation>
     </message>
     <message>
@@ -129,8 +141,12 @@
 <context>
     <name>EditDetPresets</name>
     <message>
-        <location filename="editdetpresets.ui" line="26"/>
         <source>Dialog</source>
+        <translation type="obsolete">Параметры Профиля Детектора Движения</translation>
+    </message>
+    <message>
+        <location filename="editdetpresets.ui" line="26"/>
+        <source>Motion Detector Presets</source>
         <translation>Параметры Профиля Детектора Движения</translation>
     </message>
     <message>
@@ -171,7 +187,8 @@
     <name>MainWindow</name>
     <message>
         <location filename="mainwindow.ui" line="32"/>
-        <source>Das Configurar</source>
+        <source>Configurer</source>
+        <oldsource>Das Configurar</oldsource>
         <translation>Конфигуратор</translation>
     </message>
     <message>
@@ -243,7 +260,7 @@
     <message>
         <location filename="mainwindow.ui" line="349"/>
         <source>Marker</source>
-        <translation>Выделение цели</translation>
+        <translation>Цель</translation>
     </message>
     <message>
         <source>Brightness</source>
@@ -361,20 +378,24 @@
     <message>
         <location filename="mainwindow.cpp" line="556"/>
         <source>VRTPK firmware version	</source>
-        <translation type="unfinished"></translation>
+        <translation>Версия firmware ВРТПК</translation>
     </message>
     <message>
         <location filename="mainwindow.cpp" line="556"/>
         <source>Configurator build		</source>
-        <translation type="unfinished"></translation>
+        <translation>Версия &quot;Конфигуратор&quot;</translation>
     </message>
 </context>
 <context>
     <name>PortConfig</name>
     <message>
-        <location filename="portconfig.ui" line="23"/>
         <source>Dialog</source>
-        <translation>Параметры последовательного порта</translation>
+        <translation type="obsolete">Параметры последовательного порта</translation>
+    </message>
+    <message>
+        <location filename="portconfig.ui" line="23"/>
+        <source>COM port settings</source>
+        <translation>Параметры COM порта</translation>
     </message>
     <message>
         <location filename="portconfig.ui" line="42"/>
@@ -459,7 +480,7 @@
     <message>
         <location filename="registeredit.ui" line="26"/>
         <source>Dialog</source>
-        <translation type="unfinished">Регистры FPGA</translation>
+        <translation>Регистры FPGA</translation>
     </message>
     <message>
         <location filename="registeredit.ui" line="66"/>
