@@ -202,7 +202,6 @@ inline uint8_t inc(IT& it, const IT& end)
 #define inc(it) \
     it++; \
     if (it == end) { \
-        m_rois.clear(); \
         return; \
     }
 
