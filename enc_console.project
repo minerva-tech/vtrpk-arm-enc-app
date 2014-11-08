@@ -116,6 +116,8 @@
     <File Name="teplovisor/teplovisor.c"/>
     <File Name="teplovisor/teplovisor-fpga.c"/>
     <File Name="teplovisor/testapp_arm926intc.c"/>
+    <File Name="teplovisor/default_enc_cfg.cpp"/>
+    <File Name="teplovisor/default_enc_cfg.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

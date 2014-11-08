@@ -16,6 +16,7 @@
 #include "flir.h"
 
 #include "defines.h"
+#include "default_enc_cfg.h"
 /*
 extern "C" {
 #include "tables.h"
@@ -44,6 +45,7 @@ public:
 	virtual void Stop() {g_stop = true;}
 
 	virtual std::string GetEncCfg() {
+
 		std::ifstream eeprom(eeprom_filename);
 		if (!eeprom)
 			return std::string();
@@ -225,9 +227,13 @@ public:
 		const int size = str.size();
 		eeprom.write((char*)&size, sizeof(size));
 
-		eeprom.write((char*)&str[0], str.size()*sizeof(str[0]));
+        log() << "roi size + " << sizeof(size);
+
+        eeprom.write((char*)&str[0], str.size()*sizeof(str[0]));
+
+        log() << "roi size + " << str.size()*sizeof(str[0]);
 	}
-	
+
 	virtual void SetVersionInfo(const std::string& str)
 	{
 		// nothing to do.
@@ -587,7 +593,8 @@ void run()
 	ServerCmds tmp_cmds;
 	std::string enc_cfg = tmp_cmds.GetEncCfg();
 
-	Enc enc(enc_cfg);
+	Enc enc;
+    enc.init(enc_cfg);
 
 	Cap cap(SRC_WIDTH, SRC_HEIGHT);
 
@@ -730,6 +737,12 @@ int main(int argc, char *argv[])
 			catch (ex& e) {
 				log() << e.str();
 				g_stop = true;
+
+                if (e.flag() == Ex_TryAnotherConfig) {
+                    ServerCmds tmp_cmds;
+                    log() << "Writing default config to eeprom";
+                    tmp_cmds.SetEncCfg(DefaultEncCfg);
+                }
 			}
 			catch(std::exception& e) {
 				log() << "std::exception: " << e.what();

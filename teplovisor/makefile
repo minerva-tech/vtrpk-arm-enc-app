@@ -41,7 +41,8 @@ OBJ = main.o \
       error_msg.o \
       cap.o \
       proto.o \
-	  flir.o
+      flir.o \
+      default_enc_cfg.o
 
 BOOST_MODULES_TYPE = 
 
