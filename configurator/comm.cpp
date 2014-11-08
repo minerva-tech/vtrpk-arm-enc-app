@@ -2,8 +2,8 @@
 
 #include "pchbarrier.h"
 
-//#include "logview.h" // todo: as comm.cpp will be used everywhere, qt dependencies should be removed from log.
-#include "log_to_file.h"
+#include "logview.h" // todo: as comm.cpp will be used everywhere, qt dependencies should be removed from log.
+//#include "log_to_file.h"
 #include "comm.h"
 
 using std::min;

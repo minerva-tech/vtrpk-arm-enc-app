@@ -15,7 +15,7 @@
 class Log {
 	friend Log& log();
 public:
-    Log() : m_ofs((QApplication::applicationDirPath()+"/log.txt").toStdString().c_str(), std::ios_base::app), m_edit(NULL),	m_sev_view(Error), m_sev_stream(Debug)
+    Log() : m_ofs((QApplication::applicationDirPath()+"/log.txt").toStdString().c_str(), std::ios_base::trunc), m_edit(NULL),	m_sev_view(Error), m_sev_stream(Debug)
 	{ m_ofs << "[" << boost::gregorian::day_clock::local_day() << "]" << std::endl; }
 
 	enum Severity {

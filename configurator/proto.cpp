@@ -2,7 +2,8 @@
 
 #include "pchbarrier.h"
 
-#include "log_to_file.h"
+#include "logview.h"
+//#include "log_to_file.h"
 #include "comm.h"
 #include "proto.h"
 

@@ -499,6 +499,8 @@ void QDSWidget::UploadROI()
 {
 	assert(g_roi_map_w % 8 == 0);
 
+    m_rois.finishRoi();
+
 	std::vector<uint8_t> roi;
 	roi.resize(g_roi_map_w * g_roi_map_h / 8);
 
