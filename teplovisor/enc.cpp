@@ -84,31 +84,29 @@ void ARM926_Dcache_Disable()
 	return;
 }
 
-Enc::Enc(const std::string& config)
+Enc::Enc() :
+    m_handle(nullptr)
 {
 //	init();
 
 	cache_init();
 
 	ires_init();
-
-	enc_create(config);
 }
 
 Enc::~Enc()
 {
-	H264VENC_Status status;
-	H264VENC_control(m_handle, XDM_RESET, &m_dynamicparams/*NULL*/, &status/*NULL*/);
+    if (m_handle) {
+        H264VENC_Status status;
+        H264VENC_control(m_handle, XDM_RESET, &m_dynamicparams/*NULL*/, &status/*NULL*/);
 
 #ifdef _ENABLE_IRES_EDMA3
-    if (IRES_OK != RMAN_freeResources((IALG_Handle)(m_handle), &H264VENC_TI_IRES, 1))
-        log() << "CODEC_DEBUG_ENABLE: Free Resource Failed";
+        if (IRES_OK != RMAN_freeResources((IALG_Handle)(m_handle), &H264VENC_TI_IRES, 1))
+            log() << "CODEC_DEBUG_ENABLE: Free Resource Failed";
 #endif
-    if(m_handle)
-    {
-		H264VENC_delete(m_handle);
-		m_handle = NULL;
-	}
+        H264VENC_delete(m_handle);
+        m_handle = NULL;
+    }
 
 #ifdef _ENABLE_IRES_EDMA3
     if (IRES_OK != RMAN_unregister(&IRESMAN_EDMA3CHAN))
@@ -126,6 +124,11 @@ Enc::~Enc()
 
 //	log() << "RMAN exited";
 #endif
+}
+
+void Enc::init(const std::string& config) // TODO: Bad. It's could be called only once. Better to move this code to ctor, but resources allocation should be done in a RAII way then.
+{
+	enc_create(config);
 }
 
 XDAS_Int8* Enc::encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size)
@@ -402,7 +405,7 @@ void Enc::enc_create(const std::string& config)
 
     if(H264VENC_control(m_handle, XDM_SETPARAMS, &m_dynamicparams, &status) == XDM_EFAIL) {
         log() << "Error code : 0x" << std::hex << (int)status.videncStatus.extendedError << std::dec;
-    	throw ex("Set Encoder parameters Command Failed " + printErrorMsg(status.videncStatus.extendedError));
+    	throw ex("Set Encoder parameters Command Failed " + printErrorMsg(status.videncStatus.extendedError), Ex_TryAnotherConfig);
     }
 
     if(status.videncStatus.extendedError) {
@@ -895,7 +898,7 @@ void Enc::load_params(const std::string& config)
     log() << "CODEC_DEBUG_ENABLE: Reading Configuration file";
 
     if(!readparamfile(config, sTokenMap))
-    	throw ex("CODEC_DEBUG_ENABLE: ERROR! - Unable to read Config File");
+    	throw ex("CODEC_DEBUG_ENABLE: ERROR! - Unable to read Config File", Ex_TryAnotherConfig);
 
 #ifdef BASE_PARAMS
 	m_params.videncParams.size = sizeof(IVIDENC1_Params);

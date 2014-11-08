@@ -28,8 +28,10 @@ struct XDM_Buf {
 
 class Enc {
 public:
-	Enc(const std::string& config);
+	Enc();
 	~Enc();
+
+    void init(const std::string& config);
 
 	XDAS_Int8* encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size);
 	
@@ -42,8 +44,8 @@ private:
 	IH264VENC_Fxns			m_fxns;
 	H264VENC_Params			m_params;
 	H264VENC_DynamicParams	m_dynamicparams;
-	H264VENC_InArgs 			m_inargs;
-	H264VENC_OutArgs 			m_outargs;
+	H264VENC_InArgs 		m_inargs;
+	H264VENC_OutArgs 		m_outargs;
 
 	int 					m_uiNumFramesToBeEncoded;
 
