@@ -136,14 +136,20 @@ void Flir::recv_cb(uint8_t* p, const system::error_code& err, std::size_t size)
 {
 	log() << "Camera has answered, size: " << size;
 
+	log() << "Cam answer: ";
+
+	for (int i=0; i<size; i++) log() << i << " : " << (int)p[i];
+
 	m_answered = p[0] == 0x6e && p[1] == 0x00; // Used for detect_baudrate;
-	
-	if (m_answered && p[3]==0x04) { // SERIAL_NUMBER
-		m_serials[0] = p[8] <<24 | p[9] << 16 | p[10]<< 8 | p[11];
-		m_serials[1] = p[12]<<24 | p[13]<< 16 | p[14]<< 8 | p[15];
-	} else if (m_answered && p[3]==0x05) { // GET_REVISION
-		m_versions[0] = p[8] <<24 | p[9] << 16 | p[10]<< 8 | p[11];
-		m_versions[1] = p[12]<<24 | p[13]<< 16 | p[14]<< 8 | p[15];
+
+	if (size > 15) {
+		if (m_answered && p[3]==0x04) { // SERIAL_NUMBER
+			m_serials[0] = p[8] <<24 | p[9] << 16 | p[10]<< 8 | p[11];
+			m_serials[1] = p[12]<<24 | p[13]<< 16 | p[14]<< 8 | p[15];
+		} else if (m_answered && p[3]==0x05) { // GET_REVISION
+			m_versions[0] = p[8] <<24 | p[9] << 16 | p[10]<< 8 | p[11];
+			m_versions[1] = p[12]<<24 | p[13]<< 16 | p[14]<< 8 | p[15];
+		}
 	}
 
 	Auxiliary::SendCameraRegisterVal(p, size);
@@ -184,12 +190,12 @@ uint32_t Flir::detect_baudrate(bool boot)
 		for (int i=0; i<2000; i++) {
 			log() << "Test FLIR connection at " << baudrates[0];
 			send(0x0, NULL, 0);
-			wait_for_answer(1);
+			wait_for_answer(100);
 			if (m_answered)
 				return baudrates[0];
 		}
 	}
-	
+
 	for (int i=0; i<sizeof(baudrates)/sizeof(baudrates[0]); i++) {
 		log() << "test FLIR connection at " << baudrates[i];
 
@@ -202,7 +208,7 @@ uint32_t Flir::detect_baudrate(bool boot)
 		if (m_answered)
 			return baudrates[i];
 	}
-	
+
 	return 0;
 }
 
