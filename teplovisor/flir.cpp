@@ -187,7 +187,7 @@ uint32_t Flir::detect_baudrate(bool boot)
 
 	if (boot) {
 		m_port.set_option(asio::serial_port::baud_rate(baudrates[0]));
-		for (int i=0; i<2000; i++) {
+		for (int i=0; i<20; i++) {
 			log() << "Test FLIR connection at " << baudrates[0];
 			send(0x0, NULL, 0);
 			wait_for_answer(100);
