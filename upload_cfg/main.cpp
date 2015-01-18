@@ -19,6 +19,7 @@ int main(int argc, char **argv)
 	const std::string enc_cfg((std::istreambuf_iterator<char>(enc_f_in)), std::istreambuf_iterator<char>());
 	server.SendEncCfg(enc_cfg);
 
+
 	std::ifstream md_f_in(argv[4]);
 	const std::string md_cfg((std::istreambuf_iterator<char>(md_f_in)), std::istreambuf_iterator<char>());
 	server.SendMDCfg(md_cfg);

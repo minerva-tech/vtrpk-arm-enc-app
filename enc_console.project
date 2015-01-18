@@ -118,6 +118,10 @@
     <File Name="teplovisor/testapp_arm926intc.c"/>
     <File Name="teplovisor/default_enc_cfg.cpp"/>
     <File Name="teplovisor/default_enc_cfg.h"/>
+    <File Name="teplovisor/vsensor.cpp"/>
+    <File Name="teplovisor/vsensor.h"/>
+    <File Name="teplovisor/servercmds.cpp"/>
+    <File Name="teplovisor/servercmds.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

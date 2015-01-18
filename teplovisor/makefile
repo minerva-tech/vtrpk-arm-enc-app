@@ -42,7 +42,8 @@ OBJ = main.o \
       cap.o \
       proto.o \
       flir.o \
-      default_enc_cfg.o
+      default_enc_cfg.o \
+	  servercmds.o
 
 BOOST_MODULES_TYPE = 
 

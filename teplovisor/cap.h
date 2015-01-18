@@ -5,15 +5,15 @@
  *      Author: a
  */
 
+#ifndef CAP_H
+#define CAP_H
+
 #include <memory>
 
 #include <linux/videodev2.h>
 #include <linux/media.h>
 
 #include "cmem.h"
-
-#ifndef CAP_H
-#define CAP_H
 
 const int APP_NUM_BUFS = 3;
 
