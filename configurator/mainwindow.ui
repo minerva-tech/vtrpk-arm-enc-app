@@ -457,6 +457,7 @@
     </property>
     <addaction name="actionEdit"/>
     <addaction name="actionCamera"/>
+    <addaction name="actionVideo_Sensor"/>
    </widget>
    <addaction name="menuSettings"/>
    <addaction name="menuLog"/>
@@ -568,6 +569,11 @@
   <action name="menuAbout">
    <property name="text">
     <string>About</string>
+   </property>
+  </action>
+  <action name="actionVideo_Sensor">
+   <property name="text">
+    <string>Video Sensor</string>
    </property>
   </action>
  </widget>

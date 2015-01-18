@@ -66,6 +66,8 @@ private slots:
 
     void on_menuAbout_triggered();
 
+    void on_actionVideo_Sensor_triggered();
+
 private:
     static const int stat_renew_interval = 1000; //(msec) renew stat once a second
 

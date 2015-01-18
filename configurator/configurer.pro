@@ -26,7 +26,8 @@ SOURCES += main.cpp\
     proto.cpp \
     portconfig.cpp \
     registeredit.cpp \
-    camregisteredit.cpp
+    camregisteredit.cpp \
+    vsensorsettings.cpp
 
 HEADERS  += mainwindow.h \
     editdetpresets.h \
@@ -45,7 +46,8 @@ HEADERS  += mainwindow.h \
     portconfig.h \
     registeredit.h \
     proto.h \
-    camregisteredit.h
+    camregisteredit.h \
+    vsensorsettings.h
 
 INCLUDEPATH += ../filter/ball
 
@@ -60,9 +62,10 @@ FORMS    += mainwindow.ui \
     cfgeditor.ui \
     portconfig.ui \
     registeredit.ui \
-    camregisteredit.ui
+    camregisteredit.ui \
+    vsensorsettings.ui
 
-LIBS += -L../boost_1_54_0/stage/lib
+LIBS += -L../../boost_1_54_0/stage/lib
 
 LIBS += Strmiids.lib ole32.lib gdi32.lib user32.lib
 

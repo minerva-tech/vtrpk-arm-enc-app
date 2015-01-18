@@ -18,6 +18,7 @@
 #include "qdswidget.h"
 #include "cfgeditor.h"
 #include "portconfig.h"
+#include "vsensorsettings.h"
 #include "ui_mainwindow.h"
 
 #include "defs.h"
@@ -557,4 +558,10 @@ void MainWindow::on_menuAbout_triggered()
     msg.exec();
 
     return;
+}
+
+void MainWindow::on_actionVideo_Sensor_triggered()
+{
+    VSensorSettings d;
+    d.exec();
 }
