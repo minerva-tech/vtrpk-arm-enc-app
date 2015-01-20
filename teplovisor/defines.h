@@ -19,9 +19,10 @@ const char version_info_filename[] = "/etc/versioninfo";
 enum {
 	cam_id_config_offset = 0,
 	md_config_offset = 1,
+	vsensor_config_offset = 1000,
 	encoder_config_offset = 1024,
 	roi_config_offset = 50*1024,
-	md_config_max_size = encoder_config_offset - md_config_offset,
+	md_config_max_size = vsensor_config_offset - md_config_offset,
 	encoder_config_max_size = roi_config_offset - encoder_config_offset,
 	roi_config_max_size = 50*1024
 };

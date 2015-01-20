@@ -31,7 +31,7 @@ public:
 	Enc();
 	~Enc();
 
-    void init(const std::string& config);
+    void init(const std::string& config, int w, int h);
 
 	XDAS_Int8* encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size);
 	
@@ -44,19 +44,19 @@ private:
 	IH264VENC_Fxns			m_fxns;
 	H264VENC_Params			m_params;
 	H264VENC_DynamicParams	m_dynamicparams;
-	H264VENC_InArgs 		m_inargs;
-	H264VENC_OutArgs 		m_outargs;
+	H264VENC_InArgs	 		m_inargs;
+	H264VENC_OutArgs 			m_outargs;
 
-	int 					m_uiNumFramesToBeEncoded;
+	int 						m_uiNumFramesToBeEncoded;
 
-	int						m_uiExtWidth;
-	int						m_uiExtHeight;
-	int						m_uiFrmPitch;
+	int							m_uiExtWidth;
+	int							m_uiExtHeight;
+	int							m_uiFrmPitch;
 
-	xdc_Char				m_bSEIFlagOut;
+	xdc_Char					m_bSEIFlagOut;
 	XDAS_UInt8 				m_sliceFormat;
 
-	IVIDEO1_BufDescIn		m_inBuf;
+	IVIDEO1_BufDescIn			m_inBuf;
 	XDM_Buf					m_outBuf;
 	std::vector<CmemBuf::ptr> m_cmemBufs;
 
@@ -67,7 +67,7 @@ private:
 	void mem_init();
 	void load_params(const std::string& config);
 	void dynamicparams_init();
-	void enc_create(const std::string& config);
+	void enc_create(const std::string& config, int w, int h);
 	void dim_init();
 	void check_warnings();
 };

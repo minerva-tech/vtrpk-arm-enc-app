@@ -72,18 +72,34 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir
 //	log() << std::hex << "Type: " << Auxiliary::Type(payload);
 //	log() << "Should be: " << Auxiliary::RegisterValType << std::dec;
 
-	if (Auxiliary::Type(payload) == Auxiliary::RegisterValType) {
-		Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
-		log() << "Set reg 0x" << std::hex << (int)reg.addr << " to 0x" << reg.val << std::dec;
-		setReg(reg.addr, reg.val);
-	}
+	switch(Auxiliary::Type(payload)) {
+		case Auxiliary::RegisterValType : {
+			Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
+			log() << "Set reg 0x" << std::hex << (int)reg.addr << " to 0x" << reg.val << std::dec;
+			setReg(reg.addr, reg.val);
+			break;
+		}
+		case Auxiliary::CameraRegisterValType : {
+			Auxiliary::CameraRegisterValData data = Auxiliary::CameraRegisterVal(payload);
+			log() << "sending data to camera, size : " << Auxiliary::Size(payload);
+			flir.send(data.val, Auxiliary::Size(payload));
+			break; 
+		}
+		case Auxiliary::VideoSensorResolutionType: {
+			Auxiliary::VideoSensorResolutionData res = Auxiliary::VideoSensorResolution(payload);
+			log() << "new video sensor resolutions: " << res.src_w << "x" << res.src_h << ", dst res: " << res.dst_w << "x" << res.dst_h;
+			
+			std::ofstream eeprom(eeprom_filename);
+			if (!eeprom)
+				break;
 
-	if (Auxiliary::Type(payload) == Auxiliary::CameraRegisterValType) {
-		Auxiliary::CameraRegisterValData data = Auxiliary::CameraRegisterVal(payload);
-
-        log() << "sending data to camera, size : " << Auxiliary::Size(payload);
-
-		flir.send(data.val, Auxiliary::Size(payload));
+			eeprom.seekp(vsensor_config_offset, std::ios_base::beg);
+			eeprom.write((char*)&res, sizeof(res));
+			break;
+		}
+		default:
+			log() << "Something goes wrong, auxiliary packet of unknoun type was received.";
+			break;
 	}
 }
 
@@ -354,8 +370,23 @@ adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70,
 
 void run()
 {
-	const int w = TARGET_WIDTH;
-	const int h = TARGET_HEIGHT;
+	Auxiliary::VideoSensorResolutionData res = {-1, -1, -1, -1};
+
+	std::ifstream eeprom(eeprom_filename);
+	if (eeprom) {
+		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
+		eeprom.read((char*)&res, sizeof(res));
+	}
+
+	if (res.src_w <= 0 || res.src_h <= 0 || res.dst_w <= 0 || res.dst_h <= 0) {
+		res.src_w = SRC_WIDTH;
+		res.src_h = SRC_HEIGHT;
+		res.dst_w = TARGET_WIDTH;
+		res.dst_h = TARGET_HEIGHT;
+	}
+	
+	const int w = res.dst_w;
+	const int h = res.dst_h;
 
 	int adapt_bitrate_pos = 0;
 	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip; // how much video frames should be skipped according to current channel state
@@ -370,9 +401,9 @@ void run()
 	std::string enc_cfg = tmp_cmds.GetEncCfg();
 
 	Enc enc;
-    enc.init(enc_cfg);
+	enc.init(enc_cfg, res.dst_w, res.dst_h);
 
-	Cap cap(SRC_WIDTH, SRC_HEIGHT);
+	Cap cap(res.src_w, res.src_h, res.dst_w, res.dst_h);
 
 	cap.start_streaming();
 

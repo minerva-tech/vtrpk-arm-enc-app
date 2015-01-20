@@ -126,9 +126,9 @@ Enc::~Enc()
 #endif
 }
 
-void Enc::init(const std::string& config) // TODO: Bad. It's could be called only once. Better to move this code to ctor, but resources allocation should be done in a RAII way then.
+void Enc::init(const std::string& config, int w, int h) // TODO: Bad. It's could be called only once. Better to move this code to ctor, but resources allocation should be done in a RAII way then.
 {
-	enc_create(config);
+	enc_create(config, w, h);
 }
 
 XDAS_Int8* Enc::encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size)
@@ -325,15 +325,20 @@ void Enc::mem_init()
 	}
 }
 
-void Enc::enc_create(const std::string& config)
+void Enc::enc_create(const std::string& config, int w, int h)
 {
 	m_fxns = H264VENC_TI_IH264VENC;
 
 	load_params(config);
+	
+	if (w>0 && h>0) {
+		m_dynamicparams.videncDynamicParams.inputWidth  = w;
+		m_dynamicparams.videncDynamicParams.inputHeight = h;
+	}
 
 	dim_init();
 
-    dynamicparams_init();
+	dynamicparams_init();
 
 	log() << "Encoder creation";
 
@@ -399,7 +404,7 @@ void Enc::enc_create(const std::string& config)
 	m_outargs.numPackets = 0;
 
 	H264VENC_Status status;
-    status.videncStatus.size = sizeof(IH264VENC_Status);
+	status.videncStatus.size = sizeof(IH264VENC_Status);
 
 	log() << "Set dynamic params";
 
@@ -595,12 +600,12 @@ void Enc::load_params(const std::string& config)
     /* Point the param pointer to default parameters from encoder */
     m_params = H264VENC_PARAMS;
 
-    m_dynamicparams.VUI_Buffer = &VUIPARAMSBUFFER;
+	m_dynamicparams.VUI_Buffer = &VUIPARAMSBUFFER;
 	m_dynamicparams.CustomScaleMatrix_Buffer = &CUSTOMSEQSCALEMATRICES;
 
 	int uiTokenCtr = 0;
 
-    sTokenMapping sTokenMap[CFG_MAX_ITEMS_TO_PARSE];
+	sTokenMapping sTokenMap[CFG_MAX_ITEMS_TO_PARSE];
 
     /* Set up Token Map for all the input parameters to be read from the
      * configuration file

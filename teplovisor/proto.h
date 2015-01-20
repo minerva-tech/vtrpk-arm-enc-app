@@ -157,7 +157,7 @@ namespace Auxiliary {
 		TimestampType,
 		RegisterValType,
 		CameraRegisterValType,
-		VideoSensorResolutionsType,
+		VideoSensorResolutionType,
 		VideoSensorSettingsType
 	};
 
@@ -188,10 +188,10 @@ namespace Auxiliary {
 	};*/
 	
 	struct VideoSensorResolutionData {
-		uint16_t src_w;
-		uint16_t src_h;
-		uint16_t dst_w;
-		uint16_t dst_h;
+		int16_t src_w;
+		int16_t src_h;
+		int16_t dst_w;
+		int16_t dst_h;
 	};
 	
 	struct VideoSensorSettingsData {
@@ -260,37 +260,30 @@ namespace Auxiliary {
 		return data;
 	}
 
-
 	inline TimestampData Timestamp(const uint8_t* buf) {
 		assert(Type(buf) == TimestampType);
-		TimestampData data;
-		const uint8_t* p = (uint8_t*)&((Pkt<TimestampData>*)buf)->data;
-		memcpy(&data, p, sizeof(data)); // unaligned
-		return data;
+		return GetVal<TimestampData>(buf);
 	}
 
 	inline RegisterValData RegisterVal(const uint8_t* buf) {
 		assert(Type(buf) == RegisterValType);
-		RegisterValData data;
-		const uint8_t* p = (uint8_t*)&((Pkt<RegisterValData>*)buf)->data;
-		memcpy(&data, p, sizeof(data)); // unaligned
-		return data;
+		return GetVal<RegisterValData>(buf);
 	}
 
 	inline CameraRegisterValData CameraRegisterVal(const uint8_t* buf) {
 		assert(Type(buf) == CameraRegisterValType);
-		CameraRegisterValData data;
-		const uint8_t* p = (uint8_t*)&((Pkt<CameraRegisterValData>*)buf)->data;
-		memcpy(&data, p, sizeof(data)); // unaligned
-		return data;
+		return GetVal<CameraRegisterValData>(buf);
+	}
+
+	inline VideoSensorResolutionData VideoSensorResolution(const uint8_t* buf) {
+		assert(Type(buf) == VideoSensorResolutionType);
+		return GetVal<VideoSensorResolutionData>(buf);
 	}
 	
 	inline VideoSensorSettingsData VideoSensorSettings(const uint8_t* buf) {
 		assert(Type(buf) == VideoSensorSettingsType);
 		return GetVal<VideoSensorSettingsData>(buf);
 	}
-
-	
 };
 
 #endif

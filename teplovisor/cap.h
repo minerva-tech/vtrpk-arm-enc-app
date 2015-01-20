@@ -44,7 +44,7 @@ struct CaptureFd {
 
 class Cap {
 public:
-	Cap(int w, int h);
+	Cap(int w, int h, int dst_w, int dst_h);
 	~Cap();
 
 	void start_streaming();
@@ -56,6 +56,8 @@ public:
 private:
 	int m_width;
 	int m_height;
+	int m_dst_width;
+	int m_dst_height;
 	
 	long long m_prev_time;
 	long long m_diff_time;
