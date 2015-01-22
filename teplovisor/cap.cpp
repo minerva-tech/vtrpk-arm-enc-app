@@ -51,6 +51,9 @@ m_teplovisor_fd("/dev/v4l-subdev0"),
 m_capt_fd("/dev/video4"),
 m_media_fd("/dev/media0")
 {
+	log() << "src_w : " << m_width << " src_h : " << m_height;
+	log() << "dst_w : " << m_dst_width << " dst_h : " << m_dst_height;
+	
 	m_media_fd.open(O_RDWR);
 
 	break_links();
@@ -163,6 +166,9 @@ Entity IDs can be non-contiguous. Applications must not try to enumerate entitie
 		else if (!strcmp(m_entity[index].name, E_TEPLOVISOR_NAME)) {
 			E_TEPLOVISOR = m_entity[index].id;
 		}
+		else if (!strcmp(m_entity[index].name, E_VRTVK_EV76C661_FPGA_NAME)) {
+			E_VRTVK_EV76C661_FPGA = m_entity[index].id;
+		}
 		else if (!strcmp(m_entity[index].name, E_CCDC_NAME)) {
 			E_CCDC = m_entity[index].id;
 		}
@@ -234,17 +240,24 @@ void Cap::enable_links() // todo: these links wont break if exception will occur
 	media_link_desc link;
 	memset(&link, 0, sizeof(link));
 
+#if VIDEO_SENSOR
+	link.flags |=  MEDIA_LNK_FL_ENABLED;
+	link.source.entity = E_VRTVK_EV76C661_FPGA;
+	link.source.index = P_VRTVK_EV76C661_FPGA;
+	link.source.flags = MEDIA_PAD_FL_OUTPUT;
+#else
 	link.flags |=  MEDIA_LNK_FL_ENABLED;
 	link.source.entity = E_TEPLOVISOR;
 	link.source.index = P_TEPLOVISOR;
 	link.source.flags = MEDIA_PAD_FL_OUTPUT;
+#endif
 
 	link.sink.entity = E_CCDC;
 	link.sink.index = P_CCDC_SINK;
 	link.sink.flags = MEDIA_PAD_FL_INPUT;
 
 	if(ioctl(m_media_fd, MEDIA_IOC_SETUP_LINK, &link))
-		throw ex("failed to enable link between tvp514x and ccdc");
+		throw ex("failed to enable link between teplovisor and ccdc");
 	else
 		log() << "[teplovisor]----------->[ccdc] ENABLED";
 
@@ -473,7 +486,11 @@ void Cap::set_formats()
 	v4l2_subdev_format f;
 
 //	f = fmt(P_TVP514X, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_INTERLACED);
+#if VIDEO_SENSOR
+	f = fmt(P_VRTVK_EV76C661_FPGA, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+#else
 	f = fmt(P_TEPLOVISOR, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+#endif
 	int ret = ioctl(m_teplovisor_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", fmt.pad);

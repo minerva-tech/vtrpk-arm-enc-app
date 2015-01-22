@@ -52,7 +52,11 @@ void setReg(uint8_t addr, uint16_t val)
 	close(fd);
 }
 
+#if not VIDEO_SENSOR
 void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir)
+#else
+void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
+#endif
 {
 	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] <<
 	" " << (int)payload[2] << " " << (int)payload[3] << " " << (int)payload[4] << " " << (int)payload[5] <<
@@ -82,7 +86,9 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir
 		case Auxiliary::CameraRegisterValType : {
 			Auxiliary::CameraRegisterValData data = Auxiliary::CameraRegisterVal(payload);
 			log() << "sending data to camera, size : " << Auxiliary::Size(payload);
+#if not VIDEO_SENSOR			
 			flir.send(data.val, Auxiliary::Size(payload));
+#endif
 			break; 
 		}
 		case Auxiliary::VideoSensorResolutionType: {
@@ -519,15 +525,23 @@ int main(int argc, char *argv[])
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
+#if not VIDEO_SENSOR
 		Flir flir("/dev/ttyS0");
 
 		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
+#else
+		ServerCmds cmds;
+#endif
+
 		Server server(&cmds);
 
 		Comm::instance().setCameraID(cmds.GetCameraID());
 
+#if not VIDEO_SENSOR
 		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(flir)), 3);
-
+#else
+		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3), 3);
+#endif
 		CMEM_init();
 
 		Enc::rman_init();

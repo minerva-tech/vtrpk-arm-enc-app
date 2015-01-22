@@ -78,6 +78,7 @@ private:
 	int E_VIDEO;
 //	int E_TVP514X;
 	int E_TEPLOVISOR;
+	int E_VRTVK_EV76C661_FPGA;
 	int E_CCDC;
 	int E_PRV;
 	int E_RSZ;
