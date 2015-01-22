@@ -1,5 +1,9 @@
 #include "vsensorsettings.h"
 #include "ui_vsensorsettings.h"
+#include "logview.h"
+#include "ext_headers.h"
+#include "comm.h"
+#include "proto.h"
 
 VSensorSettings::VSensorSettings(QWidget *parent) :
     QDialog(parent),
@@ -11,6 +15,18 @@ VSensorSettings::VSensorSettings(QWidget *parent) :
 }
 
 VSensorSettings::~VSensorSettings()
-{
+{    
     delete ui;
+}
+
+void VSensorSettings::on_buttonBox_accepted()
+{
+    Auxiliary::VideoSensorResolutionData res;
+
+    res.src_w = ui->SensorResX->text().toInt();
+    res.src_h = ui->SensorResY->text().toInt();
+    res.dst_w = ui->TargetResX->text().toInt();
+    res.dst_h = ui->TargetResY->text().toInt();
+
+    Auxiliary::SendVideoSensorResolution(res);
 }

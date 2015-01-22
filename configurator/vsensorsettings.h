@@ -2,6 +2,7 @@
 #define VSENSORSETTINGS_H
 
 #include <QDialog>
+#include <QAbstractButton>
 
 namespace Ui {
 class VSensorSettings;
@@ -14,6 +15,9 @@ class VSensorSettings : public QDialog
 public:
     explicit VSensorSettings(QWidget *parent = 0);
     ~VSensorSettings();
+
+private slots:
+    void on_buttonBox_accepted();
 
 private:
     Ui::VSensorSettings *ui;

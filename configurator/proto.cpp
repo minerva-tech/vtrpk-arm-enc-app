@@ -2,7 +2,6 @@
 
 #include "pchbarrier.h"
 
-#include "logview.h"
 //#include "log_to_file.h"
 #include "comm.h"
 #include "proto.h"
@@ -50,9 +49,9 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 	case MDConfig:
 		getEncCfgChunk(msg, m_md_cfg, boost::bind(&IServerCmds::SetMDCfg, m_callbacks, _1));
 		break;
-    case VersionInfo:
-        getEncCfgChunk(msg, m_version_info, boost::bind(&IServerCmds::SetVersionInfo, m_callbacks, _1));
-        break;
+	case VersionInfo:
+		getEncCfgChunk(msg, m_version_info, boost::bind(&IServerCmds::SetVersionInfo, m_callbacks, _1));
+		break;
     }
 
 	return;
@@ -82,10 +81,10 @@ void Server::execute(uint8_t command, uint8_t arg)
 	case RequestROI:
 		boost::thread(boost::bind(&Server::SendROI, m_callbacks->GetROI()));
 		break;
-    case RequestVersionInfo:
-        boost::thread(boost::bind(&Server::SendVersionInfo, m_callbacks->GetVersionInfo()));
-        break;
-    case RequestRegister:
+	case RequestVersionInfo:
+		boost::thread(boost::bind(&Server::SendVersionInfo, m_callbacks->GetVersionInfo()));
+		break;
+	case RequestRegister:
 		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
 		break;
 	case SetID:
@@ -106,19 +105,19 @@ void Server::getEncCfgChunk(const Server::Message* msg, CfgContainer& cfg, const
 //	std::string& str = m_config[cfg_idx];
 
 //	std::copy(&msg->payload[0], &msg->payload[msg->size()], std::inserter(str, str.end()));
-    if (msg->first_pkt()) {
-        cfg.clear();
-        m_first_packet_was_received[msg->type()] = true;
-    }
+	if (msg->first_pkt()) {
+		cfg.clear();
+		m_first_packet_was_received[msg->type()] = true;
+	}
 
 	std::copy(&msg->payload[0], &msg->payload[msg->size()], std::inserter(cfg, cfg.end()));
 
-    if (msg->last_pkt() && m_first_packet_was_received[msg->type()]) {
+	if (msg->last_pkt() && m_first_packet_was_received[msg->type()]) {
 //		m_callbacks->SetEncCfg(str);
 		cb(cfg);
 //		str.clear();
 		cfg.clear();
-        m_first_packet_was_received[msg->type()] = false;
+		m_first_packet_was_received[msg->type()] = false;
 	}
 
 	return;
