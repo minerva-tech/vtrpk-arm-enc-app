@@ -34,7 +34,12 @@
 
 #define ALIGN(x, y)	(((x + (y-1))/y)*y)
 
+#if VIDEO_SENSOR
+const int CODE = V4L2_MBUS_FMT_YUYV10_1X20;
+const int CODE2 = V4L2_MBUS_FMT_YUYV8_2X8;
+#else
 const int CODE = V4L2_MBUS_FMT_YUYV8_2X8;
+#endif
 
 Cap::Cap(int w, int h, int dst_w, int dst_h) :
 m_width(w),
@@ -447,6 +452,7 @@ void Cap::set_capture_inputs()
 	else
 		log() << "successfully set COMPOSITE input";
 
+#if not VIDEO_SENSOR
 	log() << "setting NTSC std.";
 
 	v4l2_std_id cur_std;
@@ -457,6 +463,7 @@ void Cap::set_capture_inputs()
 		throw ex("failed to set NTSC std on capture device\n");
 	else
 		log() << "successfully set NTSC std.";
+#endif
 }
 
 static v4l2_subdev_format fmt(__u32 pad, __u32 which, __u32 code, __u32 w, __u32 h, __u32 colorspace, __u32 field)
@@ -510,25 +517,25 @@ void Cap::set_formats()
 
 	log() << "setting format on OF-pad of ccdc entity.";
 
-	f = fmt(P_CCDC_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+	f = fmt(P_CCDC_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE2, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_ccdc_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
-		printf("failed to set format on pad");// %x\n", fmt.pad);
+		throw ex("failed to set format on pad");// %x\n", fmt.pad);
 	else
 		log() << "successfully format is set on pad " << f.pad;
 
 	log() << "setting format on sink-pad of prv entity.";
 
-	f = fmt(P_PRV_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+	f = fmt(P_PRV_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE2, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_prv_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
-		printf("failed to set format on pad");// %x\n", fmt.pad);
+		throw ex("failed to set format on pad");// %x\n", fmt.pad);
 	else
 		log() << "successfully format is set on pad " << f.pad;
 
 	log() << "setting format on source-pad of prv entity.";
 
-	f = fmt(P_PRV_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+	f = fmt(P_PRV_SOURCE, V4L2_SUBDEV_FORMAT_ACTIVE, CODE2, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_prv_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");// %x\n", fmt.pad);
@@ -537,7 +544,7 @@ void Cap::set_formats()
 
 	log() << "setting format on sink-pad of rsz entity.";
 
-	f = fmt(P_RSZ_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
+	f = fmt(P_RSZ_SINK, V4L2_SUBDEV_FORMAT_ACTIVE, CODE2, m_width, m_height, V4L2_COLORSPACE_SMPTE170M, V4L2_FIELD_NONE);
 	ret = ioctl(m_rsz_fd, VIDIOC_SUBDEV_S_FMT, &f);
 	if(ret)
 		throw ex("failed to set format on pad");//%x\n", fmt.pad);

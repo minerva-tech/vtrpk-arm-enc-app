@@ -43,7 +43,8 @@ OBJ = main.o \
       proto.o \
       flir.o \
       default_enc_cfg.o \
-	  servercmds.o
+	  servercmds.o \
+	  vsensor.o
 
 BOOST_MODULES_TYPE = 
 

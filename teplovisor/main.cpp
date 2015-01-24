@@ -18,6 +18,8 @@
 
 #include "defines.h"
 #include "default_enc_cfg.h"
+
+#include "vsensor.h"
 /*
 extern "C" {
 #include "tables.h"
@@ -29,7 +31,7 @@ extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long 
 
 volatile bool g_stop = false;
 int g_chroma_value = 0x80;
-bool g_dump_yuv = false;
+bool g_dump_yuv = true;
 
 int g_tx_buffer_size = 1000;
 
@@ -441,7 +443,7 @@ void run()
 
 	while(!g_stop) {
         // Startup time measure point #1
-        LED_RXD(1);
+		LED_RXD(1);
 
 		v4l2_buffer buf = cap.getFrame();
 
@@ -458,7 +460,7 @@ void run()
 		if (!to_skip) {
 			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
 			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
-			log() << "Frame encoded";
+			log() << "Frame encoded " << coded_size;
 		} else {
 			if (to_skip>0) // to_skip == -1 means no video is sent at all
 				to_skip--; 
@@ -514,7 +516,6 @@ int main(int argc, char *argv[])
 	printf("Teplovisor app starting time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
 	
 	try {
-
         LED_ERR(1);
 
 		if (argc < 3) {
@@ -530,6 +531,8 @@ int main(int argc, char *argv[])
 
 		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 #else
+		VSensor vsensor;
+	
 		ServerCmds cmds;
 #endif
 
