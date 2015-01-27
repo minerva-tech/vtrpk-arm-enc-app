@@ -87,6 +87,9 @@ void Server::execute(uint8_t command, uint8_t arg)
 	case RequestRegister:
 		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
 		break;
+	case RequestVideoSensorParameters:
+		boost::thread(boost::bind(&Auxiliary::SendVideoSensorParameters, m_callbacks->GetVideoSensorParameters()));
+		break;
 	case SetID:
 		m_callbacks->SetCameraID(arg);
 		break;

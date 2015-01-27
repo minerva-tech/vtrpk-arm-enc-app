@@ -6,7 +6,11 @@ extern volatile bool g_stop;
 class ServerCmds : public IServerCmds
 {
 public:
+#if VIDEO_SENSOR
+	ServerCmds(VSensor* vsensor = NULL) : m_vsensor(vsensor) {}
+#else
 	ServerCmds(Flir* flir = NULL) : m_flir(flir) {}
+#endif
 
 	virtual bool Hello(int id) {Comm::instance().drop_unsent();return true;}
 	virtual void Start() {log()<<"start";g_stop = false;}
@@ -17,6 +21,7 @@ public:
 	virtual std::vector<uint8_t> GetROI();
 	virtual std::string GetVersionInfo();
 	virtual uint8_t GetCameraID();
+	virtual Auxiliary::VideoSensorParameters GetVideoSensorParameters();
 	virtual uint16_t GetRegister(uint8_t addr);
 	virtual void SetEncCfg(const std::string& str);
 	virtual void SetMDCfg(const std::string& str);
@@ -25,7 +30,12 @@ public:
 	virtual void SetCameraID(uint8_t id);
 	
 private:
+
+#if VIDEO_SENSOR
+	VSensor* m_vsensor;
+#else
 	Flir* m_flir;
+#endif
 };
 
 #endif

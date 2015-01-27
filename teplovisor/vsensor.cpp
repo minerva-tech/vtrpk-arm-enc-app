@@ -3,6 +3,8 @@
 #include "ext_headers.h"
 #include "log_to_file.h"
 
+#include "comm.h"
+#include "auxiliary.h"
 #include "vsensor.h"
 
 const uint16_t binning_reg_list[][2] = {
@@ -46,9 +48,14 @@ VSensor::VSensor()
 
 	for (int i=0; i<sizeof(binning_reg_list)/sizeof(binning_reg_list[0]); i++) {
 		*(uint16_t*)&regs[binning_reg_list[i][0]] = binning_reg_list[i][1];
-		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(100)); // TODO : set correct timeout
 	}
 
 	munmap((void*)map_base, 1024);
 	close(fd);
+}
+
+void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
+{
+	
 }

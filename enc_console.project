@@ -122,6 +122,7 @@
     <File Name="teplovisor/vsensor.h"/>
     <File Name="teplovisor/servercmds.cpp"/>
     <File Name="teplovisor/servercmds.h"/>
+    <File Name="teplovisor/auxiliary.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

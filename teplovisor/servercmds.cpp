@@ -7,6 +7,7 @@
 #include "defines.h"
 #include "proto.h"
 #include "flir.h"
+#include "vsensor.h"
 
 #include "servercmds.h"
 
@@ -101,7 +102,7 @@ std::string ServerCmds::GetVersionInfo()
 
 		ver += "\n";
 	}
-	
+#if not VIDEO_SENSOR
 	if (m_flir) {
 		char t[128];
 		sprintf(t, "\"Teplovisor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
@@ -115,6 +116,7 @@ std::string ServerCmds::GetVersionInfo()
 		sprintf(t, "Camera SW version\t\t%u\n", flir_data[2]); ver += t;
 		sprintf(t, "Camera HW version\t\t%u\n", flir_data[3]); ver += t;
 	}
+#endif
 
 	return ver;
 }
@@ -154,6 +156,20 @@ uint16_t ServerCmds::GetRegister(uint8_t addr)
 	close(fd);
 
 	return val;
+}
+
+Auxiliary::VideoSensorParameters ServerCmds::GetVideoSensorParameters()
+{
+	Auxiliary::VideoSensorParameters params;
+	
+	std::ifstream eeprom(eeprom_filename);
+	if (eeprom) {
+		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
+		eeprom.read((char*)&params.res, sizeof(params.res));
+		eeprom.read((char*)&params.set, sizeof(params.set));
+	}
+	
+	return params;
 }
 
 void ServerCmds::SetEncCfg(const std::string& str) 

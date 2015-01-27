@@ -14,12 +14,13 @@
 #include "enc.h"
 #include "proto.h"
 #include "flir.h"
-#include "servercmds.h"
+#include "vsensor.h"
 
 #include "defines.h"
 #include "default_enc_cfg.h"
 
-#include "vsensor.h"
+#include "servercmds.h"
+
 /*
 extern "C" {
 #include "tables.h"
@@ -31,7 +32,7 @@ extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long 
 
 volatile bool g_stop = false;
 int g_chroma_value = 0x80;
-bool g_dump_yuv = true;
+bool g_dump_yuv = false;
 
 int g_tx_buffer_size = 1000;
 
@@ -57,7 +58,7 @@ void setReg(uint8_t addr, uint16_t val)
 #if not VIDEO_SENSOR
 void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir)
 #else
-void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
+void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, VSensor& vsensor)
 #endif
 {
 	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] <<
@@ -103,6 +104,18 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
 
 			eeprom.seekp(vsensor_config_offset, std::ios_base::beg);
 			eeprom.write((char*)&res, sizeof(res));
+			break;
+		}
+		case Auxiliary::VideoSensorSettingsType: {
+			Auxiliary::VideoSensorSettingsData set = Auxiliary::VideoSensorSettings(payload);
+			
+			std::ofstream eeprom(eeprom_filename);
+			if (!eeprom)
+				break;
+
+			eeprom.seekp(vsensor_config_offset+sizeof(Auxiliary::VideoSensorResolutionData), std::ios_base::beg);
+			eeprom.write((char*)&set, sizeof(set));
+			vsensor.set(set);
 			break;
 		}
 		default:
@@ -271,40 +284,7 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	// as info_mask has nothing but zeroes, fill it with ones
 	memset(&info_mask[0], 0xff, info_mask.size());
 }
-/*
-const char STARTCODE[12] = "FRAME START";
 
-void readStartcode(const volatile uint16_t* reg, int thres)
-{
-	bool startcode_at_begin = true;
-
-	int startcode_off = 0;
-	int was_read = 0;
-
-	while (startcode_off != sizeof(STARTCODE)/(sizeof(STARTCODE[0])) && was_read++ < thres) {
-		const uint16_t val = *reg;
-
-		if (val == *(uint16_t*)&STARTCODE[startcode_off]) {
-			startcode_off += 2;
-		} else {
-			if (val == *(uint16_t*)&STARTCODE[0])
-				startcode_off = 2;
-			else
-				startcode_off = 0;
-			startcode_at_begin = false;
-			continue;
-		}
-	}
-
-	if (!startcode_at_begin)
-		log() << "No startcode was found at the place where it should be. Was thrown " << was_read*2 << " bytes.";
-
-	if (startcode_off == 12)
-		log() << "Startcode was found";
-	else
-		log() << "Startcode wasn't found";
-}
-*/
 void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h, int chroma_val)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
@@ -338,12 +318,6 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 //		*it_info++ &= *it_info_mask++;
 }
 
-struct adapt_bitrate_desc_t {
-	int to_skip;
-	int switch_up_from_here;
-	int switch_down_from_here;
-};
-
 static void LED_RXD(int on)
 {
     FILE* fled = fopen("/sys/class/leds/rxd/brightness", "wt");
@@ -374,9 +348,15 @@ static void LED_ERR(int on)
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
 }
 
+struct adapt_bitrate_desc_t {
+	int to_skip;
+	int switch_up_from_here;
+	int switch_down_from_here;
+};
+
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
-void run()
+void run(int fps_divider)
 {
 	Auxiliary::VideoSensorResolutionData res = {-1, -1, -1, -1};
 
@@ -392,13 +372,13 @@ void run()
 		res.dst_w = TARGET_WIDTH;
 		res.dst_h = TARGET_HEIGHT;
 	}
-	
+
 	const int w = res.dst_w;
 	const int h = res.dst_h;
 
 	int adapt_bitrate_pos = 0;
-	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip; // how much video frames should be skipped according to current channel state
-	
+	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider; // how much video frames should be skipped according to current channel state
+
 	Comm::instance().allowTransmission(true);
 
 	while(g_stop) {
@@ -459,13 +439,13 @@ void run()
 
 		if (!to_skip) {
 			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
-			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
+			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider;
 			log() << "Frame encoded " << coded_size;
 		} else {
-			if (to_skip>0) // to_skip == -1 means no video is sent at all
+			if (to_skip>0) // to_skip < 0 means no video is sent at all
 				to_skip--; 
 
-			log() << "     VRTPK App: Frame skipped";
+			log() << "VRTPK App: Frame skipped";
 		}
 
 		cap.putFrame(buf);
@@ -532,8 +512,18 @@ int main(int argc, char *argv[])
 		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 #else
 		VSensor vsensor;
+		
+		Auxiliary::VideoSensorSettingsData vs_set;
+
+		std::ifstream eeprom(eeprom_filename); // TODO : remove it from here, hide it in ServerCmds ctor/VSensor ctor ?
+		if (eeprom) {
+			eeprom.seekg(vsensor_config_offset+sizeof(Auxiliary::VideoSensorResolutionData), std::ios_base::beg);
+			eeprom.read((char*)&vs_set, sizeof(vs_set));
+			
+			vsensor.set(vs_set);
+		}
 	
-		ServerCmds cmds;
+		ServerCmds cmds(&vsensor);
 #endif
 
 		Server server(&cmds);
@@ -543,7 +533,7 @@ int main(int argc, char *argv[])
 #if not VIDEO_SENSOR
 		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(flir)), 3);
 #else
-		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3), 3);
+		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(vsensor)), 3);
 #endif
 		CMEM_init();
 
@@ -556,7 +546,11 @@ int main(int argc, char *argv[])
 
 		while(1) {
 			try {
-				run();
+#if VIDEO_SENSOR
+				run(vs_set.fps_divider);
+#else
+				run(1);
+#endif
 			}
 			catch (ex& e) {
 				log() << e.str();
