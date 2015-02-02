@@ -68,6 +68,8 @@ private slots:
 
     void on_actionVideo_Sensor_triggered();
 
+    void on_EnableMotion_toggled(bool checked);
+
 private:
     static const int stat_renew_interval = 1000; //(msec) renew stat once a second
 

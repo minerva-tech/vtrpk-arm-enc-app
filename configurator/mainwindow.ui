@@ -74,7 +74,7 @@
       <x>420</x>
       <y>1</y>
       <width>161</width>
-      <height>111</height>
+      <height>131</height>
      </rect>
     </property>
     <property name="title">
@@ -107,7 +107,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>51</y>
+       <y>50</y>
        <width>141</width>
        <height>23</height>
       </rect>
@@ -116,12 +116,25 @@
       <string>Apply</string>
      </property>
     </widget>
+    <widget class="QCheckBox" name="EnableMotion">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>110</y>
+       <width>70</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Enable</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
       <x>420</x>
-      <y>120</y>
+      <y>140</y>
       <width>161</width>
       <height>50</height>
      </rect>
@@ -156,7 +169,7 @@
     <property name="geometry">
      <rect>
       <x>420</x>
-      <y>170</y>
+      <y>190</y>
       <width>161</width>
       <height>111</height>
      </rect>
@@ -393,8 +406,8 @@
    <widget class="QPushButton" name="connectButton">
     <property name="geometry">
      <rect>
-      <x>444</x>
-      <y>312</y>
+      <x>450</x>
+      <y>310</y>
       <width>111</width>
       <height>21</height>
      </rect>
@@ -418,7 +431,7 @@
      <x>0</x>
      <y>0</y>
      <width>590</width>
-     <height>18</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuSettings">
@@ -441,8 +454,8 @@
      <rect>
       <x>397</x>
       <y>99</y>
-      <width>107</width>
-      <height>82</height>
+      <width>135</width>
+      <height>94</height>
      </rect>
     </property>
     <property name="title">

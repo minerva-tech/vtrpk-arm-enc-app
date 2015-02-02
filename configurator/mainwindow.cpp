@@ -194,7 +194,9 @@ bool MainWindow::tryConnect()
 
     PortConfigSingleton& cfg = PortConfigSingleton::instance();
 
-    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress))>=0)) {
+    bool motion_enable = false;
+
+    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress, &motion_enable))>=0)) {
         QMessageBox msg;
         msg.setIcon(QMessageBox::Critical);
         msg.setText(tr("Cannot establish connection with a device"));
@@ -209,6 +211,8 @@ bool MainWindow::tryConnect()
     progress.close();
 
     Comm::instance().setCameraID(cam_id);
+
+    ui->EnableMotion->setEnabled(motion_enable);
 
     return connected;
 }
@@ -230,6 +234,7 @@ void MainWindow::enableControls(bool enabled)
     ui->actionCamera->setEnabled(false); // Unfinished yet.
     ui->Thresholds->setEnabled(enabled);
     ui->Marker->setEnabled(enabled);
+    ui->EnableMotion->setEnabled(enabled);
 }
 
 void MainWindow::on_EditDetectorSettings_clicked()
@@ -564,4 +569,9 @@ void MainWindow::on_actionVideo_Sensor_triggered()
 {
     VSensorSettings d;
     d.exec();
+}
+
+void MainWindow::on_EnableMotion_toggled(bool checked)
+{
+    Server::SendCommand(Server::ToggleStreams, checked ? MOTION_ENABLE_BIT : 0);
 }

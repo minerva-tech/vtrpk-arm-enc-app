@@ -3,6 +3,8 @@
 
 #include "iobserver.h"
 
+static const int MOTION_ENABLE_BIT = 0x01;
+
 class IServerCmds
 {
 public:
@@ -21,6 +23,7 @@ public:
 	virtual void SetMDCfg(const std::string&) = 0;
 	virtual void SetROI(const std::vector<uint8_t>&) = 0;
 	virtual void SetVersionInfo(const std::string&) = 0;
+    virtual void SetStreamsEnableFlag(int streams_enable) = 0;
 	virtual void SetCameraID(uint8_t id) = 0;
 };
 
@@ -37,6 +40,7 @@ public:
 		RequestROI,
 		RequestVersionInfo,
 		RequestRegister,
+        ToggleStreams,
 		SetID
 	};
 
@@ -107,7 +111,7 @@ class Client {
 
 	class Cmds : public IServerCmds {
 	public:
-		Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false) {}
+        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_streams_enable(-1) {}
 
 		virtual bool Hello(int id) {m_hello_received = true; m_camera_id = id; return false;}
 		virtual void Start() {assert(0);}
@@ -124,6 +128,7 @@ class Client {
 		virtual void SetMDCfg(const std::string& cfg) {m_md_cfg = cfg; m_md_cfg_received = true;}
 		virtual void SetROI(const std::vector<uint8_t>& roi) {m_roi = roi; m_roi_received = true;}
 		virtual void SetVersionInfo(const std::string& ver_info) {m_version_info = ver_info; m_version_info_received = true;}
+        virtual void SetStreamsEnableFlag(int streams_enable) {m_streams_enable = streams_enable;}
 		virtual void SetCameraID(uint8_t id) {}
 
 		bool m_hello_received;
@@ -132,6 +137,7 @@ class Client {
 		bool m_roi_received;
 		bool m_version_info_received;
 		int  m_camera_id;
+        int  m_streams_enable;
 		std::string m_enc_cfg;
 		std::string m_md_cfg;
 		std::vector<uint8_t> m_roi;
@@ -142,7 +148,7 @@ public:
 	static const boost::chrono::seconds timeout;
 	static const boost::chrono::seconds get_enc_cfg_timeout;
 
-	static int Handshake(IObserver* observer = NULL);
+    static int Handshake(IObserver* observer = NULL, bool* motion_enable = NULL);
 	static std::string GetEncCfg(IObserver* observer = NULL);
 	static std::string GetMDCfg(IObserver* observer = NULL);
 	static std::vector<uint8_t> GetROI(IObserver* observer = NULL);

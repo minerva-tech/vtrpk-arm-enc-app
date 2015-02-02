@@ -90,6 +90,9 @@ void Server::execute(uint8_t command, uint8_t arg)
 	case SetID:
 		m_callbacks->SetCameraID(arg);
 		break;
+    case ToggleStreams:
+        m_callbacks->SetStreamsEnableFlag(arg);
+        break;
 	default:
 		log() << "Invalid command";
 	};
@@ -194,7 +197,7 @@ void Server::SendCommand(Commands cmd, uint8_t arg)
 	Comm::instance().transmit(0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
 }
 
-int Client::Handshake(IObserver* observer)
+int Client::Handshake(IObserver* observer, bool* motion_enable)
 {
     Cmds cmds;
     Server server(&cmds);
@@ -202,13 +205,17 @@ int Client::Handshake(IObserver* observer)
     server.SendCommand(Server::Hello);
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
-    while(!cmds.m_hello_received) {
+//    while(!cmds.m_hello_received) {
+    while(cmds.m_streams_enable == -1) {
         if (chrono::steady_clock::now() - start > timeout)
             return -1;
         if (observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    if (motion_enable)
+        *motion_enable = cmds.m_streams_enable & MOTION_ENABLE_BIT;
 
     return cmds.m_camera_id;
 }

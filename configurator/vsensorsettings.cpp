@@ -11,11 +11,11 @@ VSensorSettings::VSensorSettings(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    ui->Binning->insertItems(0, QStringList() << tr("No") << "x/1" << "x/2" << "x/4");
+    ui->Binning->insertItems(0, QStringList() << tr("No") << "x/1" << "x/2" << "x/4");\
 }
 
 VSensorSettings::~VSensorSettings()
-{    
+{
     delete ui;
 }
 
@@ -29,4 +29,15 @@ void VSensorSettings::on_buttonBox_accepted()
     res.dst_h = ui->TargetResY->text().toInt();
 
     Auxiliary::SendVideoSensorResolution(res);
+}
+
+void VSensorSettings::on_Binning_currentIndexChanged(int index)
+{
+    if (index == 0) {
+        ui->SensorResX->setText("1280");
+        ui->SensorResY->setText("720");
+    } else {
+        ui->SensorResX->setText("640");
+        ui->SensorResY->setText("480");
+    }
 }
