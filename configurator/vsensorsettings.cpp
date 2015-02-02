@@ -29,6 +29,15 @@ void VSensorSettings::on_buttonBox_accepted()
     res.dst_h = ui->TargetResY->text().toInt();
 
     Auxiliary::SendVideoSensorResolution(res);
+
+    Auxiliary::VideoSensorSettingsData set;
+
+    set.binning = ui->Binning->currentIndex();
+    set.fps_divider = ui->FramerateDivider->text().toInt();
+    set.pixel_correction = ui->PixelCorrection->isChecked() ? 1 : 0;
+    set.ten_bit_compression = ui->Compression->isChecked() ? 1 : 0;
+
+    Auxiliary::SendVideoSensorSettings(set);
 }
 
 void VSensorSettings::on_Binning_currentIndexChanged(int index)

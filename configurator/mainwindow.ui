@@ -116,7 +116,7 @@
       <string>Apply</string>
      </property>
     </widget>
-    <widget class="QCheckBox" name="EnableMotion">
+    <widget class="QCheckBox" name="enableMotion">
      <property name="geometry">
       <rect>
        <x>10</x>

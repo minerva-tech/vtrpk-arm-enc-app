@@ -68,13 +68,13 @@ private slots:
 
     void on_actionVideo_Sensor_triggered();
 
-    void on_EnableMotion_toggled(bool checked);
+    void on_enableMotion_stateChanged(int arg1);
 
 private:
     static const int stat_renew_interval = 1000; //(msec) renew stat once a second
 
     void enableControls(bool);
-    bool tryConnect();
+    bool tryConnect(bool* motion_enable);
 
     Ui::MainWindow*     ui;
     RegisterEdit*       m_regedit;
