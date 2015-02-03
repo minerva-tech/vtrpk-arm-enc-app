@@ -249,6 +249,13 @@ namespace Auxiliary {
         Comm::instance().transmit(Port, sizeof(pkt), (uint8_t*)&pkt);
     }
 
+    inline void SendVideoSensorSettings(const VideoSensorSettingsData& set) {
+        Pkt<VideoSensorSettingsData> pkt;
+        pkt.type = VideoSensorSettingsType;
+        pkt.data = set;
+        Comm::instance().transmit(Port, sizeof(pkt), (uint8_t*)&pkt);
+    }
+
 	inline AuxiliaryType Type(const uint8_t* data) {
 		uint16_t type;
 		const uint8_t* p = (uint8_t*)&((Pkt<uint32_t>*)data)->type;

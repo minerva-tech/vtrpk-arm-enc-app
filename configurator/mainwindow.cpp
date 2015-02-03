@@ -60,7 +60,9 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 //    print_comm_layout();
 
-    const bool connected = tryConnect();
+    bool motion_enable = false;
+
+    const bool connected = tryConnect(&motion_enable);
 //    const bool connected = false;
 
     ui->setupUi(this);
@@ -76,6 +78,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     enableControls(connected);
     ui->connectButton->setEnabled(!connected);
+
+    ui->enableMotion->setChecked(motion_enable);
 
     connect(ui->DSWidget, SIGNAL(setStartChecked(bool)), this, SLOT(setStartChecked(bool)));
 
@@ -184,7 +188,7 @@ void port_open()
     }
 }
 
-bool MainWindow::tryConnect()
+bool MainWindow::tryConnect(bool* motion_enable)
 {
     ProgressDialog progress(tr("Establishing connection with a device"), QString(), 0, 5, this);
 
@@ -194,9 +198,7 @@ bool MainWindow::tryConnect()
 
     PortConfigSingleton& cfg = PortConfigSingleton::instance();
 
-    bool motion_enable = false;
-
-    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress, &motion_enable))>=0)) {
+    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress, motion_enable))>=0)) {
         QMessageBox msg;
         msg.setIcon(QMessageBox::Critical);
         msg.setText(tr("Cannot establish connection with a device"));
@@ -211,8 +213,6 @@ bool MainWindow::tryConnect()
     progress.close();
 
     Comm::instance().setCameraID(cam_id);
-
-    ui->EnableMotion->setEnabled(motion_enable);
 
     return connected;
 }
@@ -234,7 +234,7 @@ void MainWindow::enableControls(bool enabled)
     ui->actionCamera->setEnabled(false); // Unfinished yet.
     ui->Thresholds->setEnabled(enabled);
     ui->Marker->setEnabled(enabled);
-    ui->EnableMotion->setEnabled(enabled);
+  //  ui->enableMotion->setEnabled(enabled);
 }
 
 void MainWindow::on_EditDetectorSettings_clicked()
@@ -540,9 +540,11 @@ void MainWindow::on_Thresholds_clicked(bool checked)
 void MainWindow::on_connectButton_clicked()
 {
     ui->DSWidget->Stop();
-    const bool connected = tryConnect();
+    bool enable_motion = false;
+    const bool connected = tryConnect(&enable_motion);
     ui->CameraID->setCurrentIndex(Comm::instance().cameraID());
     enableControls(connected);
+    ui->enableMotion->setChecked(enable_motion);
     ui->connectButton->setEnabled(!connected);
 }
 
@@ -571,7 +573,9 @@ void MainWindow::on_actionVideo_Sensor_triggered()
     d.exec();
 }
 
-void MainWindow::on_EnableMotion_toggled(bool checked)
+void MainWindow::on_enableMotion_stateChanged(int arg1)
 {
-    Server::SendCommand(Server::ToggleStreams, checked ? MOTION_ENABLE_BIT : 0);
+    ui->DSWidget->Stop();
+    Server::SendCommand(Server::ToggleStreams, arg1 ? MOTION_ENABLE_BIT : 0);
+    ui->DSWidget->Play();
 }
