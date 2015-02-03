@@ -45,8 +45,13 @@ void VSensorSettings::on_Binning_currentIndexChanged(int index)
     if (index == 0) {
         ui->SensorResX->setText("1280");
         ui->SensorResY->setText("720");
+
+        ui->PixelCorrection->setEnabled(true);
     } else {
         ui->SensorResX->setText("640");
         ui->SensorResY->setText("480");
+
+        ui->PixelCorrection->setChecked(false);
+        ui->PixelCorrection->setEnabled(false);
     }
 }
