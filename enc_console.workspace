@@ -3,7 +3,6 @@
   <Project Name="enc_console" Path="enc_console.project" Active="Yes"/>
   <Project Name="recv_test" Path="recv_test/recv_test.project" Active="No"/>
   <Project Name="upload_cfg" Path="upload_cfg/upload_cfg.project"/>
-  <Project Name="dump_video" Path="dump_video/dump_video.project"/>
   <BuildMatrix>
     <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Project Name="enc_console" ConfigName="Debug"/>

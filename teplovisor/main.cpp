@@ -108,10 +108,12 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, VSensor& v
 		}
 		case Auxiliary::VideoSensorSettingsType: {
 			Auxiliary::VideoSensorSettingsData set = Auxiliary::VideoSensorSettings(payload);
-			
+
 			std::ofstream eeprom(eeprom_filename);
 			if (!eeprom)
 				break;
+
+            log() << "received fps divider: " << set.fps_divider;
 
 			eeprom.seekp(vsensor_config_offset+sizeof(Auxiliary::VideoSensorResolutionData), std::ios_base::beg);
 			eeprom.write((char*)&set, sizeof(set));
@@ -356,15 +358,25 @@ struct adapt_bitrate_desc_t {
 
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
-void run(int fps_divider)
+void run()
 {
+    int fps_divider = 1;
+
+#if VIDEO_SENSOR
+
 	Auxiliary::VideoSensorResolutionData res = {-1, -1, -1, -1};
 
 	std::ifstream eeprom(eeprom_filename);
 	if (eeprom) {
+        Auxiliary::VideoSensorSettingsData vs_set;
+
 		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
 		eeprom.read((char*)&res, sizeof(res));
+		eeprom.read((char*)&vs_set, sizeof(vs_set));
+
+        fps_divider = vs_set.fps_divider;
 	}
+#endif
 
 	if (res.src_w <= 0 || res.src_h <= 0 || res.dst_w <= 0 || res.dst_h <= 0) {
 		res.src_w = SRC_WIDTH;
@@ -378,6 +390,8 @@ void run(int fps_divider)
 
 	int adapt_bitrate_pos = 0;
 	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider; // how much video frames should be skipped according to current channel state
+
+    log() << "Fps divider : " << fps_divider;
 
 	Comm::instance().allowTransmission(true);
 
@@ -405,6 +419,10 @@ void run(int fps_divider)
 	info_out.resize(w*h/8);
 
 	initMD();
+
+    bool motion_enable = tmp_cmds.GetStreamsEnableFlag() & MOTION_ENABLE_BIT;
+
+    log() << "motion_enable = " << (int)motion_enable;
 
 	v4l2_buffer buf = cap.getFrame(); // skip first frame as it contains garbage
 	cap.putFrame(buf);
@@ -440,19 +458,19 @@ void run(int fps_divider)
 		if (!to_skip) {
 			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
 			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider;
-			log() << "Frame encoded " << coded_size;
+//			log() << "Frame encoded " << coded_size;
 		} else {
 			if (to_skip>0) // to_skip < 0 means no video is sent at all
 				to_skip--; 
 
-			log() << "VRTPK App: Frame skipped";
+//			log() << "VRTPK App: Frame skipped";
 		}
 
 		cap.putFrame(buf);
 
-		const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
+        const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
 
-		const ptrdiff_t info_size = cur - &info_out[0];
+        const ptrdiff_t info_size = cur - &info_out[0];
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
@@ -465,11 +483,11 @@ void run(int fps_divider)
 //			fwrite((uint8_t*)bs, 1, coded_size, f_dump);
 		}
 
-		if (info_size)
+		if (motion_enable && info_size)
 			Comm::instance().transmit(2, info_size, &info_out[0]);
 
 		const int buf_size = Comm::instance().getBufferSize();
-		log() << "buffer size " << buf_size;
+//		log() << "buffer size " << buf_size;
 		if (buf_size > g_adapt_bitrate_desc[adapt_bitrate_pos].switch_up_from_here) {
 			adapt_bitrate_pos++;
 			log() << "switched to " << adapt_bitrate_pos;
@@ -547,9 +565,9 @@ int main(int argc, char *argv[])
 		while(1) {
 			try {
 #if VIDEO_SENSOR
-				run(vs_set.fps_divider);
+				run();
 #else
-				run(1);
+				run();
 #endif
 			}
 			catch (ex& e) {

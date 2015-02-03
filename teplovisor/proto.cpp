@@ -64,7 +64,9 @@ void Server::execute(uint8_t command, uint8_t arg)
 	switch (command) {
 	case Hello:
 		if (m_callbacks->Hello(arg))
-			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
+            boost::thread([&]() {Server::SendCommand(Hello, Comm::instance().cameraID());
+                                 Server::SendCommand(ToggleStreams, m_callbacks->GetStreamsEnableFlag());});
+//			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
 		break;
 	case Start:
 		m_callbacks->Start();
@@ -87,12 +89,12 @@ void Server::execute(uint8_t command, uint8_t arg)
 	case RequestRegister:
 		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
 		break;
-	case RequestVideoSensorParameters:
-		boost::thread(boost::bind(&Auxiliary::SendVideoSensorParameters, m_callbacks->GetVideoSensorParameters()));
-		break;
 	case SetID:
 		m_callbacks->SetCameraID(arg);
 		break;
+    case ToggleStreams:
+        m_callbacks->SetStreamsEnableFlag(arg);
+        break;
 	default:
 		log() << "Invalid command";
 	};
@@ -197,7 +199,7 @@ void Server::SendCommand(Commands cmd, uint8_t arg)
 	Comm::instance().transmit(0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
 }
 
-int Client::Handshake(IObserver* observer)
+int Client::Handshake(IObserver* observer, bool* motion_enable)
 {
     Cmds cmds;
     Server server(&cmds);
@@ -205,13 +207,17 @@ int Client::Handshake(IObserver* observer)
     server.SendCommand(Server::Hello);
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
-    while(!cmds.m_hello_received) {
+//    while(!cmds.m_hello_received) {
+    while(cmds.m_streams_enable == -1) {
         if (chrono::steady_clock::now() - start > timeout)
             return -1;
         if (observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    if (motion_enable)
+        *motion_enable = cmds.m_streams_enable & MOTION_ENABLE_BIT;
 
     return cmds.m_camera_id;
 }
@@ -276,7 +282,7 @@ std::string Client::GetVersionInfo(IObserver* observer)
     server.SendCommand(Server::RequestVersionInfo);
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
-    while(!cmds.m_roi_received && chrono::steady_clock::now() - start < timeout) {
+    while(!cmds.m_version_info_received && chrono::steady_clock::now() - start < timeout) {
         if (observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
