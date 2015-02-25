@@ -117,7 +117,7 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, VSensor& v
 
 			eeprom.seekp(vsensor_config_offset+sizeof(Auxiliary::VideoSensorResolutionData), std::ios_base::beg);
 			eeprom.write((char*)&set, sizeof(set));
-			vsensor.set(set);
+//			vsensor.set(set);
 			break;
 		}
 		default:
@@ -358,14 +358,23 @@ struct adapt_bitrate_desc_t {
 
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
-void run()
-{
-    int fps_divider = 1;
-
 #if VIDEO_SENSOR
+void run(VSensor& vsensor)
+#else
+void run()
+#endif
+{
+	Comm::instance().allowTransmission(true);
+
+	while(g_stop) {
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
+	}
+
+    int fps_divider = 1;
 
 	Auxiliary::VideoSensorResolutionData res = {-1, -1, -1, -1};
 
+#if VIDEO_SENSOR
 	std::ifstream eeprom(eeprom_filename);
 	if (eeprom) {
         Auxiliary::VideoSensorSettingsData vs_set;
@@ -373,6 +382,8 @@ void run()
 		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
 		eeprom.read((char*)&res, sizeof(res));
 		eeprom.read((char*)&vs_set, sizeof(vs_set));
+
+        vsensor.set(vs_set);
 
         fps_divider = vs_set.fps_divider;
 	}
@@ -391,13 +402,8 @@ void run()
 	int adapt_bitrate_pos = 0;
 	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider; // how much video frames should be skipped according to current channel state
 
+    log() << "wxh: " << res.src_w << "x" << res.src_h << " -> " << res.dst_w << "x" << res.dst_h;
     log() << "Fps divider : " << fps_divider;
-
-	Comm::instance().allowTransmission(true);
-
-	while(g_stop) {
-		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
-	}
 
 	ServerCmds tmp_cmds;
 	std::string enc_cfg = tmp_cmds.GetEncCfg();
@@ -457,7 +463,8 @@ void run()
 
 		if (!to_skip) {
 			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
-			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider;
+			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
+            to_skip = to_skip * fps_divider + fps_divider-1;
 //			log() << "Frame encoded " << coded_size;
 		} else {
 			if (to_skip>0) // to_skip < 0 means no video is sent at all
@@ -529,6 +536,8 @@ int main(int argc, char *argv[])
 
 		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 #else
+        log() << "Init vsensor";
+
 		VSensor vsensor;
 		
 		Auxiliary::VideoSensorSettingsData vs_set;
@@ -540,7 +549,9 @@ int main(int argc, char *argv[])
 			
 			vsensor.set(vs_set);
 		}
-	
+
+        log() << "Vsensor was initialized";
+
 		ServerCmds cmds(&vsensor);
 #endif
 
@@ -565,7 +576,7 @@ int main(int argc, char *argv[])
 		while(1) {
 			try {
 #if VIDEO_SENSOR
-				run();
+				run(vsensor);
 #else
 				run();
 #endif

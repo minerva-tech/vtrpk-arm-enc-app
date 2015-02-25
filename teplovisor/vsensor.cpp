@@ -53,15 +53,12 @@ const reg_val_t resolution_full_reg_list[] = {
 	{0x36, 0x0600}//Frame height (1536)
 };
 
-reg_val_t binning_reg_list[] = {
-    /*Binning enable in sensor*/
-	{0x3A, 0x0000},//001- binning enable. 200-div factor =4, 100 =2, 000 =1
-	{0x38, 0x028a}
-};
-
-reg_val_t compression_correction_reg_list[] = {
+reg_val_t bcc_reg_list[] = {
 	/*10 bit compression // установить 4й бит(enable) убрать/disable (0x0010)
-    Pixel correction // установить 5й бит(enable) убрать/disable (0x0020) */
+    Pixel correction // установить 5й бит(enable) убрать/disable (0x0020)
+    Binning enable in sensor
+	001- binning enable. 200-div factor =4, 100 =2, 000 =1
+    */
     {0x3A, 0x0000},
     {0x38, 0x028a}
 };
@@ -86,7 +83,7 @@ static void set_registers(const reg_val_t* reg_list, size_t len)
 
 	for (int i=0; i<len; i++) {
 		*(uint16_t*)&regs[reg_list[i].reg] = reg_list[i].val;
-//		boost::this_thread::sleep_for(boost::chrono::milliseconds(100)); // TODO : set correct timeout
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(100)); // TODO : set correct timeout
 	}
 
 	munmap((void*)map_base, 1024);
@@ -94,27 +91,40 @@ static void set_registers(const reg_val_t* reg_list, size_t len)
 }
 
 #define set_regs(x) set_registers(x, sizeof(x)/sizeof(x[0]))
+//#define set_regs(x) ;
 
 VSensor::VSensor()
 {
     set_regs(idle_state_reg_list);
-    set_regs(binning_reg_list);
+    set_regs(init_reg_list);
+//    set_regs(start_sensor_reg_list);
 }
 
 void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
 {
     set_regs(idle_state_reg_list);
 
-    if (settings.binning)
-        binning_reg_list[0].val = 1 | (settings.binning-1)<<8;
-    else
-        binning_reg_list[0].val = 0;
+    log() << "Binning: " << (int)settings.binning << " compression: "
+            << (int)settings.ten_bit_compression << " correction: " << (int)settings.pixel_correction;
 
-    set_regs(binning_reg_list);
+    if (settings.binning) {
+        log() << "binning is on";
+        set_regs(resolution_half_reg_list);
+        bcc_reg_list[0].val = 1 | (settings.binning-1)<<8;
+    } else {
+        log() << "binning is off";
+        set_regs(resolution_full_reg_list);
+        bcc_reg_list[0].val = 0;
+    }
 
-    compression_correction_reg_list[0].val = ((settings.ten_bit_compression?1:0) << 4) | ((settings.pixel_correction?1:0) << 5);
+//    set_regs(binning_reg_list);
 
-    set_regs(compression_correction_reg_list);
+    bcc_reg_list[0].val |= ((settings.ten_bit_compression?1:0) << 4) | ((settings.pixel_correction?1:0) << 5);
+
+    log() << "bcc reg : " << bcc_reg_list[0].val;
+
+//    set_regs(compression_correction_reg_list);
+    set_regs(bcc_reg_list);
 
     set_regs(start_sensor_reg_list);
 }
