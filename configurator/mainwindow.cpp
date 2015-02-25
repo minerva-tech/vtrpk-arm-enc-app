@@ -79,7 +79,7 @@ MainWindow::MainWindow(QWidget *parent) :
     enableControls(connected);
     ui->connectButton->setEnabled(!connected);
 
-    ui->enableMotion->setChecked(motion_enable);
+//    ui->enableMotion->setChecked(motion_enable);
 
     connect(ui->DSWidget, SIGNAL(setStartChecked(bool)), this, SLOT(setStartChecked(bool)));
 
@@ -544,7 +544,7 @@ void MainWindow::on_connectButton_clicked()
     const bool connected = tryConnect(&enable_motion);
     ui->CameraID->setCurrentIndex(Comm::instance().cameraID());
     enableControls(connected);
-    ui->enableMotion->setChecked(enable_motion);
+//    ui->enableMotion->setChecked(enable_motion);
     ui->connectButton->setEnabled(!connected);
 }
 
@@ -554,6 +554,8 @@ void MainWindow::on_menuAbout_triggered()
 
     ProgressDialog progress(tr("Downloading version info"), QString(), 0, Client::timeout.count(), this);
     QString version = QString::fromStdString(Client::GetVersionInfo(&progress));
+
+    log() << version.toStdString();
 
     progress.close();
 

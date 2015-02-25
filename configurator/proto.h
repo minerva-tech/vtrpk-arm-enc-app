@@ -111,7 +111,7 @@ class Client {
 
 	class Cmds : public IServerCmds {
 	public:
-        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_streams_enable(-1) {}
+        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_version_info_received(false), m_streams_enable(-1) {}
 
 		virtual bool Hello(int id) {m_hello_received = true; m_camera_id = id; return false;}
 		virtual void Start() {assert(0);}

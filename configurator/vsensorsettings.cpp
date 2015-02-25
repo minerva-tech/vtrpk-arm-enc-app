@@ -26,7 +26,7 @@ void VSensorSettings::on_buttonBox_accepted()
     res.src_w = ui->SensorResX->text().toInt();
     res.src_h = ui->SensorResY->text().toInt();
     res.dst_w = ui->TargetResX->text().toInt();
-    res.dst_h = ui->TargetResY->text().toInt();
+    res.dst_h = ui->TargetResY->text().toInt()/2;
 
     Auxiliary::SendVideoSensorResolution(res);
 
@@ -44,12 +44,12 @@ void VSensorSettings::on_Binning_currentIndexChanged(int index)
 {
     if (index == 0) {
         ui->SensorResX->setText("1280");
-        ui->SensorResY->setText("720");
+        ui->SensorResY->setText("1024");
 
         ui->PixelCorrection->setEnabled(true);
     } else {
         ui->SensorResX->setText("640");
-        ui->SensorResY->setText("480");
+        ui->SensorResY->setText("512");
 
         ui->PixelCorrection->setChecked(false);
         ui->PixelCorrection->setEnabled(false);

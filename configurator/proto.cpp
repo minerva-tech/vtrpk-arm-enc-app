@@ -235,6 +235,8 @@ std::string Client::GetEncCfg(IObserver* observer)
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_enc_cfg_received = false;
+
     return cmds.m_enc_cfg;
 }
 
@@ -251,6 +253,8 @@ std::string Client::GetMDCfg(IObserver* observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    cmds.m_md_cfg_received = false;
 
     return cmds.m_md_cfg;
 }
@@ -269,6 +273,8 @@ std::vector<uint8_t> Client::GetROI(IObserver* observer)
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_roi_received = false;
+
     return cmds.m_roi;
 }
 
@@ -285,6 +291,8 @@ std::string Client::GetVersionInfo(IObserver* observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    cmds.m_version_info_received = false;
 
     return cmds.m_version_info;
 }
