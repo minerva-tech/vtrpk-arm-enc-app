@@ -86,6 +86,8 @@ std::string ServerCmds::GetVersionInfo()
 {
 	std::string ver;
 
+    log() << "get version info called";
+
 	std::ifstream version_file(version_info_filename);
 	if (!version_file) {
 		ver = "No system version info.\n";
@@ -116,7 +118,13 @@ std::string ServerCmds::GetVersionInfo()
 		sprintf(t, "Camera SW version\t\t%u\n", flir_data[2]); ver += t;
 		sprintf(t, "Camera HW version\t\t%u\n", flir_data[3]); ver += t;
 	}
+#else
+    char t[128];
+	sprintf(t, "\"Teplovisor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
+	sprintf(t, "FPGA revision\t\t%x\n", GetRegister(0x2e)); ver += t;
 #endif
+
+    log() << ver;
 
 	return ver;
 }
