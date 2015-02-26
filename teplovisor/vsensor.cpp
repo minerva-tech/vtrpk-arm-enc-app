@@ -35,6 +35,7 @@ const reg_val_t init_reg_list[] = {
 
 const reg_val_t resolution_half_reg_list[] = {
 	/* FPGA reg settings for binning*/
+    {0x18, 0x0004},//2^20 / number of pixels
     {0x22, 0x0280},//Picture width in hex (640)
 	{0x24, 0x0200},//Picture height in hex (512)
 	{0x26, 0x0b80},//Pictire start Hor (3584-640)
@@ -45,6 +46,7 @@ const reg_val_t resolution_half_reg_list[] = {
 
 const reg_val_t resolution_full_reg_list[] = {
     /*FPGA settings for full resolution*/
+    {0x18, 0x0001},//2^20 / number of pixels
     {0x22, 0x0500},//Picture width in hex (1280)
 	{0x24, 0x0400},//Picture height in hex (1024)
 	{0x26, 0x0500},//Pictire start Hor (1792-1280)
