@@ -401,6 +401,7 @@ void run()
 
 	int adapt_bitrate_pos = 0;
 	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider; // how much video frames should be skipped according to current channel state
+    int to_skip_motion = 0;
 
     log() << "wxh: " << res.src_w << "x" << res.src_h << " -> " << res.dst_w << "x" << res.dst_h;
     log() << "Fps divider : " << fps_divider;
@@ -426,7 +427,7 @@ void run()
 
 	initMD();
 
-    bool motion_enable = tmp_cmds.GetStreamsEnableFlag() & MOTION_ENABLE_BIT;
+    bool motion_enable = true;//tmp_cmds.GetStreamsEnableFlag() & MOTION_ENABLE_BIT;
 
     log() << "motion_enable = " << (int)motion_enable;
 
@@ -475,9 +476,16 @@ void run()
 
 		cap.putFrame(buf);
 
-        const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
+        ptrdiff_t info_size = 0;
 
-        const ptrdiff_t info_size = cur - &info_out[0];
+        if (!to_skip_motion) {
+            const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
+            info_size = cur - &info_out[0];
+            to_skip_motion = fps_divider-1;
+        } else {
+            if (to_skip_motion > 0)
+                to_skip_motion--;
+        }
 
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
