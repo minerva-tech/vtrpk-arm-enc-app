@@ -63,6 +63,7 @@ void Server::execute(uint8_t command, uint8_t arg)
 	
 	switch (command) {
 	case Hello:
+        log() << "Hello command received : " << (int)arg;
 		if (m_callbacks->Hello(arg))
 			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
 		break;
@@ -91,6 +92,7 @@ void Server::execute(uint8_t command, uint8_t arg)
 		m_callbacks->SetCameraID(arg);
 		break;
     case ToggleStreams:
+        log() << "Set streams enable flag command : " << (int)arg;
         m_callbacks->SetStreamsEnableFlag(arg);
         break;
 	default:
@@ -205,8 +207,8 @@ int Client::Handshake(IObserver* observer, bool* motion_enable)
     server.SendCommand(Server::Hello);
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
-//    while(!cmds.m_hello_received) {
-    while(cmds.m_streams_enable == -1) {
+    while(!cmds.m_hello_received) {
+//    while(cmds.m_streams_enable == -1) { // CAUTION! when we will enable "motion detector" checkbox, this part of a code should be changed. Problem is after hello is received, camera number still isn't set. So, togglestreams command is rejected because it contains wrong camera number, and we ignore cam id in hello packet only
         if (chrono::steady_clock::now() - start > timeout)
             return -1;
         if (observer)
