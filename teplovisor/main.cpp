@@ -31,6 +31,7 @@ extern "C" {
 extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
 
 volatile bool g_stop = false;
+volatile int  g_bitrate = -1;
 int g_chroma_value = 0x80;
 bool g_dump_yuv = false;
 
@@ -404,13 +405,14 @@ void run()
     int to_skip_motion = 0;
 
     log() << "wxh: " << res.src_w << "x" << res.src_h << " -> " << res.dst_w << "x" << res.dst_h;
-    log() << "Fps divider : " << fps_divider;
+    log() << "Fps divider : " << (int)fps_divider;
+    log() << "Bitrate : " << g_bitrate;
 
 	ServerCmds tmp_cmds;
 	std::string enc_cfg = tmp_cmds.GetEncCfg();
 
 	Enc enc;
-	enc.init(enc_cfg, res.dst_w, res.dst_h);
+	enc.init(enc_cfg, res.dst_w, res.dst_h, g_bitrate);
 
 	Cap cap(res.src_w, res.src_h, res.dst_w, res.dst_h);
 

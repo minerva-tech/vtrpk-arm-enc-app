@@ -269,6 +269,7 @@ void Comm::setCameraID(int id) {
 }
 
 int Comm::cameraID() const {
+    log() << "Camera ID was read : " << m_camera_id;
 	return m_camera_id;
 }
 

@@ -287,3 +287,13 @@ void ServerCmds::SetCameraID(uint8_t id) {
 
 	log() << "New camera ID received : " << (int)id;
 }
+
+void ServerCmds::BufferClear()
+{
+    Comm::instance().drop_unsent();
+}
+
+void ServerCmds::SetBitrate(int bitrate)
+{
+    g_bitrate = bitrate;
+}

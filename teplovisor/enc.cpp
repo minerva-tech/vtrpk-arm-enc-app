@@ -126,9 +126,9 @@ Enc::~Enc()
 #endif
 }
 
-void Enc::init(const std::string& config, int w, int h) // TODO: Bad. It's could be called only once. Better to move this code to ctor, but resources allocation should be done in a RAII way then.
+void Enc::init(const std::string& config, int w, int h, int bitrate) // TODO: Bad. It's could be called only once. Better to move this code to ctor, but resources allocation should be done in a RAII way then.
 {
-	enc_create(config, w, h);
+	enc_create(config, w, h, bitrate);
 }
 
 XDAS_Int8* Enc::encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size)
@@ -325,7 +325,7 @@ void Enc::mem_init()
 	}
 }
 
-void Enc::enc_create(const std::string& config, int w, int h)
+void Enc::enc_create(const std::string& config, int w, int h, int bitrate)
 {
 	m_fxns = H264VENC_TI_IH264VENC;
 
@@ -335,6 +335,11 @@ void Enc::enc_create(const std::string& config, int w, int h)
 		m_dynamicparams.videncDynamicParams.inputWidth  = w;
 		m_dynamicparams.videncDynamicParams.inputHeight = h;
 	}
+
+    if (bitrate > 0) {
+        m_dynamicparams.videncDynamicParams.targetBitRate = bitrate * 100;
+        log() << "Bitrate set : " << m_dynamicparams.videncDynamicParams.targetBitRate;
+    }
 
 	dim_init();
 

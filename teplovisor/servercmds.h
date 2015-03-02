@@ -2,6 +2,7 @@
 #define SERVERCMDS_H
 
 extern volatile bool g_stop;
+extern volatile int  g_bitrate;
 
 class ServerCmds : public IServerCmds
 {
@@ -31,6 +32,9 @@ public:
 	virtual void SetVersionInfo(const std::string& str);
     virtual void SetStreamsEnableFlag(int streams_enable);
 	virtual void SetCameraID(uint8_t id);
+
+    virtual void BufferClear();
+    virtual void SetBitrate(int bitrate);
 
 private:
 

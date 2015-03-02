@@ -18,7 +18,6 @@ public:
 	virtual std::vector<uint8_t> GetROI() = 0;
 	virtual std::string GetVersionInfo() = 0;
 	virtual uint16_t GetRegister(uint8_t addr) = 0;
-    virtual int GetStreamsEnableFlag() = 0;
 	virtual uint8_t GetCameraID() = 0;
 
 	virtual void SetEncCfg(const std::string&) = 0;
@@ -27,6 +26,9 @@ public:
 	virtual void SetVersionInfo(const std::string&) = 0;
     virtual void SetStreamsEnableFlag(int streams_enable) = 0;
 	virtual void SetCameraID(uint8_t id) = 0;
+
+    virtual void BufferClear() = 0;
+    virtual void SetBitrate(int bitrate) = 0;
 };
 
 class Server
@@ -43,13 +45,15 @@ public:
 		RequestVersionInfo,
 		RequestRegister,
         ToggleStreams,
-		SetID
+        SetID,
+        BufferClear = 0x10,
+        SetBitrate = 0x11
 	};
 
 	Server(IServerCmds* callbacks);
 	~Server();
 
-	static void SendCommand(Commands cmd, uint8_t arg = 0);
+    static void SendCommand(Commands cmd, uint8_t arg0 = 0, uint8_t arg1 = 0);
 
 	static void SendEncCfg(const std::string&);
 	static void SendMDCfg(const std::string&);
@@ -74,7 +78,7 @@ private:
 
 	void Callback(uint8_t camera, const uint8_t* payload, int comment);
 
-	void execute(uint8_t command, uint8_t arg = 0);
+    void execute(uint8_t command, uint8_t arg0 = 0, uint8_t arg1 = 0);
 
 //	void getEncCfgChunk(const Message* msg);
 	template<typename CfgContainer, typename Cb>
@@ -113,9 +117,9 @@ class Client {
 
 	class Cmds : public IServerCmds {
 	public:
-        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_streams_enable(-1) {}
+        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_version_info_received(false), m_streams_enable(-1) {}
 
-		virtual bool Hello(int id) {m_hello_received = true; m_camera_id = id; return false;}
+        virtual bool Hello(int id) {m_hello_received = true; log() << "Camera ID received : " << id; m_camera_id = id; return false;}
 		virtual void Start() {assert(0);}
 		virtual void Stop() {assert(0);}
 
@@ -124,7 +128,6 @@ class Client {
 		virtual std::vector<uint8_t> GetROI() {assert(0); return std::vector<uint8_t>();}
 		virtual std::string GetVersionInfo() {assert(0); return std::string();}
 		virtual uint16_t GetRegister(uint8_t addr) { assert(0); return 0; }
-        virtual int GetStreamsEnableFlag() { assert(0); return 0; }
 		virtual uint8_t GetCameraID() { assert(0); return 0; }
 
 		virtual void SetEncCfg(const std::string& cfg) {m_enc_cfg = cfg; m_enc_cfg_received = true;}
@@ -133,6 +136,8 @@ class Client {
 		virtual void SetVersionInfo(const std::string& ver_info) {m_version_info = ver_info; m_version_info_received = true;}
         virtual void SetStreamsEnableFlag(int streams_enable) {m_streams_enable = streams_enable;}
 		virtual void SetCameraID(uint8_t id) {}
+        virtual void BufferClear() {}
+        virtual void SetBitrate(int bitrate) {}
 
 		bool m_hello_received;
 		bool m_enc_cfg_received;

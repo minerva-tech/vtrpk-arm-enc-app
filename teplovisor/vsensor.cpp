@@ -19,7 +19,7 @@ const reg_val_t idle_state_reg_list[] = {
 
 const reg_val_t init_reg_list[] = {
 	/*Sensor init settings*/
-	{0x3A, 0x611f},//PLL -96 MHz
+	{0x3A, 0x610f},//PLL -96 MHz
 	{0x38, 0x0289},
 	{0x3A, 0xdf21},//All clocks from PLL
 	{0x38, 0x0288},
