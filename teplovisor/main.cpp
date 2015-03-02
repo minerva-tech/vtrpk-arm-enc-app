@@ -541,6 +541,23 @@ int main(int argc, char *argv[])
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
+        {
+            std::ifstream adapt_bitrate_fs("levels.txt");
+
+            if (adapt_bitrate_fs) {
+                for (int i=0; i<sizeof(g_adapt_bitrate_desc)/sizeof(g_adapt_bitrate_desc[0]); i++) {
+                    adapt_bitrate_fs >> g_adapt_bitrate_desc[i].switch_down_from_here;
+                    adapt_bitrate_fs >> g_adapt_bitrate_desc[i].switch_up_from_here;
+                }
+
+                log() << "Adaptive bitrate thresholds : ";
+                for (int i=0; i<sizeof(g_adapt_bitrate_desc)/sizeof(g_adapt_bitrate_desc[0]); i++) {
+                    log() << "level " << i << " up   : " << g_adapt_bitrate_desc[i].switch_up_from_here;
+                    log() << "level " << i << " down : " << g_adapt_bitrate_desc[i].switch_down_from_here;
+                }
+            }
+        }
+
 #if not VIDEO_SENSOR
 		Flir flir("/dev/ttyS0");
 
