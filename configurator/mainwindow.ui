@@ -403,6 +403,29 @@
      <string>Connect</string>
     </property>
    </widget>
+   <widget class="QLineEdit" name="bitrateEdt">
+    <property name="geometry">
+     <rect>
+      <x>470</x>
+      <y>280</y>
+      <width>113</width>
+      <height>20</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="dropQueueBtn">
+    <property name="geometry">
+     <rect>
+      <x>420</x>
+      <y>280</y>
+      <width>41</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>DQ</string>
+    </property>
+   </widget>
    <zorder>groupBox_3</zorder>
    <zorder>DSWidget</zorder>
    <zorder>groupBox</zorder>
@@ -411,6 +434,8 @@
    <zorder>statText</zorder>
    <zorder>groupBox_5</zorder>
    <zorder>connectButton</zorder>
+   <zorder>bitrateEdt</zorder>
+   <zorder>dropQueueBtn</zorder>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">

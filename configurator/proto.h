@@ -25,6 +25,9 @@ public:
 	virtual void SetVersionInfo(const std::string&) = 0;
     virtual void SetStreamsEnableFlag(int streams_enable) = 0;
 	virtual void SetCameraID(uint8_t id) = 0;
+
+    virtual void BufferClear() = 0;
+    virtual void SetBitrate(int bitrate) = 0;
 };
 
 class Server
@@ -41,13 +44,15 @@ public:
 		RequestVersionInfo,
 		RequestRegister,
         ToggleStreams,
-		SetID
+        SetID,
+        BufferClear = 0x10,
+        SetBitrate = 0x11
 	};
 
 	Server(IServerCmds* callbacks);
 	~Server();
 
-	static void SendCommand(Commands cmd, uint8_t arg = 0);
+    static void SendCommand(Commands cmd, uint8_t arg0 = 0, uint8_t arg1 = 0);
 
 	static void SendEncCfg(const std::string&);
 	static void SendMDCfg(const std::string&);
@@ -72,7 +77,7 @@ private:
 
 	void Callback(uint8_t camera, const uint8_t* payload, int comment);
 
-	void execute(uint8_t command, uint8_t arg = 0);
+    void execute(uint8_t command, uint8_t arg0 = 0, uint8_t arg1 = 0);
 
 //	void getEncCfgChunk(const Message* msg);
 	template<typename CfgContainer, typename Cb>
@@ -130,6 +135,8 @@ class Client {
 		virtual void SetVersionInfo(const std::string& ver_info) {m_version_info = ver_info; m_version_info_received = true;}
         virtual void SetStreamsEnableFlag(int streams_enable) {m_streams_enable = streams_enable;}
 		virtual void SetCameraID(uint8_t id) {}
+        virtual void BufferClear() {}
+        virtual void SetBitrate(int bitrate) {}
 
 		bool m_hello_received;
 		bool m_enc_cfg_received;

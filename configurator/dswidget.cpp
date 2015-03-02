@@ -429,9 +429,9 @@ void QDSWidget::Play()
 {
     emit setStartChecked(true);
 
-    Server::SendCommand(Server::Start);
-
     DS_OPT(m_pControl->Run());
+
+    Server::SendCommand(Server::Start);
 }
 
 void QDSWidget::Stop()

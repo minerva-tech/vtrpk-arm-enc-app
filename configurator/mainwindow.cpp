@@ -581,3 +581,15 @@ void MainWindow::on_enableMotion_stateChanged(int arg1)
     Server::SendCommand(Server::ToggleStreams, arg1 ? MOTION_ENABLE_BIT : 0);
     ui->DSWidget->Play();
 }
+
+void MainWindow::on_bitrateEdt_editingFinished()
+{
+    const int bitrate = (ui->bitrateEdt->text().toInt()+5)/10;
+
+    Server::SendCommand(Server::SetBitrate, bitrate & 0xff, (bitrate >> 8) & 0xff);
+}
+
+void MainWindow::on_dropQueueBtn_clicked()
+{
+    Server::SendCommand(Server::BufferClear);
+}

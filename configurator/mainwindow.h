@@ -70,6 +70,10 @@ private slots:
 
     void on_enableMotion_stateChanged(int arg1);
 
+    void on_bitrateEdt_editingFinished();
+
+    void on_dropQueueBtn_clicked();
+
 private:
     static const int stat_renew_interval = 1000; //(msec) renew stat once a second
 
