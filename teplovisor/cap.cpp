@@ -35,10 +35,11 @@
 #define ALIGN(x, y)	(((x + (y-1))/y)*y)
 
 #if VIDEO_SENSOR
-const int CODE = V4L2_MBUS_FMT_YUYV10_1X20;
+const int CODE  = V4L2_MBUS_FMT_YUYV10_1X20;
 const int CODE2 = V4L2_MBUS_FMT_YUYV8_2X8;
 #else
-const int CODE = V4L2_MBUS_FMT_YUYV8_2X8;
+const int CODE  = V4L2_MBUS_FMT_YUYV8_2X8;
+const int CODE2 = V4L2_MBUS_FMT_YUYV8_2X8;
 #endif
 
 Cap::Cap(int w, int h, int dst_w, int dst_h) :

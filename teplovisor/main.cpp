@@ -566,7 +566,7 @@ int main(int argc, char *argv[])
         log() << "Init vsensor";
 
 		VSensor vsensor;
-		
+
 		Auxiliary::VideoSensorSettingsData vs_set;
 
 		std::ifstream eeprom(eeprom_filename); // TODO : remove it from here, hide it in ServerCmds ctor/VSensor ctor ?
