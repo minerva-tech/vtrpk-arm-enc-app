@@ -127,30 +127,21 @@ Comm::~Comm()
 #endif
 }
 
-bool Comm::open(const std::string& port, int baud_rate, bool flow_control)
+bool Comm::open(const std::string& addr, unsigned short port)
 {
 	close();
 
 	boost::system::error_code ec;
 
-	m_out_buf.reset();
+    // TODO : Proper error handling
+    m_port.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(addr), port), ec);
 
-	m_port.open(port, ec);
+	m_out_buf.reset();
 
 	if (ec) {
 		log() << "Port opening error : " << ec.message();
 		return false;
 	}
-
-	m_port.set_option(asio::serial_port::baud_rate(baud_rate)); // ? 
-//	m_port.set_option(asio::serial_port::baud_rate(2400)); // ? 
-	m_port.set_option(asio::serial_port::character_size(8));
-//	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::software)); // ?
-	m_port.set_option(asio::serial_port::flow_control(flow_control ? asio::serial_port::flow_control::hardware : asio::serial_port::flow_control::none)); // ?
-//	m_port.set_option(asio::serial_port::flow_control(asio::serial_port::flow_control::hardware)); // ?
-	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::none)); 
-//	m_port.set_option(asio::serial_port::parity(asio::serial_port::parity::odd));
-	m_port.set_option(asio::serial_port::stop_bits(asio::serial_port::stop_bits::one));
 
 	m_sending_in_progress = false;
 	m_in_ff_idx = 0;

@@ -7,6 +7,7 @@
 
 #include "comm.h"
 #include "proto.h"
+#include "auxiliary.h"
 
 void AuxCb(uint8_t camera, const uint8_t* payload, int comment, QTextEdit* text_edit)
 {

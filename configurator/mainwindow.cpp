@@ -25,6 +25,8 @@
 
 #include "comm.h"
 #include "proto.h"
+#include "auxiliary.h"
+
 /*
 static void print_comm_layout()
 {
@@ -178,7 +180,7 @@ void port_open()
 {
     PortConfigSingleton& cfg = PortConfigSingleton::instance();
 
-    if (!Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control())) {
+    if (!Comm::instance().open(cfg.addr(), cfg.port())) {
         QMessageBox msg;
         msg.setIcon(QMessageBox::Critical);
         msg.setText(QObject::tr("Cannot establish connection with a device"));
@@ -198,7 +200,7 @@ bool MainWindow::tryConnect(bool* motion_enable)
 
     PortConfigSingleton& cfg = PortConfigSingleton::instance();
 
-    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress, motion_enable))>=0)) {
+    if (!(Comm::instance().open(cfg.addr(), cfg.port()) && (cam_id = Client::Handshake(&progress, motion_enable))>=0)) {
         QMessageBox msg;
         msg.setIcon(QMessageBox::Critical);
         msg.setText(tr("Cannot establish connection with a device"));

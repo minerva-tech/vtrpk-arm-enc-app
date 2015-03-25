@@ -94,7 +94,7 @@ public:
 	
 //	FILE* fout;
 
-	bool open(const std::string& port, int baud_rate, bool flow_control);
+    bool open(const std::string& addr, unsigned short port);
 	void close();
 	void transmit_and_close();
 
@@ -132,7 +132,7 @@ private:
 
 //	asio::io_service::work m_work;
 
-	asio::serial_port m_port;
+    asio::ip::tcp::socket m_port;
 	
     int m_camera_id;
 

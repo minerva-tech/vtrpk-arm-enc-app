@@ -26,25 +26,22 @@ class PortConfigSingleton
 {
 public:
     PortConfigSingleton() :
-        m_name("COM4"),
-        m_rate(38400),
-        m_flow_control(false)
+        m_addr("127.0.0.1"),
+        m_port(20001)
     {
         read();
     }
 
     static PortConfigSingleton& instance() { static PortConfigSingleton inst; /*read(inst);*/ return inst; }
 
-    void set(const std::string& name, int rate, bool flow_control);
+    void set(const std::string& addr, unsigned short port);
 
-    std::string name() const;
-    int rate() const;
-    bool flow_control() const;
+    std::string addr() const;
+    unsigned short port() const;
 
 private:
-    std::string m_name;
-    int m_rate;
-    bool m_flow_control;
+    std::string m_addr;
+    unsigned m_port;
 
     void read();
     void write() const;

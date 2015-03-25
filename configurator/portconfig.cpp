@@ -9,9 +9,9 @@ PortConfig::PortConfig(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    ui->portName->setText(PortConfigSingleton::instance().name().c_str());
+/*    ui->portName->setText(PortConfigSingleton::instance().name().c_str());
     ui->baudRate->setText(QString::number(PortConfigSingleton::instance().rate()));
-    ui->flowControl->setChecked(PortConfigSingleton::instance().flow_control());
+    ui->flowControl->setChecked(PortConfigSingleton::instance().flow_control());*/
 }
 
 PortConfig::~PortConfig()
@@ -21,35 +21,29 @@ PortConfig::~PortConfig()
 
 void PortConfig::on_buttonBox_accepted()
 {
-    const std::string name = ui->portName->text().toStdString();
+/*    const std::string name = ui->portName->text().toStdString();
     const int rate = ui->baudRate->text().toInt();
     const bool flow_control = ui->flowControl->isChecked();
 
-    PortConfigSingleton::instance().set(name, rate, flow_control);
+    PortConfigSingleton::instance().set(name, rate, flow_control);*/
 }
 
 
-void PortConfigSingleton::set(const std::string& name, int rate, bool flow_control)
+void PortConfigSingleton::set(const std::string& addr, unsigned short port)
 {
-    m_name = name;
-    m_rate = rate;
-    m_flow_control = flow_control;
+    m_addr = addr;
+    m_port = port;
 
     write();
 }
 
-std::string PortConfigSingleton::name() const
+std::string PortConfigSingleton::addr() const
 {
-    return m_name;
+    return m_addr;
 }
-int PortConfigSingleton::rate() const
+unsigned short PortConfigSingleton::port() const
 {
-    return m_rate;
-}
-
-bool PortConfigSingleton::flow_control() const
-{
-    return m_flow_control;
+    return m_port;
 }
 
 void PortConfigSingleton::read()
@@ -59,23 +53,20 @@ void PortConfigSingleton::read()
     if (!ofs.is_open())
         return;
 
-    std::string name;
-    int rate;
-    bool flow_control;
+    std::string addr;
+    unsigned short port;
 
-    ofs >> name;
-    ofs >> rate;
-    ofs >> flow_control;
+    ofs >> addr;
+    ofs >> port;
 
-    set(name, rate, flow_control);
+    set(addr, port);
 }
 
 void PortConfigSingleton::write() const
 {
     std::ofstream ofs((qApp->applicationDirPath()+"/port.cfg").toStdString(), std::ios_base::trunc);
 
-    ofs << m_name << std::endl;
-    ofs << m_rate << std::endl;
-    ofs << m_flow_control << std::endl;
+    ofs << m_addr << std::endl;
+    ofs << m_port << std::endl;
 }
 

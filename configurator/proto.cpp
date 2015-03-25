@@ -5,6 +5,7 @@
 //#include "log_to_file.h"
 #include "comm.h"
 #include "proto.h"
+#include "auxiliary.h"
 
 const chrono::seconds Client::timeout(5);
 const chrono::seconds Client::get_enc_cfg_timeout(30);

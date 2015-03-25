@@ -3,6 +3,7 @@
 #include "ext_headers.h"
 #include "comm.h"
 #include "proto.h"
+#include "auxiliary.h"
 #include "portconfig.h"
 #include "registeredit.h"
 #include "ui_registeredit.h"
@@ -36,7 +37,7 @@ void RegisterEdit::on_getButton_clicked()
 
     Comm::instance().setCallback(boost::bind(AuxCb, _1, _2, _3, reinterpret_cast<uint16_t*>(&val)), 3);
     Server::SendCommand(Server::RequestRegister, ui->addr->currentIndex()*2);
-	
+
 	chrono::steady_clock::time_point start = chrono::steady_clock::now();
     while (val == -1 && chrono::steady_clock::now() - start < Client::timeout)
         boost::this_thread::yield();

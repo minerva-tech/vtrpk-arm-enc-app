@@ -47,7 +47,8 @@ HEADERS  += mainwindow.h \
     registeredit.h \
     proto.h \
     camregisteredit.h \
-    vsensorsettings.h
+    vsensorsettings.h \
+    auxiliary.h
 
 INCLUDEPATH += ../filter/ball
 

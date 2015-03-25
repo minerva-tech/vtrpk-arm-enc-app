@@ -4,6 +4,7 @@
 #include "ext_headers.h"
 #include "comm.h"
 #include "proto.h"
+#include "auxiliary.h"
 
 VSensorSettings::VSensorSettings(QWidget *parent) :
     QDialog(parent),
