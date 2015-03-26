@@ -57,5 +57,9 @@ VSensor::VSensor()
 
 void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
 {
-	
+	log() << "Video sensor parameters : ";
+	log() << " binning : " << settings.binning;
+	log() << " fps divider : " << settings.fps_divider;
+	log() << " pixel correction : " << settings.pixel_correction;
+	log() << " ten bit compression : " << settings.ten_bit_compression;
 }
