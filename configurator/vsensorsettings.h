@@ -19,6 +19,8 @@ public:
 private slots:
     void on_buttonBox_accepted();
 
+    void on_Binning_currentIndexChanged(int index);
+
 private:
     Ui::VSensorSettings *ui;
 };

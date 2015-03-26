@@ -37,7 +37,7 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 
 	switch (msg->type()) {
 	case Command:
-		execute(msg->payload[0], msg->payload[1]);
+        execute(msg->payload[0], msg->payload[1], msg->payload[2]);
 		break;
 	case EncConfig:
 		//getEncCfgChunk(msg);
@@ -57,14 +57,15 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 	return;
 }
 
-void Server::execute(uint8_t command, uint8_t arg)
+void Server::execute(uint8_t command, uint8_t arg0, uint8_t arg1)
 {
 	log() << "command was received : " << (int)command;
 	
 	switch (command) {
 	case Hello:
-		if (m_callbacks->Hello(arg))
-			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
+        log() << "Hello command received : " << (int)arg0;
+        if (m_callbacks->Hello(arg0))
+            boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID(), 0));
 		break;
 	case Start:
 		m_callbacks->Start();
@@ -85,11 +86,21 @@ void Server::execute(uint8_t command, uint8_t arg)
 		boost::thread(boost::bind(&Server::SendVersionInfo, m_callbacks->GetVersionInfo()));
 		break;
 	case RequestRegister:
-		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
+        boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg0, m_callbacks->GetRegister(arg0)));
 		break;
 	case SetID:
-		m_callbacks->SetCameraID(arg);
+        m_callbacks->SetCameraID(arg0);
 		break;
+    case ToggleStreams:
+        log() << "Set streams enable flag command : " << (int)arg0;
+        m_callbacks->SetStreamsEnableFlag(arg0);
+        break;
+    case BufferClear:
+        m_callbacks->BufferClear();
+        break;
+    case SetBitrate:
+        m_callbacks->SetBitrate(arg0 | (arg1 << 8));
+        break;
 	default:
 		log() << "Invalid command";
 	};
@@ -186,15 +197,16 @@ void Server::SendID(int id)
     SendCommand(SetID, id);
 }
 
-void Server::SendCommand(Commands cmd, uint8_t arg)
+void Server::SendCommand(Commands cmd, uint8_t arg0, uint8_t arg1)
 {
 	Server::Message msg(Command, true, 1);
 	msg.payload[0] = cmd;
-	msg.payload[1] = arg;
+    msg.payload[1] = arg0;
+    msg.payload[2] = arg1;
 	Comm::instance().transmit(0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
 }
 
-int Client::Handshake(IObserver* observer)
+int Client::Handshake(IObserver* observer, bool* motion_enable)
 {
     Cmds cmds;
     Server server(&cmds);
@@ -203,12 +215,16 @@ int Client::Handshake(IObserver* observer)
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
     while(!cmds.m_hello_received) {
+//    while(cmds.m_streams_enable == -1) { // CAUTION! when we will enable "motion detector" checkbox, this part of a code should be changed. Problem is after hello is received, camera number still isn't set. So, togglestreams command is rejected because it contains wrong camera number, and we ignore cam id in hello packet only
         if (chrono::steady_clock::now() - start > timeout)
             return -1;
         if (observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    if (motion_enable)
+        *motion_enable = cmds.m_streams_enable & MOTION_ENABLE_BIT;
 
     return cmds.m_camera_id;
 }
@@ -228,6 +244,8 @@ std::string Client::GetEncCfg(IObserver* observer)
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_enc_cfg_received = false;
+
     return cmds.m_enc_cfg;
 }
 
@@ -244,6 +262,8 @@ std::string Client::GetMDCfg(IObserver* observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    cmds.m_md_cfg_received = false;
 
     return cmds.m_md_cfg;
 }
@@ -262,6 +282,8 @@ std::vector<uint8_t> Client::GetROI(IObserver* observer)
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_roi_received = false;
+
     return cmds.m_roi;
 }
 
@@ -278,6 +300,8 @@ std::string Client::GetVersionInfo(IObserver* observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    cmds.m_version_info_received = false;
 
     return cmds.m_version_info;
 }

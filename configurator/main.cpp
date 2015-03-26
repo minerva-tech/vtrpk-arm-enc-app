@@ -16,27 +16,27 @@ int main(int argc, char *argv[])
 	int ret = 0;
 
 	try {
-    QApplication a(argc, argv);
+        QApplication a(argc, argv);
 
-    QSettings settings("configurer.ini", QSettings::IniFormat);
+        QSettings settings("configurer.ini", QSettings::IniFormat);
 
-    QString lang = settings.value(LanguageParam).toString();
+        QString lang = settings.value(LanguageParam).toString();
 
-    QTranslator appTranslator;
-    appTranslator.load("configurer_" + lang, a.applicationDirPath());
-    a.installTranslator(&appTranslator);
+        QTranslator appTranslator;
+        appTranslator.load("configurer_" + lang, a.applicationDirPath());
+        a.installTranslator(&appTranslator);
 
-    MainWindow::setLang(lang);
+        MainWindow::setLang(lang);
 
-    MainWindow w;
+        MainWindow w;
 
-//    w.setLang(lang);
+//      w.setLang(lang);
 
-    w.show();
+        w.show();
 
-	log() << "Start";
+        log() << "Start";
 
-	ret = a.exec();
+        ret = a.exec();
 	}
 	catch(::exception& ex) {
 		QApplication a(argc, argv); // i'm not sure if it's correct.

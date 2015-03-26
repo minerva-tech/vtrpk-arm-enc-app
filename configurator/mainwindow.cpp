@@ -60,7 +60,9 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 //    print_comm_layout();
 
-    const bool connected = tryConnect();
+    bool motion_enable = false;
+
+    const bool connected = tryConnect(&motion_enable);
 //    const bool connected = false;
 
     ui->setupUi(this);
@@ -76,6 +78,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     enableControls(connected);
     ui->connectButton->setEnabled(!connected);
+
+//    ui->enableMotion->setChecked(motion_enable);
 
     connect(ui->DSWidget, SIGNAL(setStartChecked(bool)), this, SLOT(setStartChecked(bool)));
 
@@ -184,7 +188,7 @@ void port_open()
     }
 }
 
-bool MainWindow::tryConnect()
+bool MainWindow::tryConnect(bool* motion_enable)
 {
     ProgressDialog progress(tr("Establishing connection with a device"), QString(), 0, 5, this);
 
@@ -194,7 +198,7 @@ bool MainWindow::tryConnect()
 
     PortConfigSingleton& cfg = PortConfigSingleton::instance();
 
-    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress))>=0)) {
+    if (!(Comm::instance().open(cfg.name(), cfg.rate(), cfg.flow_control()) && (cam_id = Client::Handshake(&progress, motion_enable))>=0)) {
         QMessageBox msg;
         msg.setIcon(QMessageBox::Critical);
         msg.setText(tr("Cannot establish connection with a device"));
@@ -230,6 +234,7 @@ void MainWindow::enableControls(bool enabled)
     ui->actionCamera->setEnabled(false); // Unfinished yet.
     ui->Thresholds->setEnabled(enabled);
     ui->Marker->setEnabled(enabled);
+  //  ui->enableMotion->setEnabled(enabled);
 }
 
 void MainWindow::on_EditDetectorSettings_clicked()
@@ -535,9 +540,11 @@ void MainWindow::on_Thresholds_clicked(bool checked)
 void MainWindow::on_connectButton_clicked()
 {
     ui->DSWidget->Stop();
-    const bool connected = tryConnect();
+    bool enable_motion = false;
+    const bool connected = tryConnect(&enable_motion);
     ui->CameraID->setCurrentIndex(Comm::instance().cameraID());
     enableControls(connected);
+//    ui->enableMotion->setChecked(enable_motion);
     ui->connectButton->setEnabled(!connected);
 }
 
@@ -547,6 +554,8 @@ void MainWindow::on_menuAbout_triggered()
 
     ProgressDialog progress(tr("Downloading version info"), QString(), 0, Client::timeout.count(), this);
     QString version = QString::fromStdString(Client::GetVersionInfo(&progress));
+
+    log() << version.toStdString();
 
     progress.close();
 
@@ -564,4 +573,23 @@ void MainWindow::on_actionVideo_Sensor_triggered()
 {
     VSensorSettings d;
     d.exec();
+}
+
+void MainWindow::on_enableMotion_stateChanged(int arg1)
+{
+    ui->DSWidget->Stop();
+    Server::SendCommand(Server::ToggleStreams, arg1 ? MOTION_ENABLE_BIT : 0);
+    ui->DSWidget->Play();
+}
+
+void MainWindow::on_bitrateEdt_editingFinished()
+{
+    const int bitrate = (ui->bitrateEdt->text().toInt()+5)/10;
+
+    Server::SendCommand(Server::SetBitrate, bitrate & 0xff, (bitrate >> 8) & 0xff);
+}
+
+void MainWindow::on_dropQueueBtn_clicked()
+{
+    Server::SendCommand(Server::BufferClear);
 }

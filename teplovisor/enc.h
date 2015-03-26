@@ -31,7 +31,7 @@ public:
 	Enc();
 	~Enc();
 
-    void init(const std::string& config, int w, int h);
+    void init(const std::string& config, int w, int h, int bitrate);
 
 	XDAS_Int8* encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size);
 	
@@ -67,7 +67,7 @@ private:
 	void mem_init();
 	void load_params(const std::string& config);
 	void dynamicparams_init();
-	void enc_create(const std::string& config, int w, int h);
+	void enc_create(const std::string& config, int w, int h, int bitrate);
 	void dim_init();
 	void check_warnings();
 };

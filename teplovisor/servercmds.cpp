@@ -86,6 +86,8 @@ std::string ServerCmds::GetVersionInfo()
 {
 	std::string ver;
 
+    log() << "get version info called";
+
 	std::ifstream version_file(version_info_filename);
 	if (!version_file) {
 		ver = "No system version info.\n";
@@ -116,9 +118,34 @@ std::string ServerCmds::GetVersionInfo()
 		sprintf(t, "Camera SW version\t\t%u\n", flir_data[2]); ver += t;
 		sprintf(t, "Camera HW version\t\t%u\n", flir_data[3]); ver += t;
 	}
+#else
+    char t[128];
+	sprintf(t, "\"Teplovisor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
+	sprintf(t, "FPGA revision\t\t%x\n", GetRegister(0x2e)); ver += t;
 #endif
 
+    log() << ver;
+
 	return ver;
+}
+
+int ServerCmds::GetStreamsEnableFlag()
+{
+	std::ifstream eeprom(eeprom_filename);
+	if (!eeprom)
+		return 0;
+
+	eeprom.seekg(streams_enable_offset, std::ios_base::beg);
+
+	uint8_t flags;
+	eeprom >> flags;
+
+    log() << "Streams enable flags : " << (int)flags;
+
+    if (flags == -1) // uninitalized eeprom probably. And moreover, host code will think that we didn't connect with device.
+        flags = 0;
+
+	return flags;
 }
 
 uint8_t ServerCmds::GetCameraID() 
@@ -131,6 +158,8 @@ uint8_t ServerCmds::GetCameraID()
 
 	uint8_t id;
 	eeprom >> id;
+
+    log() << "My camera ID taken from eeprom: " << (int)id;
 
 	id = std::min((uint8_t)3, id);
 
@@ -232,6 +261,19 @@ void ServerCmds::SetVersionInfo(const std::string& str)
 	// nothing to do.
 }
 
+void ServerCmds::SetStreamsEnableFlag(int streams_enable)
+{
+	std::ofstream eeprom(eeprom_filename);
+	if (!eeprom)
+		return;
+
+	eeprom.seekp(streams_enable_offset, std::ios_base::beg);
+
+	eeprom << (uint8_t)streams_enable;
+
+	log() << "Motion detector enable : " << (int)streams_enable;
+}
+
 void ServerCmds::SetCameraID(uint8_t id) {
 	std::ofstream eeprom(eeprom_filename);
 	if (!eeprom)
@@ -244,4 +286,14 @@ void ServerCmds::SetCameraID(uint8_t id) {
 	Comm::instance().setCameraID(id);
 
 	log() << "New camera ID received : " << (int)id;
+}
+
+void ServerCmds::BufferClear()
+{
+    Comm::instance().drop_unsent();
+}
+
+void ServerCmds::SetBitrate(int bitrate)
+{
+    g_bitrate = bitrate;
 }

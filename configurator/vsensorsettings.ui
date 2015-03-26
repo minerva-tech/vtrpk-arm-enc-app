@@ -59,6 +59,9 @@
       </property>
       <item>
        <widget class="QLineEdit" name="SensorResX">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
           <horstretch>1</horstretch>
@@ -85,6 +88,9 @@
       </item>
       <item>
        <widget class="QLineEdit" name="SensorResY">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
         <property name="sizePolicy">
          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
           <horstretch>1</horstretch>

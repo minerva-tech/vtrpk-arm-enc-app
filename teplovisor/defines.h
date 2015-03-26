@@ -18,7 +18,8 @@ const char version_info_filename[] = "/etc/versioninfo";
 
 enum {
 	cam_id_config_offset = 0,
-	md_config_offset = 1,
+    streams_enable_offset = 4,
+	md_config_offset = 8,
 	vsensor_config_offset = 1000,
 	encoder_config_offset = 1024,
 	roi_config_offset = 50*1024,
