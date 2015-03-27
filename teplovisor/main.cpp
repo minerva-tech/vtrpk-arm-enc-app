@@ -32,6 +32,7 @@ extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long 
 
 volatile bool g_stop = false;
 volatile int  g_bitrate = -1;
+volatile bool g_change_bitrate = false; // TODO argh, it's soooo ugly. It must be changed as soon as i'll have hardware for checking that console still works after all changes.
 int g_chroma_value = 0x80;
 bool g_dump_yuv = false;
 
@@ -378,15 +379,15 @@ void run()
 #if VIDEO_SENSOR
 	std::ifstream eeprom(eeprom_filename);
 	if (eeprom) {
-        Auxiliary::VideoSensorSettingsData vs_set;
+		Auxiliary::VideoSensorSettingsData vs_set;
 
 		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
 		eeprom.read((char*)&res, sizeof(res));
 		eeprom.read((char*)&vs_set, sizeof(vs_set));
 
-        vsensor.set(vs_set);
+		vsensor.set(vs_set);
 
-        fps_divider = vs_set.fps_divider;
+		fps_divider = vs_set.fps_divider;
 	}
 #endif
 
@@ -402,11 +403,11 @@ void run()
 
 	int adapt_bitrate_pos = 0;
 	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip * fps_divider; // how much video frames should be skipped according to current channel state
-    int to_skip_motion = 0;
+	int to_skip_motion = 0;
 
-    log() << "wxh: " << res.src_w << "x" << res.src_h << " -> " << res.dst_w << "x" << res.dst_h;
-    log() << "Fps divider : " << (int)fps_divider;
-    log() << "Bitrate : " << g_bitrate;
+	log() << "wxh: " << res.src_w << "x" << res.src_h << " -> " << res.dst_w << "x" << res.dst_h;
+	log() << "Fps divider : " << (int)fps_divider;
+	log() << "Bitrate : " << g_bitrate;
 
 	ServerCmds tmp_cmds;
 	std::string enc_cfg = tmp_cmds.GetEncCfg();
@@ -452,6 +453,11 @@ void run()
         // Startup time measure point #1
 		LED_RXD(1);
 
+		if (g_change_bitrate) {
+			enc.changeBitrate(g_bitrate);
+			g_change_bitrate = false;
+		}
+
 		v4l2_buffer buf = cap.getFrame();
 
 		if (g_dump_yuv) {
@@ -467,7 +473,7 @@ void run()
 		if (!to_skip) {
 			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
 			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
-            to_skip = to_skip * fps_divider + fps_divider-1;
+			to_skip = to_skip * fps_divider + fps_divider-1;
 //			log() << "Frame encoded " << coded_size;
 		} else {
 			if (to_skip>0) // to_skip < 0 means no video is sent at all
@@ -563,7 +569,7 @@ int main(int argc, char *argv[])
 
 		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 #else
-        log() << "Init vsensor";
+		log() << "Init vsensor";
 
 		VSensor vsensor;
 
@@ -577,7 +583,7 @@ int main(int argc, char *argv[])
 			vsensor.set(vs_set);
 		}
 
-        log() << "Vsensor was initialized";
+		log() << "Vsensor was initialized";
 
 		ServerCmds cmds(&vsensor);
 #endif
@@ -612,11 +618,11 @@ int main(int argc, char *argv[])
 				log() << e.str();
 				g_stop = true;
 
-                if (e.flag() == Ex_TryAnotherConfig) {
-                    ServerCmds tmp_cmds;
-                    log() << "Writing default config to eeprom";
-                    tmp_cmds.SetEncCfg(DefaultEncCfg);
-                }
+				if (e.flag() == Ex_TryAnotherConfig) {
+					ServerCmds tmp_cmds;
+					log() << "Writing default config to eeprom";
+					tmp_cmds.SetEncCfg(DefaultEncCfg);
+				}
 			}
 			catch(std::exception& e) {
 				log() << "std::exception: " << e.what();

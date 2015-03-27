@@ -3,6 +3,7 @@
 
 extern volatile bool g_stop;
 extern volatile int  g_bitrate;
+extern volatile bool g_change_bitrate;
 
 class ServerCmds : public IServerCmds
 {

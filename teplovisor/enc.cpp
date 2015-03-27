@@ -153,30 +153,19 @@ static int range(int v, int l, int r) {
 	return v<l?l:v>r?r:v;
 }
 
-int Enc::changeBitrate(int delta_bitrate, int max_pos_step, int max_neg_step)
+void Enc::changeBitrate(int new_bitrate)
 {	
-	if (abs(delta_bitrate) > BITRATE_BIAS) {
-		delta_bitrate = range(delta_bitrate, -abs(max_neg_step), abs(max_pos_step));
-		int new_bitrate = m_dynamicparams.videncDynamicParams.targetBitRate + delta_bitrate;
+	m_dynamicparams.videncDynamicParams.targetBitRate = new_bitrate;
 
-		new_bitrate = range(new_bitrate, BITRATE_MIN, BITRATE_MAX);
+	H264VENC_Status status;
+	status.videncStatus.size = sizeof(IH264VENC_Status);
 
-		m_dynamicparams.videncDynamicParams.targetBitRate = new_bitrate;
-
-		H264VENC_Status status;
-		status.videncStatus.size = sizeof(IH264VENC_Status);
-
-		if(H264VENC_control(m_handle, XDM_SETPARAMS, &m_dynamicparams, &status) == XDM_EFAIL) { // TODO: Is it possible to change only one dynamic parameter? I believe yes, but have no doc here to check.
-			log() << "Error code : 0x" << std::hex << (int)status.videncStatus.extendedError << std::dec;
-			throw ex("Set Encoder parameters Command Failed " + printErrorMsg(status.videncStatus.extendedError));
-		}
-		
-		log() << "Due to data channel state, AVC target bitrate was changed to " << new_bitrate << " bps";
-		
-		return new_bitrate;
+	if(H264VENC_control(m_handle, XDM_SETPARAMS, &m_dynamicparams, &status) == XDM_EFAIL) { // TODO: Is it possible to change only one dynamic parameter? I believe yes, but have no doc here to check.
+		log() << "Error code : 0x" << std::hex << (int)status.videncStatus.extendedError << std::dec;
+		throw ex("Set Encoder parameters Command Failed " + printErrorMsg(status.videncStatus.extendedError));
 	}
 	
-	return m_dynamicparams.videncDynamicParams.targetBitRate;
+	log() << "AVC target bitrate was changed to " << new_bitrate << " bps";
 }
 
 void Enc::copyInputBuf(XDAS_Int8* in, int width, int height, int stride)
@@ -337,7 +326,7 @@ void Enc::enc_create(const std::string& config, int w, int h, int bitrate)
 	}
 
     if (bitrate > 0) {
-        m_dynamicparams.videncDynamicParams.targetBitRate = bitrate * 100;
+        m_dynamicparams.videncDynamicParams.targetBitRate = bitrate;
         log() << "Bitrate set : " << m_dynamicparams.videncDynamicParams.targetBitRate;
     }
 

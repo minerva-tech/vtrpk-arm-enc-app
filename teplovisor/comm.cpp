@@ -20,8 +20,17 @@ const char SHARED_MEM_NAME[] = "8e7rUzAf";
 
 Log::PrintLine& operator << (Log& log, const Comm::Pkt& pkt)
 {
-	return log << Log::Dump << "Packet transmitted, addr = " << pkt.address << 
-		", payload : " << std::hex << pkt.payload[0] << pkt.payload[1] << pkt.payload[2] << pkt.payload[3] << std::dec;
+	const uint8_t* p = reinterpret_cast<const uint8_t*>(&pkt);
+	
+	static_assert(sizeof(pkt) == 15, "Packet size should be 15 bytes.");
+	
+	       log << /*Log::Dump/*/Log::Debug << std::hex << (int)p[0] << (int)p[1] << (int)p[2]  << (int)p[3]  << 
+																(int)p[4]  << (int)p[5]  << (int)p[6]  << (int)p[7] << std::dec;
+	return log << /*Log::Dump/*/Log::Debug << std::hex << (int)p[8] << (int)p[9] << (int)p[10] << (int)p[11] << 
+																(int)p[12] << (int)p[13] << (int)p[14] << std::dec;
+	
+//	return log << Log::Dump << "Packet transmitted, addr = " << pkt.address << 
+//		", payload : " << std::hex << pkt.payload[0] << pkt.payload[1] << pkt.payload[2] << pkt.payload[3] << std::dec;
 }
 
 Comm::Pkt::Pkt()
@@ -420,7 +429,8 @@ void Comm::recv_pkt(const Pkt* pkt)
 	if (m_callback[pkt->port()])
 		m_callback[pkt->port()](pkt->camera(), pkt->payload, comment);
 
-//	log() << *pkt;
+	log() << "Packet was received";
+	log() << *pkt;
 }
 
 void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
@@ -509,7 +519,7 @@ std::vector<std::pair<std::string, uint32_t> > Comm::getStat()
 	boost::chrono::duration<double> dur = boost::chrono::steady_clock::now() - m_start;
 	double count = dur.count();
 
-	times.push_back(std::pair<std::string, uint32_t>("Command bitrate: ", 		(m_recv_amount[0]+0.5)/count));
+	times.push_back(std::pair<std::string, uint32_t>("Command bitrate: ", 	(m_recv_amount[0]+0.5)/count));
 	times.push_back(std::pair<std::string, uint32_t>("Video bitrate: ", 		(m_recv_amount[1]+0.5)/count));
 	times.push_back(std::pair<std::string, uint32_t>("Detector bitrate: ", 	(m_recv_amount[2]+0.5)/count));
 	times.push_back(std::pair<std::string, uint32_t>("Auxiliary bitrate: ", 	(m_recv_amount[3]+0.5)/count));
