@@ -92,7 +92,7 @@ public:
 	int cameraID() const { return m_camera_id; }
 
 	~Comm();
-	
+
 //	FILE* fout;
 
     bool open(const std::string& addr, unsigned short port);

@@ -35,13 +35,13 @@ public:
 
 	XDAS_Int8* encFrame(XDAS_Int8* in, int width, int height, int stride, size_t* out_size);
 	
-	int changeBitrate(int new_bitrate, int max_pos_step, int max_neg_step);
+	void changeBitrate(int new_bitrate);
 
 	static void rman_init(); // unfortunately i wasn't able to init/exit RMAN each time when encoder restarted. So it's init once, when app is started. Yes, it's ugly.
 
 private:
 	H264VENC_Handle			m_handle;
-	IH264VENC_Fxns			m_fxns;
+	IH264VENC_Fxns				m_fxns;
 	H264VENC_Params			m_params;
 	H264VENC_DynamicParams	m_dynamicparams;
 	H264VENC_InArgs	 		m_inargs;
