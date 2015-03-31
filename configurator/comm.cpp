@@ -98,10 +98,7 @@ Comm::Comm() :
 	m_owners(0),
 #endif
 	m_out_buf(out_buf_size),
-	m_sending_in_progress(false),
-	m_in_ff_idx(0),
-	m_cur(m_in_buf[m_in_ff_idx].begin()),
-	m_remains(0)
+    m_sending_in_progress(false)
 {
 //	asio::io_service::work work(m_io_service);
 
@@ -144,14 +141,12 @@ bool Comm::open(const std::string& addr, unsigned short port)
 	}
 
 	m_sending_in_progress = false;
-	m_in_ff_idx = 0;
-	m_cur = m_in_buf[m_in_ff_idx].begin();
-	m_remains = 0;
+    m_in_buf.reset();
 
 	std::fill(&m_in_count_lsb[0], &m_in_count_lsb[sizeof(m_in_count_lsb)/sizeof(m_in_count_lsb[0])], -1);
 
-	m_port.async_read_some(asio::buffer(m_in_buf[m_in_ff_idx]), 
-		bind(&Comm::recv_chunk, this, m_in_buf[m_in_ff_idx].begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
+    m_port.async_read_some(asio::buffer(m_in_buf.buf),
+        bind(&Comm::recv_ethernet_chunk, this, &m_in_buf.buf[0], asio::placeholders::error, asio::placeholders::bytes_transferred));
 
 	m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
 
@@ -314,80 +309,124 @@ void Comm::recv_pkt(const Pkt* pkt)
 //	log() << *pkt;
 }
 
-void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
+// TODO : recv_*_chunk MUST be rewritten
+void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
 {
-//	log() << "rcv : " << bytes_transferred;
+    if (e) {
+        if (e != asio::error::operation_aborted)
+            log() << Log::Error << "Error of data receiving : " << e.message();
+        else
+            log() << "Error of data receiving : operation aborted";
 
-//	fwrite(p, 1, bytes_transferred, fout);
-	
-//	if (!e) {
-		if (e) {
-			if (e != asio::error::operation_aborted)
-				log() << Log::Error << "Error of data receiving : " << e.message();
-			else
-				log() << "Error of data receiving : operation aborted";
+        if (!bytes_transferred)
+            return;
+    }
 
-			if (!bytes_transferred)
-				return;
-		}
+    uint8_t* pend = p + bytes_transferred;
 
-		uint8_t* pend = p + bytes_transferred;
+    while (m_in_buf.remains + pend - m_in_buf.cur >= sizeof(EthernetPkt)) {
+        if (m_in_buf.remains) {
+            assert(m_in_buf.cur == m_in_buf.buf.begin());
 
-		while (m_remains + pend - m_cur >= sizeof(Pkt)) {
-			if (m_remains) {
-				assert(m_cur == m_in_buf[m_in_ff_idx].begin());
+            uint8_t* buf_end = m_in_buf.buf.end();
 
-				uint8_t* buf_end = m_in_buf[m_in_ff_idx^1].end();
+            uint8_t* pkt_start = buf_end - m_in_buf.remains; // No data loss or corruptions, right?
 
-				uint8_t* pkt_start = std::find(buf_end - m_remains, buf_end, PREAMBLE);
+            if (pkt_start != m_in_buf.buf.end()) {
+                EthernetPkt pkt;
+                uint8_t* ppkt = reinterpret_cast<uint8_t*>(&pkt);
+                const ptrdiff_t len = buf_end - pkt_start;
 
-				if (buf_end - pkt_start + pend - m_cur < sizeof(Pkt)) {
-					m_remains = buf_end - pkt_start;
-					break;
-				}
+                memcpy(ppkt, pkt_start, len);
+                memcpy(ppkt + len, m_in_buf.cur, sizeof(EthernetPkt) - len);
 
-				if (pkt_start != m_in_buf[m_in_ff_idx^1].end()) {
-					Pkt pkt;
-					uint8_t* ppkt = pkt.buf();
-					const ptrdiff_t len = buf_end - pkt_start;
+                m_in_buf.cur += sizeof(EthernetPkt) - len;
 
-					memcpy(ppkt, pkt_start, len);
-					memcpy(ppkt + len, m_cur, sizeof(Pkt) - len);
+                recv_chunk(pkt.payload.data, e, pkt.payload.len, pkt.payload.header.uni_net_addr.device_number);
+            }
 
-					m_cur += sizeof(Pkt) - len;
+            m_in_buf.remains = 0;
+        }
 
-					recv_pkt(&pkt);
-				}
+        uint8_t* pkt_start = m_in_buf.cur;
 
-				m_remains = 0;
-			}
+        if (pend - pkt_start >= sizeof(EthernetPkt)) {
+            EthernetPkt* pkt = reinterpret_cast<EthernetPkt*>(pkt_start);
+            recv_chunk(pkt->payload.data, e, pkt->payload.len, pkt->payload.header.uni_net_addr.device_number);
+            m_in_buf.cur = pkt_start + sizeof(EthernetPkt);
+        } else {
+            m_in_buf.cur = pkt_start;
+            break;
+        }
+    }
 
-			uint8_t* pkt_start = std::find(m_cur, pend, PREAMBLE);
+    if (pend < m_in_buf.buf.end()) {
+        m_port.async_read_some(asio::buffer(pend, m_in_buf.buf.end() - pend),
+            bind(&Comm::recv_ethernet_chunk, this, pend, asio::placeholders::error, asio::placeholders::bytes_transferred));
+    } else {
+        m_in_buf.remains = m_in_buf.buf.end() - m_in_buf.cur;
+        m_in_buf.cur = m_in_buf.buf.begin();
+        m_port.async_read_some(asio::buffer(m_in_buf.buf),
+            bind(&Comm::recv_ethernet_chunk, this, m_in_buf.cur, asio::placeholders::error, asio::placeholders::bytes_transferred));
+    }
+}
 
-			if (pend - pkt_start >= sizeof(Pkt)) {
-				recv_pkt(reinterpret_cast<const Pkt*>(pkt_start));
-				m_cur = pkt_start + sizeof(Pkt);
-			} else {
-				m_cur = pkt_start;
-				break;
-			}
-		}
+void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred, uint8_t cam_id)
+{
+    Buf& in_buf = m_in_buf_cam[cam_id];
 
-		if (pend < m_in_buf[m_in_ff_idx].end()) {
-			m_port.async_read_some(asio::buffer(pend, m_in_buf[m_in_ff_idx].end() - pend), 
-				bind(&Comm::recv_chunk, this, pend, asio::placeholders::error, asio::placeholders::bytes_transferred));
-		} else {
-			m_remains = m_in_buf[m_in_ff_idx].end() - m_cur;
-			m_in_ff_idx = m_in_ff_idx^1;
-			m_cur = m_in_buf[m_in_ff_idx].begin();
-			m_port.async_read_some(asio::buffer(m_in_buf[m_in_ff_idx]),
-				bind(&Comm::recv_chunk, this, m_cur, asio::placeholders::error, asio::placeholders::bytes_transferred));
-		}
-/*	} else if (e != asio::error::operation_aborted) {
-		log() << Log::Error << "Error of data receiving : " << e.message();
-	} else {
-		log() << "Error of data receiving : operation aborted";
-	}*/
+    // TODO : it's very stupid. This copy isn't necessary. But let's make it work this way first.
+    if (in_buf.buf.end() - in_buf.writing_pt > bytes_transferred) {
+        const size_t first_part = in_buf.buf.end()-in_buf.writing_pt;
+        memcpy(in_buf.writing_pt, p, first_part);
+        memcpy(in_buf.buf.begin(), p + first_part, bytes_transferred-first_part);
+        in_buf.writing_pt = in_buf.buf.begin() + (in_buf.buf.end() - in_buf.writing_pt);
+    } else {
+        memcpy(in_buf.writing_pt, p, bytes_transferred);
+        in_buf.writing_pt += bytes_transferred;
+    }
+
+    uint8_t* pend = in_buf.writing_pt + bytes_transferred;
+
+    while (in_buf.remains + pend - in_buf.cur >= sizeof(Pkt)) {
+        if (in_buf.remains) {
+            assert(in_buf.cur == in_buf.buf.begin());
+
+            uint8_t* pkt_start = std::find(in_buf.buf.end() - in_buf.remains, in_buf.buf.end(), PREAMBLE);
+
+            const uint8_t* buf_end = in_buf.buf.end();
+
+            if (buf_end - pkt_start + pend - in_buf.cur < sizeof(Pkt)) {
+                in_buf.remains = buf_end - pkt_start;
+                break;
+            }
+
+            if (pkt_start != in_buf.buf.end()) {
+                Pkt pkt;
+                uint8_t* ppkt = pkt.buf();
+                const ptrdiff_t len = buf_end - pkt_start;
+
+                memcpy(ppkt, pkt_start, len);
+                memcpy(ppkt + len, in_buf.cur, sizeof(Pkt) - len);
+
+                in_buf.cur += sizeof(Pkt) - len;
+
+                recv_pkt(&pkt);
+            }
+
+            in_buf.remains = 0;
+        }
+
+        uint8_t* pkt_start = std::find(in_buf.cur, pend, PREAMBLE);
+
+        if (pend - pkt_start >= sizeof(Pkt)) {
+            recv_pkt(reinterpret_cast<const Pkt*>(pkt_start));
+            in_buf.cur = pkt_start + sizeof(Pkt);
+        } else {
+            in_buf.cur = pkt_start;
+            break;
+        }
+    }
 }
 
 /**

@@ -7,7 +7,7 @@ const int CAMERAS_N = 4;
 
 const int LSB_MAX_VAL_PLUS_1 = 16;
 
-const int CHUNK_SIZE = 128;
+const int CHUNK_SIZE = 1024;
 
 const int PREAMBLE = 0x02;
 
@@ -50,6 +50,7 @@ struct CircBuf
 class Comm
 {
 struct Pkt;
+struct EthernetPkt;
 
 friend Log::PrintLine& operator << (Log& log, const Pkt& pkt);
 friend void print_comm_layout();
@@ -111,7 +112,16 @@ private:
 	int m_owners;
 #endif
 
-	typedef array<uint8_t, CHUNK_SIZE> Buf;
+//	typedef array<uint8_t, CHUNK_SIZE> Buf;
+
+    struct Buf {
+        Buf() : cur(&buf[0]), remains(0), writing_pt(&buf[0]) {}
+        void reset() { cur = &buf[0]; remains = 0; writing_pt = &buf[0]; }
+        boost::array <uint8_t, CHUNK_SIZE> buf;
+        uint8_t*    cur;
+        ptrdiff_t   remains;
+        uint8_t*    writing_pt;
+    };
 
 	static const int MAX_QUEUE_LEN = 1;
 
@@ -120,7 +130,8 @@ private:
 //	void transmitted(shared_ptr<Pkt> sp, const system::error_code&, size_t);
 
 	void recv_pkt(const Pkt* pkt);
-	void recv_chunk(uint8_t* p, const boost::system::error_code& e, std::size_t bytes_transferred);
+    void recv_chunk(uint8_t* p, const boost::system::error_code& e, std::size_t bytes_transferred, uint8_t cam_id);
+    void recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred);
 
 	Callback m_callback[4];
 
@@ -146,14 +157,36 @@ private:
 //	int m_out_ff_idx;
 	bool m_sending_in_progress;
 
-	Buf m_in_buf[2]; // it's not necessary indeed. single buffer is enough. and async_read_some() goes till current reading pointer
-	int m_in_ff_idx;
+    Buf m_in_buf;
 
-	uint8_t* m_cur;
-	ptrdiff_t m_remains;
+    std::map<uint8_t, Buf> m_in_buf_cam;
 
 	boost::chrono::steady_clock::time_point m_start;
 	uint32_t m_recv_amount[4];
+};
+
+const int MAX_APP_PAYLOAD = 50;
+
+struct UniNetAddr_t {
+    uint8_t         level_number;
+    uint8_t         device_number;
+};
+
+struct uartHeader_t {
+    UniNetAddr_t    uni_net_addr;
+    uint8_t         port;
+};
+
+struct uartDataBuffer_t {
+    uartHeader_t    header;
+    uint8_t         len;
+    uint8_t         data[MAX_APP_PAYLOAD];
+};
+
+struct Comm::EthernetPkt {
+    int             SOF;
+    uartDataBuffer_t payload;
+    uint16_t        crc16;
 };
 
 struct Comm::Pkt {
