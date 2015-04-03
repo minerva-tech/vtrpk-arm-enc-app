@@ -115,12 +115,12 @@ private:
 //	typedef array<uint8_t, CHUNK_SIZE> Buf;
 
     struct Buf {
-        Buf() : cur(&buf[0]), remains(0), writing_pt(&buf[0]) {}
-        void reset() { cur = &buf[0]; remains = 0; writing_pt = &buf[0]; }
+        Buf() : cur(0), remains(0), writing_pt(0) {}
+        void reset() { cur = 0; remains = 0; writing_pt = 0; }
         boost::array <uint8_t, CHUNK_SIZE> buf;
-        uint8_t*    cur;
+        ptrdiff_t   cur;
         ptrdiff_t   remains;
-        uint8_t*    writing_pt;
+        ptrdiff_t   writing_pt;
     };
 
 	static const int MAX_QUEUE_LEN = 1;
@@ -129,7 +129,7 @@ private:
 	void transmitted(const system::error_code&, size_t);
 //	void transmitted(shared_ptr<Pkt> sp, const system::error_code&, size_t);
 
-	void recv_pkt(const Pkt* pkt);
+    void recv_pkt(const Pkt* pkt, int cam_id_override = -1);
     void recv_chunk(uint8_t* p, const boost::system::error_code& e, std::size_t bytes_transferred, uint8_t cam_id);
     void recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred);
 

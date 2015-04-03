@@ -284,7 +284,7 @@ void Comm::transmitted(shared_ptr<Pkt> sp, const system::error_code& e, size_t)
 }
 */
 
-void Comm::recv_pkt(const Pkt* pkt)
+void Comm::recv_pkt(const Pkt* pkt, int cam_id_override)
 {
 	int comment = Invalid;
 
@@ -299,12 +299,16 @@ void Comm::recv_pkt(const Pkt* pkt)
 	if (comment == Invalid) 
 		comment = Normal;
 
-	m_in_count_lsb[pkt->camera()] = (pkt->count_lsb()+1) % LSB_MAX_VAL_PLUS_1;
+    m_in_count_lsb[pkt->camera()] = (pkt->count_lsb()+1) % LSB_MAX_VAL_PLUS_1; // TODO calculated wrong
 
-    m_recv_amount[pkt->port()] += mss;
+    m_recv_amount[pkt->port()] += mss; // TODO calculated sum of all cams
 
-	if (m_callback[pkt->port()] && comment == Normal)
-		m_callback[pkt->port()](pkt->camera(), pkt->payload, comment);
+    if (m_callback[pkt->port()] && comment == Normal) {
+        if (cam_id_override >= 0)
+            m_callback[pkt->port()](cam_id_override, pkt->payload, comment);
+        else
+            m_callback[pkt->port()](pkt->camera(), pkt->payload, comment);
+    }
 
 //	log() << *pkt;
 }
@@ -324,50 +328,48 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
 
     uint8_t* pend = p + bytes_transferred;
 
-    while (m_in_buf.remains + pend - m_in_buf.cur >= sizeof(EthernetPkt)) {
+    m_in_buf.writing_pt += bytes_transferred;
+
+    while (m_in_buf.remains + m_in_buf.writing_pt - m_in_buf.cur >= sizeof(EthernetPkt)) {
         if (m_in_buf.remains) {
-            assert(m_in_buf.cur == m_in_buf.buf.begin());
+            assert(m_in_buf.cur == 0);
 
             uint8_t* buf_end = m_in_buf.buf.end();
 
             uint8_t* pkt_start = buf_end - m_in_buf.remains; // No data loss or corruptions, right?
 
-            if (pkt_start != m_in_buf.buf.end()) {
-                EthernetPkt pkt;
-                uint8_t* ppkt = reinterpret_cast<uint8_t*>(&pkt);
-                const ptrdiff_t len = buf_end - pkt_start;
+            EthernetPkt pkt;
+            uint8_t* ppkt = reinterpret_cast<uint8_t*>(&pkt);
 
-                memcpy(ppkt, pkt_start, len);
-                memcpy(ppkt + len, m_in_buf.cur, sizeof(EthernetPkt) - len);
+            memcpy(ppkt, pkt_start, m_in_buf.remains);
+            memcpy(ppkt + m_in_buf.remains, m_in_buf.buf.begin(), sizeof(EthernetPkt) - m_in_buf.remains);
 
-                m_in_buf.cur += sizeof(EthernetPkt) - len;
+            m_in_buf.cur += sizeof(EthernetPkt) - m_in_buf.remains;
 
-                recv_chunk(pkt.payload.data, e, pkt.payload.len, pkt.payload.header.uni_net_addr.device_number);
-            }
+            recv_chunk(pkt.payload.data, e, pkt.payload.len, pkt.payload.header.uni_net_addr.device_number);
 
             m_in_buf.remains = 0;
         }
 
-        uint8_t* pkt_start = m_in_buf.cur;
+        uint8_t* pkt_start = m_in_buf.buf.begin() + m_in_buf.cur;
 
-        if (pend - pkt_start >= sizeof(EthernetPkt)) {
+        if (m_in_buf.buf.begin() + m_in_buf.writing_pt - pkt_start >= sizeof(EthernetPkt)) {
             EthernetPkt* pkt = reinterpret_cast<EthernetPkt*>(pkt_start);
             recv_chunk(pkt->payload.data, e, pkt->payload.len, pkt->payload.header.uni_net_addr.device_number);
-            m_in_buf.cur = pkt_start + sizeof(EthernetPkt);
-        } else {
-            m_in_buf.cur = pkt_start;
-            break;
+            m_in_buf.cur += sizeof(EthernetPkt);
         }
     }
 
     if (pend < m_in_buf.buf.end()) {
+        assert(pend == m_in_buf.buf.begin()+m_in_buf.writing_pt);
         m_port.async_read_some(asio::buffer(pend, m_in_buf.buf.end() - pend),
             bind(&Comm::recv_ethernet_chunk, this, pend, asio::placeholders::error, asio::placeholders::bytes_transferred));
     } else {
-        m_in_buf.remains = m_in_buf.buf.end() - m_in_buf.cur;
-        m_in_buf.cur = m_in_buf.buf.begin();
+        m_in_buf.remains = m_in_buf.buf.size() - m_in_buf.cur;
+        m_in_buf.cur = 0;
+        m_in_buf.writing_pt = 0;
         m_port.async_read_some(asio::buffer(m_in_buf.buf),
-            bind(&Comm::recv_ethernet_chunk, this, m_in_buf.cur, asio::placeholders::error, asio::placeholders::bytes_transferred));
+            bind(&Comm::recv_ethernet_chunk, this, m_in_buf.buf.begin(), asio::placeholders::error, asio::placeholders::bytes_transferred));
     }
 }
 
@@ -375,58 +377,59 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
 {
     Buf& in_buf = m_in_buf_cam[cam_id];
 
-    // TODO : it's very stupid. This copy isn't necessary. But let's make it work this way first.
-    if (in_buf.buf.end() - in_buf.writing_pt > bytes_transferred) {
-        const size_t first_part = in_buf.buf.end()-in_buf.writing_pt;
-        memcpy(in_buf.writing_pt, p, first_part);
-        memcpy(in_buf.buf.begin(), p + first_part, bytes_transferred-first_part);
-        in_buf.writing_pt = in_buf.buf.begin() + (in_buf.buf.end() - in_buf.writing_pt);
-    } else {
-        memcpy(in_buf.writing_pt, p, bytes_transferred);
-        in_buf.writing_pt += bytes_transferred;
-    }
+    assert(in_buf.remains < sizeof(Pkt));
 
-    uint8_t* pend = in_buf.writing_pt + bytes_transferred;
+    if (in_buf.remains) {
+        if (bytes_transferred+in_buf.remains >= sizeof(Pkt)) {
+            uint8_t* pkt_start = std::find(in_buf.buf.begin(), in_buf.buf.begin() + in_buf.remains, PREAMBLE);
 
-    while (in_buf.remains + pend - in_buf.cur >= sizeof(Pkt)) {
-        if (in_buf.remains) {
-            assert(in_buf.cur == in_buf.buf.begin());
-
-            uint8_t* pkt_start = std::find(in_buf.buf.end() - in_buf.remains, in_buf.buf.end(), PREAMBLE);
-
-            const uint8_t* buf_end = in_buf.buf.end();
-
-            if (buf_end - pkt_start + pend - in_buf.cur < sizeof(Pkt)) {
-                in_buf.remains = buf_end - pkt_start;
-                break;
-            }
-
-            if (pkt_start != in_buf.buf.end()) {
+            if (pkt_start == in_buf.buf.end()) {
                 Pkt pkt;
                 uint8_t* ppkt = pkt.buf();
-                const ptrdiff_t len = buf_end - pkt_start;
 
-                memcpy(ppkt, pkt_start, len);
-                memcpy(ppkt + len, in_buf.cur, sizeof(Pkt) - len);
+                const size_t first_part_len = in_buf.remains - (pkt_start - in_buf.buf.begin());
 
-                in_buf.cur += sizeof(Pkt) - len;
+                memcpy(ppkt, pkt_start, first_part_len);
 
-                recv_pkt(&pkt);
+                const size_t second_part_len = sizeof(Pkt)-first_part_len;
+
+                memcpy(ppkt+first_part_len, p, second_part_len);
+
+                p += second_part_len;
+                bytes_transferred -= second_part_len;
+
+                recv_pkt(&pkt, cam_id);
             }
 
             in_buf.remains = 0;
-        }
-
-        uint8_t* pkt_start = std::find(in_buf.cur, pend, PREAMBLE);
-
-        if (pend - pkt_start >= sizeof(Pkt)) {
-            recv_pkt(reinterpret_cast<const Pkt*>(pkt_start));
-            in_buf.cur = pkt_start + sizeof(Pkt);
+            in_buf.writing_pt = 0;
         } else {
-            in_buf.cur = pkt_start;
-            break;
+            memcpy(in_buf.buf.begin()+in_buf.writing_pt, p, bytes_transferred);
+            in_buf.writing_pt += bytes_transferred;
+            in_buf.remains += bytes_transferred;
+            p += bytes_transferred;
+            bytes_transferred = 0;
         }
     }
+
+    while (bytes_transferred > sizeof(Pkt)) {
+        const uint8_t* pend = p + bytes_transferred;
+
+        uint8_t* pkt_start = std::find(p, p + bytes_transferred, PREAMBLE);
+
+        if (pend - pkt_start >= sizeof(Pkt)) {
+            recv_pkt((Pkt*)pkt_start, cam_id);
+            p += sizeof(Pkt);
+            bytes_transferred -= sizeof(Pkt);
+        } else {
+            bytes_transferred = pend-pkt_start;
+            p = pkt_start;
+        }
+    }
+
+    memcpy(in_buf.buf.begin() + in_buf.writing_pt, p, bytes_transferred);
+    in_buf.writing_pt += bytes_transferred;
+    in_buf.remains += bytes_transferred; // TODO : remains == wrinting_pt huh?
 }
 
 /**
