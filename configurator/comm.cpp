@@ -2,8 +2,8 @@
 
 #include "pchbarrier.h"
 
-#include "logview.h" // todo: as comm.cpp will be used everywhere, qt dependencies should be removed from log.
-//#include "log_to_file.h"
+//#include "logview.h" // todo: as comm.cpp will be used everywhere, qt dependencies should be removed from log.
+#include "log_to_file.h"
 #include "comm.h"
 
 using std::min;
@@ -326,6 +326,8 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
             return;
     }
 
+    log() << "bte : " << bytes_transferred;
+
     uint8_t* pend = p + bytes_transferred;
 
     m_in_buf.writing_pt += bytes_transferred;
@@ -344,19 +346,35 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
             memcpy(ppkt, pkt_start, m_in_buf.remains);
             memcpy(ppkt + m_in_buf.remains, m_in_buf.buf.begin(), sizeof(EthernetPkt) - m_in_buf.remains);
 
-            m_in_buf.cur += sizeof(EthernetPkt) - m_in_buf.remains;
+            const size_t second_part_size = sizeof(EthernetPkt) - m_in_buf.remains;
 
-            recv_chunk(pkt.payload.data, e, pkt.payload.len, pkt.payload.header.uni_net_addr.device_number);
+            m_in_buf.remains = std::max(0, m_in_buf.remains - (pkt.payload.len + 7)); // TODO : DIRTY, fix it after vovs will talk with modem guys re their packets
 
-            m_in_buf.remains = 0;
+            if (pkt.payload.header.port == 0x3c)
+                recv_chunk(pkt.payload.data, e, pkt.payload.len, pkt.payload.header.uni_net_addr.device_number);
+
+            if (!m_in_buf.remains) {
+                m_in_buf.cur = second_part_size;
+
+                if (MAX_APP_PAYLOAD > pkt.payload.len)
+                    m_in_buf.cur -= MAX_APP_PAYLOAD - pkt.payload.len; // TODO : DIRTY. And document states that len of data field is 50 bytes always. Should be clarified.
+            } else {
+                continue; // TODO
+            }
         }
 
         uint8_t* pkt_start = m_in_buf.buf.begin() + m_in_buf.cur;
 
         if (m_in_buf.buf.begin() + m_in_buf.writing_pt - pkt_start >= sizeof(EthernetPkt)) {
             EthernetPkt* pkt = reinterpret_cast<EthernetPkt*>(pkt_start);
-            recv_chunk(pkt->payload.data, e, pkt->payload.len, pkt->payload.header.uni_net_addr.device_number);
+
+            if (pkt->payload.header.port == 0x3c)
+                recv_chunk(pkt->payload.data, e, pkt->payload.len, pkt->payload.header.uni_net_addr.device_number);
+
             m_in_buf.cur += sizeof(EthernetPkt);
+
+            if (MAX_APP_PAYLOAD > pkt->payload.len)
+                m_in_buf.cur -= MAX_APP_PAYLOAD - pkt->payload.len; // TODO : DIRTY. And document states that len of data field is 50 bytes always. Should be clarified.
         }
     }
 
@@ -377,17 +395,22 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
 {
     Buf& in_buf = m_in_buf_cam[cam_id];
 
-    assert(in_buf.remains < sizeof(Pkt));
+    log() << "bt : " << bytes_transferred;
 
     if (in_buf.remains) {
         if (bytes_transferred+in_buf.remains >= sizeof(Pkt)) {
             uint8_t* pkt_start = std::find(in_buf.buf.begin(), in_buf.buf.begin() + in_buf.remains, PREAMBLE);
 
-            if (pkt_start == in_buf.buf.end()) {
+            if (in_buf.buf.begin() != pkt_start)
+                log() << "Something goes wrong 1 : " << pkt_start - in_buf.buf.begin();
+
+            const size_t useless_data_len = pkt_start - in_buf.buf.begin();
+
+            if (bytes_transferred + in_buf.remains - useless_data_len >= sizeof(Pkt)) {
                 Pkt pkt;
                 uint8_t* ppkt = pkt.buf();
 
-                const size_t first_part_len = in_buf.remains - (pkt_start - in_buf.buf.begin());
+                const size_t first_part_len = in_buf.remains - useless_data_len;
 
                 memcpy(ppkt, pkt_start, first_part_len);
 
@@ -399,10 +422,16 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
                 bytes_transferred -= second_part_len;
 
                 recv_pkt(&pkt, cam_id);
-            }
 
-            in_buf.remains = 0;
-            in_buf.writing_pt = 0;
+                in_buf.remains = 0;
+                in_buf.writing_pt = 0;
+            } else {
+                memcpy(in_buf.buf.begin()+in_buf.writing_pt, p, bytes_transferred); // TODO : copypaste
+                in_buf.writing_pt += bytes_transferred;
+                in_buf.remains += bytes_transferred;
+                p += bytes_transferred;
+                bytes_transferred = 0;
+            }
         } else {
             memcpy(in_buf.buf.begin()+in_buf.writing_pt, p, bytes_transferred);
             in_buf.writing_pt += bytes_transferred;
@@ -412,17 +441,20 @@ void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes
         }
     }
 
-    while (bytes_transferred > sizeof(Pkt)) {
+    while (bytes_transferred >= sizeof(Pkt)) {
         const uint8_t* pend = p + bytes_transferred;
 
         uint8_t* pkt_start = std::find(p, p + bytes_transferred, PREAMBLE);
 
+        if (p != pkt_start)
+            log() << "Something goes wrong 2 : " << pkt_start - p;
+
         if (pend - pkt_start >= sizeof(Pkt)) {
             recv_pkt((Pkt*)pkt_start, cam_id);
-            p += sizeof(Pkt);
-            bytes_transferred -= sizeof(Pkt);
+            bytes_transferred -= pkt_start - p + sizeof(Pkt);
+            p = pkt_start + sizeof(Pkt);
         } else {
-            bytes_transferred = pend-pkt_start;
+            bytes_transferred = pend - pkt_start;
             p = pkt_start;
         }
     }

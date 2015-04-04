@@ -184,9 +184,10 @@ struct uartDataBuffer_t {
 };
 
 struct Comm::EthernetPkt {
-    int             SOF;
+    uint8_t          SOF;
     uartDataBuffer_t payload;
-    uint16_t        crc16;
+    uint8_t          crc16_lsb;
+    uint8_t          crc16_msb; // otherwise i've got problem with alignment
 };
 
 struct Comm::Pkt {
