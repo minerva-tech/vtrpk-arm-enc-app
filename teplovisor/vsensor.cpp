@@ -19,17 +19,19 @@ const reg_val_t idle_state_reg_list[] = {
 
 const reg_val_t init_reg_list[] = {
 	/*Sensor init settings*/
-	{0x3A, 0x610f},//PLL -96 MHz
+	{0x3A, 0x631f},//PLL -611f 96 MHz, 631f - 48
 	{0x38, 0x0289},
 	{0x3A, 0xdf21},//All clocks from PLL
 	{0x38, 0x0288},
 	{0x3A, 0x0500},//widht of 1st SIMD vertical band 500 default (1280)
 	{0x38, 0x0295},
-	{0x3a, 0x0400},//height of 1st SIMD horizontal band 400 default (1024)
+	{0x3a, 0x0400-3},//height of 1st SIMD horizontal band 400 default (1024)
 	{0x38, 0x0293},
 	{0x3A, 0x0a01},//Pattern->video (default)
 	{0x38, 0x0287},
-    {0x20, 0x6605}//bounching ball removing
+    {0x3A, 0x00C0},// Reg.0A: enable Context and Histogramm
+    {0x38, 0x028A}
+   // {0x20, 0x6605}//bounching ball removing
     /*End of sensor init settings*/
 };
 
@@ -49,10 +51,10 @@ const reg_val_t resolution_full_reg_list[] = {
     {0x18, 0x0001},//2^20 / number of pixels
     {0x22, 0x0500},//Picture width in hex (1280)
 	{0x24, 0x0400},//Picture height in hex (1024)
-	{0x26, 0x0500},//Pictire start Hor (1792-1280)
-	{0x28, 0x0200},//Picture start Vert (1536-1024)
+	{0x26, 0x0200},//Pictire start Hor (1792-1280)
+	{0x28, 0x0011},//Picture start Vert (1041-1024) 1536
 	{0x34, 0x0700},//Frame width (1792)
-	{0x36, 0x0600}//Frame height (1536)
+	{0x36, 0x0411}//Frame height (1041) 1536
 };
 
 reg_val_t bcc_reg_list[] = {
@@ -61,7 +63,7 @@ reg_val_t bcc_reg_list[] = {
     Binning enable in sensor
 	001- binning enable. 200-div factor =4, 100 =2, 000 =1
     */
-    {0x3A, 0x0000},
+    {0x3A, 0x00C0},// Reg.0A: enable Context and Histogramm
     {0x38, 0x028a}
 };
 
@@ -112,11 +114,11 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
     if (settings.binning) {
         log() << "binning is on";
         set_regs(resolution_half_reg_list);
-        bcc_reg_list[0].val = 1 | (settings.binning-1)<<8;
+        bcc_reg_list[0].val |= (0x0001);// reg 0x0A bit 0
     } else {
         log() << "binning is off";
         set_regs(resolution_full_reg_list);
-        bcc_reg_list[0].val = 0;
+        bcc_reg_list[0].val &= ~(0x0001);// reg 0x0A bit 0
     }
 
 //    set_regs(binning_reg_list);

@@ -397,7 +397,7 @@ void run()
 		res.dst_w = TARGET_WIDTH;
 		res.dst_h = TARGET_HEIGHT;
 	}
-
+//  res.dst_h = 1024;
 	const int w = res.dst_w;
 	const int h = res.dst_h;
 
@@ -463,7 +463,39 @@ void run()
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
+  // Вот ТУТ, из (uint8_t*)buf.m.userptr надо доставать 1ую и 2 последние строки.
+  // Подробное, с излишним количеством локальных переменных, описание
+  // сделано исключительно для тупящих.
+  /*    {
+            uint8_t* ptl_luma_plane = (uint8_t*)buf.m.userptr;
+            uint8_t* ptr_header_line;
+            uint8_t* ptr_footer_line;
+            uint8_t* ptr_histogram_line;
+            uint16_t* ptr_histogram;
+            int i;
 
+            ptr_header_line = ptl_luma_plane;
+            ptr_footer_line = ptl_luma_plane + (sizeof(uint8_t) * w * (h-1));
+            ptr_histogram_line = ptl_luma_plane + (sizeof(uint8_t) * w * (h-2));
+            ptr_histogram = (uint16_t*)ptr_histogram_line;
+
+
+            printf(" -- Header -- %w x %d\n", w, h);
+            for(i=0; i<25; i++)
+                printf( " %02X",ptr_header_line[i]);
+            printf("\n\n");
+
+            printf(" -- Footer --\n");
+            for(i=0; i<5; i++)
+                printf( " %02X",ptr_footer_line[0]);
+            printf("\n\n");
+
+            printf(" -- Histogramma --\n");
+            for(i=0; i<64; i++) printf( " %4d",ptr_histogram[i]);
+            printf("\n -- -- -- -- -- --\n");
+
+        }
+*/
 		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
 		size_t coded_size=0;
