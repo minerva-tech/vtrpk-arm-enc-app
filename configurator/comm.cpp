@@ -332,9 +332,12 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
 
     m_in_buf.writing_pt += bytes_transferred;
 
+    assert(m_in_buf.writing_pt == pend - m_in_buf.buf.begin());
+
     while (m_in_buf.remains + m_in_buf.writing_pt - m_in_buf.cur >= sizeof(EthernetPkt)) {
         if (m_in_buf.remains) {
             assert(m_in_buf.cur == 0);
+            assert(m_in_buf.remains < sizeof(EthernetPkt));
 
             uint8_t* buf_end = m_in_buf.buf.end();
 
@@ -343,10 +346,10 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
             EthernetPkt pkt;
             uint8_t* ppkt = reinterpret_cast<uint8_t*>(&pkt);
 
-            memcpy(ppkt, pkt_start, m_in_buf.remains);
-            memcpy(ppkt + m_in_buf.remains, m_in_buf.buf.begin(), sizeof(EthernetPkt) - m_in_buf.remains);
-
             const size_t second_part_size = sizeof(EthernetPkt) - m_in_buf.remains;
+
+            memcpy(ppkt, pkt_start, m_in_buf.remains);
+            memcpy(ppkt + m_in_buf.remains, m_in_buf.buf.begin(), second_part_size);
 
             m_in_buf.remains = std::max(0, m_in_buf.remains - (pkt.payload.len + 7)); // TODO : DIRTY, fix it after vovs will talk with modem guys re their packets
 
@@ -365,7 +368,7 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
 
         uint8_t* pkt_start = m_in_buf.buf.begin() + m_in_buf.cur;
 
-        if (m_in_buf.buf.begin() + m_in_buf.writing_pt - pkt_start >= sizeof(EthernetPkt)) {
+        if (m_in_buf.writing_pt - m_in_buf.cur >= sizeof(EthernetPkt)) {
             EthernetPkt* pkt = reinterpret_cast<EthernetPkt*>(pkt_start);
 
             if (pkt->payload.header.port == 0x3c)
