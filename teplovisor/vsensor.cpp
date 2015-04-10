@@ -72,6 +72,12 @@ const reg_val_t start_sensor_reg_list[] = {
 	{0x38, 0x028b}
 };
 
+reg_val_t aec_reg_list[] = {
+    {0x3A, 0x0200},// Reg.0x0E: roi1_t_init_II.
+    {0x38, 0x028e}
+};
+
+
 static void set_registers(const reg_val_t* reg_list, size_t len)
 {
 	int fd;
@@ -132,3 +138,23 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
 
     set_regs(start_sensor_reg_list);
 }
+
+void VSensor::increment_integration_time(uint16_t delta)
+{
+    aec_reg_list[0].val += delta;
+    set_regs(aec_reg_list);
+}
+
+void VSensor::decrement_integration_time(uint16_t delta)
+{
+    aec_reg_list[0].val -= delta;
+    set_regs(aec_reg_list);
+}
+
+/*
+void VSensor::decrement_integration_time(float N_times)
+{
+    aec_reg_list[0].val = (uint16_t)((float)aec_reg_list[0].val * N_times);
+    set_regs(aec_reg_list);
+}
+*/
