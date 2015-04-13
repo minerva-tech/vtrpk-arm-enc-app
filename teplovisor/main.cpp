@@ -361,9 +361,9 @@ struct adapt_bitrate_desc_t {
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
 #if VIDEO_SENSOR
-void run(VSensor& vsensor)
+void run(VSensor& vsensor, int bitrate_scale)
 #else
-void run()
+void run(int bitrate_scale)
 #endif
 {
 	Comm::instance().allowTransmission(true);
@@ -436,7 +436,7 @@ void run()
 
 	v4l2_buffer buf = cap.getFrame(); // skip first frame as it contains garbage
 	cap.putFrame(buf);
-	
+
 	struct timespec clock_cur;
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	printf("Teplovisor app first frame captured time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
@@ -454,7 +454,7 @@ void run()
 		LED_RXD(1);
 
 		if (g_change_bitrate) {
-			enc.changeBitrate(g_bitrate);
+			enc.changeBitrate(g_bitrate * bitrate_scale / 100);
 			g_change_bitrate = false;
 		}
 
@@ -539,8 +539,8 @@ int main(int argc, char *argv[])
 	try {
         LED_ERR(1);
 
-		if (argc < 3) {
-			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)>\n" << std::endl;
+		if (argc < 5) {
+			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)> <bitrate scale (percent)>\n" << std::endl;
 			return 0;
 		}
 
@@ -563,7 +563,7 @@ int main(int argc, char *argv[])
                 }
             }
         }
-
+		
 #if not VIDEO_SENSOR
 		Flir flir("/dev/ttyS0");
 
@@ -601,17 +601,22 @@ int main(int argc, char *argv[])
 
 		Enc::rman_init();
 
-		if (argc==4)
+		if (argc>=4)
 			g_tx_buffer_size = atoi(argv[3]);
+
+		int bitrate_scale = 100;
+
+		if (argc>=5)
+			bitrate_scale = atoi(argv[4]);
 
 		Comm::instance().setTxBufferSize(g_tx_buffer_size);
 
 		while(1) {
 			try {
 #if VIDEO_SENSOR
-				run(vsensor);
+				run(vsensor, bitrate_scale);
 #else
-				run();
+				run(bitrate_scale);
 #endif
 			}
 			catch (ex& e) {
