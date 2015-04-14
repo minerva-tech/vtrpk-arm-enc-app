@@ -30,7 +30,11 @@ const reg_val_t init_reg_list[] = {
 	{0x3A, 0x0a01},//Pattern->video (default)
 	{0x38, 0x0287},
     {0x3A, 0x00C0},// Reg.0A: enable Context and Histogramm
-    {0x38, 0x028A}
+    {0x38, 0x028A},
+    {0x3A, 0x0200},// Reg.0x0E: roi1_t_init_II.
+    {0x38, 0x028e},
+    {0x3A, 0x0000},// Reg.0x11: roi1_gain.
+    {0x38, 0x0280|0x0011}
    // {0x20, 0x6605}//bounching ball removing
     /*End of sensor init settings*/
 };
@@ -77,6 +81,12 @@ reg_val_t aec_reg_list[] = {
     {0x38, 0x028e}
 };
 
+reg_val_t agc_reg_list[] = {
+    {0x3A, 0x0000},// Reg.0x0E: roi1_t_init_II.
+    {0x38, 0x0280|0x0011}
+};
+
+static const double analog_gain_table[8] = { 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 8.0 };
 
 static void set_registers(const reg_val_t* reg_list, size_t len)
 {
@@ -151,6 +161,31 @@ void VSensor::decrement_integration_time(uint16_t delta)
     set_regs(aec_reg_list);
 }
 
+void VSensor::increment_analog_gain(void)
+{
+    uint16_t x = (agc_reg_list[0].val & 0xFF00)>>8;
+
+    if(x<5) x++;// to avoid wrong value
+
+    // keep digital gain unchanged
+    agc_reg_list[0].val = agc_reg_list[0].val & 0x00FF;
+    agc_reg_list[0].val = agc_reg_list[0].val | ((x<<8)&0xFF00);
+
+    set_regs(agc_reg_list);
+}
+
+void VSensor::decrement_analog_gain(void)
+{
+    uint16_t x = (agc_reg_list[0].val & 0xFF00)>>8;
+
+    if(x>0) x--;// to avoid wrong value
+
+    // keep digital gain unchanged
+    agc_reg_list[0].val = agc_reg_list[0].val & 0x00FF;
+    agc_reg_list[0].val = agc_reg_list[0].val | ((x<<8)&0xFF00);
+
+    set_regs(agc_reg_list);
+}
 /*
 void VSensor::decrement_integration_time(float N_times)
 {

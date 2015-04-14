@@ -359,7 +359,6 @@ struct adapt_bitrate_desc_t {
 };
 
 
-static const double analog_gain_table[8] = { 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 8.0 };
 static const double digital_gain_step = (15.875/255.0);
 
 struct aec_parameters_t{
@@ -559,88 +558,92 @@ void run()
             /*
              * AUTO EXPOSURE CONTROL
              *
-             *
              * default integration_time = 512 * 1792 / 48000000 = 19.11466 mS
              * integration time step is 1 line delta = 1792 / 48000000 = 37.3 uS
              */
              uint32_t frame_counter;
              uint16_t integration_time = aec[0].ROI_T_INT_II;
              char exposure_command = ' ';
+             int need_gain_correction;
 
-#define AEC_TOO_LIGHT_THRESH ( (int)((1280*1024 / 4)*0.05) )/* 5% pixels */
-#define AEC_TOO_DARK_THRESH ( (int)((1280*1024 / 4)*0.05) ) /* 5% pixels */
-#define AEC_GOOD_THRESH ( (int)((1280*1024 / 4)*0.20) )     /* 20% pixels */
+#define AEC_10_THRESH(w,h) ( (int)(((w)*(h) / 4)*0.10) )     /* 10% pixels */
+#define AEC_20_THRESH(w,h) ( (int)(((w)*(h) / 4)*0.20) )      /* 20% pixels */
 
+        {
+            histogram[0] += Whites;
+            histogram[3] += Blacks;
 
-             if( (Whites==0xFFFF) && (Blacks<0xFFFF) ){// too light
+            if( ((histogram[0]+histogram[1])>(histogram[2]+histogram[3])) && (((histogram[0]+histogram[1])-(histogram[2]+histogram[3]))>AEC_20_THRESH(w,h)) ){
                 exposure_command = '-';
-             }else if( (Whites<0xFFFF) && (Blacks==0xFFFF) ){ // too dark
+            }else if( (histogram[0]+histogram[1])<(histogram[2]+histogram[3]) ){
                 exposure_command = '+';
-             }else if( (Whites==0xFFFF) && (Blacks==0xFFFF) ){// let it bee too light
-                exposure_command = '-';// ????
-             }else{
-                /*
-                if( (histogram[0] > AEC_TOO_LIGHT_THRESH) || (Whites > AEC_TOO_LIGHT_THRESH) ){
-                    exposure_command = '-';
-                }else if( (histogram[3] > AEC_TOO_DARK_THRESH)||(Blacks>AEC_TOO_DARK_THRESH) ){
-                    exposure_command = '+';
-                }else if( ((histogram[1] < histogram[2])) || ((histogram[1] - histogram[2]) < AEC_GOOD_THRESH) ){
-                    exposure_command = '+';
-                }else{
-                    exposure_command = ' ';
-                }
-                */
-                if( (histogram[0] > AEC_TOO_LIGHT_THRESH) && (histogram[3] < AEC_TOO_DARK_THRESH) ){
-                    exposure_command = '-';
-                }else if( (histogram[3] > AEC_TOO_DARK_THRESH) && (histogram[0] < AEC_TOO_LIGHT_THRESH) ){
-                    exposure_command = '+';
-                }else if( (histogram[0] > AEC_TOO_LIGHT_THRESH) && (histogram[3] > AEC_TOO_DARK_THRESH)  ){
-                    exposure_command = ' ';
-                    // TODO:
-                    // надо проверить среднюю яркость
-                }else if( ((histogram[1] < histogram[2])) || ((histogram[1] - histogram[2]) < AEC_GOOD_THRESH) ){
-                    exposure_command = '+';
-                }else{
-                    exposure_command = ' ';
-                }
+            }else{
+                exposure_command = ' ';
+            }
+        }
 
-             }
+            aec[0].FRAME++;// на всякий случай, на будущее...
 
-            aec[0].FRAME++;
+#define EXPOSURE_DELTA_INCR ((uint16_t)24)
+#define EXPOSURE_DELTA_DECR ((uint16_t)16)
 
-            printf(" --TotalHisto=%6d(%6d)--Total=%6d(%6d)  EXPOSURE(%c) %5d \n",
-                histo_summ,
-                (int)histo_summ - (int)(1280*1024)/4,
-                histo_summ+Blacks+Whites,
-                (int)histo_summ + (int)Blacks + (int)Whites - (int)(1280*1024)/4,
-                exposure_command,
-                integration_time
-                  );
-
-             if(  exposure_command != ' ' )
+             if(  exposure_command != ' ' ){
                  if( exposure_command == '+' ){
-                     #define EXPOSURE_DELTA_INCR ((uint16_t)24)
-                     integration_time += 4;
-                     if(aec[0].ROI_T_INT_II<0xFFFF-EXPOSURE_DELTA_INCR){
+
+                     // TODO: do limit expoture(top and bottom)
+                     // bottom limit is 8 frame per second
+                     // default integration_time = 512 * 1792 / 48000000 = 19.11466 mS
+                     // integration time step is 1 line delta = 1792 / 48000000 = 37.3 uS
+                     // Longest exposure limit is about 3200 (0x0C80)
+                     //if(aec[0].ROI_T_INT_II<0xFFFF-EXPOSURE_DELTA_INCR){
+                     if( aec[0].ROI_T_INT_II < 3200 ){
                         aec[0].ROI_T_INT_II += EXPOSURE_DELTA_INCR;
                         vsensor.increment_integration_time(EXPOSURE_DELTA_INCR);
+                        integration_time += EXPOSURE_DELTA_INCR;
+                        need_gain_correction = 0;
                      }else{
-                         // NEED Gain Correction
+                         // TODO: NEED Gain Correction (increase gain)
+//                         if(aec[0].ROI_ANA_GAIN < 5 ){
+//                             aec[0].ROI_ANA_GAIN++;
+//                             vsensor.increment_analog_gain();
+//                             vsensor.decrement_integration_time(3000);
+//                         }
+                        need_gain_correction = 1;
                      }
                  }else{
-                     #define EXPOSURE_DELTA_DECR ((uint16_t)16)
-                     integration_time -= EXPOSURE_DELTA_DECR;
-                     if(aec[0].ROI_T_INT_II > EXPOSURE_DELTA_DECR ){
+                     // shortest exposure limited by zero
+                     if( aec[0].ROI_T_INT_II > EXPOSURE_DELTA_DECR ){
                         aec[0].ROI_T_INT_II -= EXPOSURE_DELTA_DECR;
                         vsensor.decrement_integration_time(EXPOSURE_DELTA_DECR);
+                        integration_time -= EXPOSURE_DELTA_DECR;
+                        need_gain_correction = 0;
                      }else{
-                         // NEED Gain Correction
+                         // TODO: NEED Gain Correction (decrease gain)
+//                         if(aec[0].ROI_ANA_GAIN > 0){
+//                            aec[0].ROI_ANA_GAIN--;
+//                            vsensor.decrement_analog_gain();
+//                         }
+                         need_gain_correction = 1;
                      }
                  }
+             }else{
+                need_gain_correction=0;
+             }
 
 
+            printf(" --TotalHisto=%6d(%6d)--Total=%6d(%6d)  EXPOSURE(%c) %5d Ga=%d %s\n",
+                histo_summ,
+                (int)histo_summ - (int)(w*h)/4,
+                histo_summ+Blacks+Whites,
+                (int)histo_summ + (int)Blacks + (int)Whites - (int)(w*h)/4,
+                exposure_command,
+                integration_time,
+                aec[0].ROI_ANA_GAIN,
+                need_gain_correction? " GAIN!" : " "
+                  );
 
-            //for(i=7;i>1;i--) memcpy( (void*)&aec[i], (void*)&aec[i-1], sizeof(aec));
+            // на всякий случай, на будущее...
+            for(i=7;i>1;i--) memcpy( (void*)&aec[i], (void*)&aec[i-1], sizeof(aec[0]));
 
             /*
              * Fill nonvideo lines with video data.
@@ -650,6 +653,10 @@ void run()
              memcpy(ptl_luma_plane, ptl_luma_plane + w, w);
              memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-3)), w);
              memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-3)), w);
+        #else
+             memcpy(ptl_luma_plane + (w*(h-3)), ptl_luma_plane + (w*(h-4)), w);
+             memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-4)), w);
+             memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-4)), w);
         #endif
 
         }
