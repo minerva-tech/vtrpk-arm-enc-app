@@ -33,7 +33,7 @@ const reg_val_t init_reg_list[] = {
     {0x38, 0x028A},
     {0x3A, 0x0200},// Reg.0x0E: roi1_t_init_II.
     {0x38, 0x028e},
-    {0x3A, 0x0000},// Reg.0x11: roi1_gain.
+    {0x3A, 0x0600},// Reg.0x11: roi1_gain.
     {0x38, 0x0280|0x0011}
    // {0x20, 0x6605}//bounching ball removing
     /*End of sensor init settings*/
@@ -158,6 +158,12 @@ void VSensor::increment_integration_time(uint16_t delta)
 void VSensor::decrement_integration_time(uint16_t delta)
 {
     aec_reg_list[0].val -= delta;
+    set_regs(aec_reg_list);
+}
+
+void VSensor::set_integration_time(uint16_t time)
+{
+    aec_reg_list[0].val = time;
     set_regs(aec_reg_list);
 }
 
