@@ -5,6 +5,15 @@
 //#include <fstream>
 #include <algorithm>
 
+// DIRTY HACK
+#define IPV6_UNICAST_HOPS			16
+#define IPV6_MULTICAST_IF			17
+#define IPV6_MULTICAST_HOPS		18
+#define IPV6_MULTICAST_LOOP		19
+#define IPV6_JOIN_GROUP     		20
+#define IPV6_LEAVE_GROUP			21
+// END OF DIRTY HACK
+
 #include <boost/array.hpp>
 #include <boost/bind.hpp>
 #include <boost/shared_ptr.hpp>
