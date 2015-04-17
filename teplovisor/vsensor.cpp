@@ -243,6 +243,14 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
     uint32_t H64[64];
     uint32_t x,y;
     int i,j,oe,ue,Mediana;
+
+    uint32_t frame_counter;
+    char exposure_command = ' ';
+    static int need_gain_correction = 0;
+
+    // skip first frames
+    if(aec[0].FRAME<20) goto aec_final;
+
     // Вот ТУТ, из (uint8_t*)buf.m.userptr надо доставать 1ую и 2 последние строки.
     // Подробное, с излишним количеством локальных переменных, описание
     // сделано исключительно для тупящих.
@@ -297,7 +305,6 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
         bin += (int)tmp;
         H64[bin_index] = bin;
     }
-    aec[0].FRAME++;// на всякий случай, на будущее...
     /* Check e2v histogramm overflow */
     x=0;
     y=0;
@@ -353,6 +360,8 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
     }
     Mediana=(64-i)*4;// (64-i) потому что яркий бин в индексе 0, а бинов в гистограмме 64. *4 потому что *(1024/64/4)
     printf("summ_luma=%6d, summ_histo=%6d, Mean=%6d Mediana=%4d (%9d)\n",summ_luma,summ_histo,summ_histo==0?0:summ_luma/summ_histo,Mediana,x);
+
+    /* Draw Histogramm */
     printf(" -- Histogramma --\n");
     for(i=0; i<64; i++) {
         int stars;
@@ -365,17 +374,17 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
         }
         printf("\n");
     }
+
     /*
      * AUTO EXPOSURE CONTROL
      *
      * default integration_time = 512 * 1792 / 48000000 = 19.11466 mS
      * integration time step is 1 line delta = 1792 / 48000000 = 37.3 uS
      */
-    uint32_t frame_counter;
-    char exposure_command = ' ';
-    static int need_gain_correction = 0;
+
 #define AEC_ALGO_B
 #ifdef AEC_ALGO_B
+
 #define Y_TOP_LIM (135)
 #define Y_BOT_LIM (105)
     if(Mediana<Y_BOT_LIM)
@@ -384,7 +393,9 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
         exposure_command = '-';
     else
         exposure_command = ' ';
+
 #endif
+
     /*
      * для разных analog_gain нужны разные дельты времени накопления (шаги изменения экспозиции)
      * для ana_gain=1 24|16,
@@ -392,6 +403,7 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
 #define EXPOSURE_DELTA_INCR ((uint16_t)(4*6))
 #define EXPOSURE_DELTA_DECR ((uint16_t)(4*4))
 #define EXPOSURE_TOP_LIMIT (3200)
+
     if(  exposure_command != ' ' ) {
         if( exposure_command == '+' ) {
             // TODO: do limit expoture(top and bottom)
@@ -404,7 +416,11 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
                 uint16_t delta = EXPOSURE_TOP_LIMIT - aec[0].ROI_T_INT_II;
                 if(delta>1) delta = (uint16_t)((float)delta*0.125);
                 */
-                uint16_t delta = EXPOSURE_DELTA_INCR;
+                uint16_t delta;
+
+                if( (Y_BOT_LIM-Mediana)<((Y_TOP_LIM-Y_BOT_LIM)/2) ) delta = 1;
+                else delta = EXPOSURE_DELTA_INCR;
+
                 aec[0].ROI_T_INT_II += delta;
                 increment_integration_time(delta);
                 need_gain_correction = 0;
@@ -426,8 +442,14 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
                 /*
                 uint16_t delta = (uint16_t)((float)aec[0].ROI_T_INT_II*0.125);
                 */
-                uint16_t delta = EXPOSURE_DELTA_DECR;
+                uint16_t delta;
+                if( (Mediana-Y_TOP_LIM)<((Y_TOP_LIM-Y_BOT_LIM)/2) ) delta = 1;
+                else delta = EXPOSURE_DELTA_INCR;
+
+                if( !(aec[0].ROI_T_INT_II>delta) ) delta=1;
+
                 aec[0].ROI_T_INT_II -= delta;
+
                 decrement_integration_time(delta);
                 need_gain_correction = 0;
             } else {
@@ -461,8 +483,6 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
            aec[0].ROI_ANA_GAIN,
            need_gain_correction? " GAIN!" : " "
           );
-    // на всякий случай, на будущее...
-    for(i=7; i>1; i--) memcpy( (void*)&aec[i], (void*)&aec[i-1], sizeof(aec[0]));
     /*
      * Fill nonvideo lines with video data.
      * Copy second line into first and h-2 line into two lowest
@@ -486,4 +506,9 @@ void VSensor::aec_tune(int h, int w, uint8_t *pYplane)
     memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-4)), w);
     memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-4)), w);
 #endif
+
+    // на всякий случай, на будущее...
+aec_final:
+    aec[0].FRAME++;// на всякий случай, на будущее...
+    for(i=7; i>1; i--) memcpy( (void*)&aec[i], (void*)&aec[i-1], sizeof(aec[0]));
 }
