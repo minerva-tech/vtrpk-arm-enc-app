@@ -358,21 +358,6 @@ struct adapt_bitrate_desc_t {
 	int switch_down_from_here;
 };
 
-
-static const double digital_gain_step = (15.875/255.0);
-
-struct aec_parameters_t{
-    uint16_t ROI_T_INT_II;   //
-    uint16_t ROI_T_INT_CLK;  //
-    uint16_t ROI_ANA_GAIN;   //
-    uint16_t ROI_DIG_GAIN;   //
-    uint64_t FRAME;          // raw frame counter
-};
-
-static aec_parameters_t aec[8];
-
-//static char histo_dbg_report[256*128];// big 32kB buffer for better debug printf
-
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
 #if VIDEO_SENSOR
@@ -412,7 +397,7 @@ void run()
 		res.dst_w = TARGET_WIDTH;
 		res.dst_h = TARGET_HEIGHT;
 	}
-  res.dst_h = 512;// TODO: ЭТО ЧИСТО ДЕБАЖНОЕ!!!! ЗАМЕНИТЬ!!!!!
+  res.dst_h = 1024;// TODO: ЭТО ЧИСТО ДЕБАЖНОЕ!!!! ЗАМЕНИТЬ!!!!!
 	const int w = res.dst_w;
 	const int h = res.dst_h;
 
@@ -479,202 +464,7 @@ void run()
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
 
-
-  // Вот ТУТ, из (uint8_t*)buf.m.userptr надо доставать 1ую и 2 последние строки.
-  // Подробное, с излишним количеством локальных переменных, описание
-  // сделано исключительно для тупящих.
-      {
-          /*
-           * Draw histogram and some numbers
-           */
-            uint8_t* ptl_luma_plane = (uint8_t*)buf.m.userptr;
-        #ifdef FIRST_LINE_OK
-            uint8_t* ptr_header_line;
-        #endif
-            uint8_t* ptr_footer_line;
-            uint8_t* ptr_histogram_line;
-            uint16_t* ptr_histogram;
-            uint32_t  histo_summ = 0;
-            uint16_t Blacks,Whites;
-            double average_luma = 0;
-            int i,j;
-            unsigned short tmp;
-            int histogram[4] = {0,0,0,0};
-
-        #ifdef FIRST_LINE_OK
-            ptr_header_line = ptl_luma_plane;
-            ptr_footer_line = ptl_luma_plane + (sizeof(uint8_t) * w * (h-1));
-            ptr_histogram_line = ptl_luma_plane + (sizeof(uint8_t) * w * (h-2));
-            ptr_histogram = (uint16_t*)ptr_histogram_line;
-
-            printf(" -- Header -- w=%d h=%d\n", w, h);
-            for(i=0; i<25; i++) printf( " %02X",ptr_header_line[i]);
-            printf("\n\n");
-
-            printf("ROI analog gain: %d\n", ptr_header_line[14]);
-            printf("ROI global digital gain: %d\n", ptr_header_line[15]);
-        #else
-            i = w==1280?2:1;
-            ptr_footer_line = ptl_luma_plane + (sizeof(uint8_t) * w * (h-i));
-            i = w==1280?3:2;
-            ptr_histogram_line = ptl_luma_plane + (sizeof(uint8_t) * w * (h-i));
-            ptr_histogram = (uint16_t*)ptr_histogram_line;
-        #endif
-
-            printf(" -- Footer -- w=%d h=%d\n", w, h);
-            for(i=0; i<5; i++) printf(" %02X",ptr_footer_line[0]);
-            printf("\n");
-
-            printf("Error flags: 0x%02X\n",ptr_footer_line[0]);
-            tmp = ((unsigned short)ptr_footer_line[1]<<8 | (unsigned short)ptr_footer_line[2]);
-            printf("0x00 pixels: %d\n",tmp);
-            Blacks = tmp;
-            tmp = ((unsigned short)ptr_footer_line[3]<<8 | (unsigned short)ptr_footer_line[4]);
-            printf("0xFF pixels: %d\n",tmp);
-            Whites = tmp;
-
-            printf(" -- Histogramma --\n");
-            for(i=0; i<(64*2); i+=2){
-                int stars;
-                int bin_index=i/2;
-                tmp = ((unsigned short)ptr_histogram_line[i]<<8 | (unsigned short)ptr_histogram_line[i+1]);
-                stars = (int)(((float)tmp)/((float)w) + 0.5);
-                printf( " %6d ",tmp);
-                for(j=0;j<stars;j++) printf("*");
-                printf("\n");
-
-                histo_summ += (uint32_t)tmp;
-
-                /* 0 1 ** 2...32 ** 33...61 ** 62 63 */
-                if( bin_index<2 ){
-                    histogram[0] += (int)tmp;
-                }else if( (bin_index>1)&&(bin_index<33) ){
-                    histogram[1] += (int)tmp;
-                }else if( (bin_index>32)&&(bin_index<62) ) {
-                    histogram[2] += (int)tmp;
-                }else{
-                    histogram[3] += (int)tmp;
-                }
-
-            }
-
-            /*
-             * AUTO EXPOSURE CONTROL
-             *
-             * default integration_time = 512 * 1792 / 48000000 = 19.11466 mS
-             * integration time step is 1 line delta = 1792 / 48000000 = 37.3 uS
-             */
-             uint32_t frame_counter;
-             char exposure_command = ' ';
-             static int need_gain_correction = 0;
-
-#define AEC_10_THRESH(w,h) ( (int)(((w)*(h) / 4)*0.10) )     /* 10% pixels */
-#define AEC_20_THRESH(w,h) ( (int)(((w)*(h) / 4)*0.20) )      /* 20% pixels */
-
-        {
-            histogram[0] += Whites;
-            histogram[3] += Blacks;
-
-            if( ((histogram[0]+histogram[1])>(histogram[2]+histogram[3])) && (((histogram[0]+histogram[1])-(histogram[2]+histogram[3]))>AEC_20_THRESH(w,h)) ){
-                exposure_command = '-';
-            }else if( (histogram[0]+histogram[1])<(histogram[2]+histogram[3]) ){
-                exposure_command = '+';
-            }else{
-                exposure_command = ' ';
-            }
-        }
-
-            aec[0].FRAME++;// на всякий случай, на будущее...
-
-#define EXPOSURE_DELTA_INCR ((uint16_t)24)
-#define EXPOSURE_DELTA_DECR ((uint16_t)16)
-#define EXPOSURE_TOP_LIMIT (9600)
-
-             if(  exposure_command != ' ' ){
-                 if( exposure_command == '+' ){
-
-                     // TODO: do limit expoture(top and bottom)
-                     // bottom limit is 8 frame per second
-                     // default integration_time = 512 * 1792 / 48000000 = 19.11466 mS
-                     // integration time step is 1 line delta = 1792 / 48000000 = 37.3 uS
-                     // Longest exposure limit is about 3200 (0x0C80)
-                     //if(aec[0].ROI_T_INT_II<0xFFFF-EXPOSURE_DELTA_INCR){
-                     if( aec[0].ROI_T_INT_II < EXPOSURE_TOP_LIMIT ){
-                        aec[0].ROI_T_INT_II += EXPOSURE_DELTA_INCR;
-                        vsensor.increment_integration_time(EXPOSURE_DELTA_INCR);
-                        need_gain_correction = 0;
-                     }else{
-                         // TODO: NEED Gain Correction (increase gain)
-                         if(aec[0].ROI_ANA_GAIN < 6 ){
-                             aec[0].ROI_ANA_GAIN++;
-                             aec[0].ROI_T_INT_II = 512;
-                             vsensor.increment_analog_gain();
-                             vsensor.set_integration_time(512);
-                         }
-                        need_gain_correction = 1;
-                     }
-                 }else{
-                     // shortest exposure limited by zero
-                     if( aec[0].ROI_T_INT_II > EXPOSURE_DELTA_DECR ){
-                        aec[0].ROI_T_INT_II -= EXPOSURE_DELTA_DECR;
-                        vsensor.decrement_integration_time(EXPOSURE_DELTA_DECR);
-                        need_gain_correction = 0;
-                     }else{
-                         // TODO: NEED Gain Correction (decrease gain)
-                         if(aec[0].ROI_ANA_GAIN > 0){
-                            aec[0].ROI_ANA_GAIN--;
-                            aec[0].ROI_T_INT_II = 512;
-                            vsensor.decrement_analog_gain();
-                            vsensor.set_integration_time(512);
-                         }
-                         need_gain_correction = 1;
-                     }
-                 }
-             }else{
-                need_gain_correction=0;
-             }
-
-
-            printf(" --TotalHisto=%6d(%6d)--Total=%6d(%6d)  EXPOSURE(%c) %5d Ga=%d %s\n",
-                histo_summ,
-                (int)histo_summ - (int)(w*h)/4,
-                histo_summ+Blacks+Whites,
-                (int)histo_summ + (int)Blacks + (int)Whites - (int)(w*h)/4,
-                exposure_command,
-                aec[0].ROI_T_INT_II,
-                aec[0].ROI_ANA_GAIN,
-                need_gain_correction? " GAIN!" : " "
-                  );
-
-            // на всякий случай, на будущее...
-            for(i=7;i>1;i--) memcpy( (void*)&aec[i], (void*)&aec[i-1], sizeof(aec[0]));
-
-            /*
-             * Fill nonvideo lines with video data.
-             * Copy second line into first and h-2 line into two lowest
-             */
-/*
-        printf("Line h-4\n");
-        for(i=0;i<64;i++)printf(" %0X", (uint8_t)((ptl_luma_plane + (w*(h-4)))[i]) );
-        printf("\nLine h-3\n");
-        for(i=0;i<64;i++)printf(" %0X", (uint8_t)((ptl_luma_plane + (w*(h-3)))[i]) );
-        printf("\nLine h-2\n");
-        for(i=0;i<64;i++)printf(" %0X", (uint8_t)((ptl_luma_plane + (w*(h-2)))[i]) );
-        printf("\nLine h-1\n");
-        for(i=0;i<64;i++)printf(" %0X", (uint8_t)((ptl_luma_plane + (w*(h-1)))[i]) );
-*/
-        #ifdef FIRST_LINE_OK
-             memcpy(ptl_luma_plane, ptl_luma_plane + w, w);
-             memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-3)), w);
-             memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-3)), w);
-        #else
-             memcpy(ptl_luma_plane + (w*(h-3)), ptl_luma_plane + (w*(h-4)), w);
-             memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-4)), w);
-             memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-4)), w);
-        #endif
-
-        }
-        /////////////////////////////////////////////////////////////////////////////////////////////////
+        vsensor.aec_tune(h,w,(uint8_t*)buf.m.userptr);
 
 		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
@@ -748,15 +538,6 @@ int main(int argc, char *argv[])
 	struct timespec clock_cur;
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	printf("Teplovisor app starting time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
-
-    /* initialize e2v aec */
-    for(i=0;i<8;i++){
-        aec[i].ROI_T_INT_II = 0x0200;
-        aec[i].ROI_T_INT_CLK = 0;
-        aec[i].ROI_ANA_GAIN = 6;
-        aec[i].ROI_DIG_GAIN = 0;
-        aec[i].FRAME = 0;
-    }
 
 	try {
         LED_ERR(1);

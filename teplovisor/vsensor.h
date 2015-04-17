@@ -11,4 +11,6 @@ public:
     void set_integration_time(uint16_t);
     void increment_analog_gain(void);
     void decrement_analog_gain(void);
+    void aec_init(void);
+    void aec_tune(int h, int w, uint8_t *pYplane);
 };
