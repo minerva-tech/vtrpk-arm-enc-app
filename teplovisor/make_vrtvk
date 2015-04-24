@@ -3,7 +3,8 @@
 #CC   = $(CROOT)/arm-unknown-linux-uclibcgnueabi-gcc
 #LINK = $(CROOT)/arm-unknown-linux-uclibcgnueabi-g++
 #STRIP= $(CROOT)/arm-unknown-linux-uclibcgnueabi-strip
-CROOT = /home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/buildroot/output/host/usr/bin
+
+CROOT = /home/sand/work/dm365/vrtpk-build-tools/vrtpk-build-tools/buildroot/output/host/usr/bin/
 CPPC = $(CROOT)/arm-unknown-linux-uclibcgnueabi-g++
 CC   = $(CROOT)/arm-unknown-linux-uclibcgnueabi-gcc
 LINK = $(CROOT)/arm-unknown-linux-uclibcgnueabi-g++
@@ -53,11 +54,11 @@ BOOST_MODULES_LIBS = $(addsuffix $(BOOST_MODULES_TYPE),$(BOOST_MODULES))
 BOOST_LDFLAGS = $(addprefix -lboost_,$(BOOST_MODULES_LIBS))
 
 #ROOT = /home/a/ti-dvsdk_dm365-evm_4_02_00_06
-ROOT = /home/a/Documents/VRTPK
-H264ROOT = /home/a/Documents/VRTPK/dm365_h264_enc
+ROOT = /home/sand/work/dm365/VRTPK/
+H264ROOT = /home/sand/work/dm365/VRTPK/dm365_h264_enc
 #DVSDK_INCLUDE = /home/kov/dm365/ti_tools/psp/linux-2.6.32.17-psp03.01.01.39/include/
 #DVSDK_INCLUDE = /home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/output/build/linux-custom/include/
-DVSDK_INCLUDE = /home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/buildroot/output/build/linux-custom/include/
+DVSDK_INCLUDE = /home/sand/work/dm365/vrtpk-build-tools/vrtpk-build-tools/buildroot/output/build/linux-custom/include/
 H264_ENC_INCLUDE = $(H264ROOT)/apps/client/test/inc/
 #FRAMEWORK_INCLUDE = $(ROOT)/framework-components_2_26_00_01/packages/
 #XDAIS_INCLUDE = $(ROOT)/xdais_6_26_01_03/packages
@@ -104,7 +105,7 @@ CONFIGPKG = h264enc_ti_dm365_linux
 ALG_LIB1 = $(H264ROOT)/lib/h264venc_ti_arm926.a
 ALG_LIB2 = $(H264ROOT)/lib/h264v_ti_dma_dm365.a
 
-BOOSTROOT = /home/a/Documents/boost/boost_1_53_0
+BOOSTROOT = /home/sand/work/dm365/boost/boost_1_53_0
 
 #CPPFLAGS += -I /home/kov/dm365/boost/boost_1_48_0/ $(BOOST_CPPFLAGS) -O2 -march=armv5t -D"_ARM926" -U"ENABLE_ARM926_TCM"
 #CPPFLAGS += -I/home/a/Documents/boost_1_48_0/ $(INCLUDES) $(BOOST_CPPFLAGS) -O2 -march=armv5t -D"_ARM926" -U"ENABLE_ARM926_TCM" 

@@ -463,7 +463,7 @@ void run()
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
-
+ 
         vsensor.aec_tune(h,w,(uint8_t*)buf.m.userptr);
 
 		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
