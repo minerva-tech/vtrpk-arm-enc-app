@@ -132,6 +132,7 @@ private:
     void recv_pkt(const Pkt* pkt, int cam_id_override = -1);
     void recv_chunk(uint8_t* p, const boost::system::error_code& e, std::size_t bytes_transferred, uint8_t cam_id);
     void recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred);
+    void connected(const boost::system::error_code& e);
 
 	Callback m_callback[4];
 
@@ -163,6 +164,9 @@ private:
 
 	boost::chrono::steady_clock::time_point m_start;
 	uint32_t m_recv_amount[4];
+
+    std::string m_addr;
+    uint16_t m_port_num;
 };
 
 const int MAX_APP_PAYLOAD = 50;
