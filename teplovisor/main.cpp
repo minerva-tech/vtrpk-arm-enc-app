@@ -463,8 +463,10 @@ void run()
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
 		}
- 
-        vsensor.aec_tune(h,w,(uint8_t*)buf.m.userptr);
+        
+#if VIDEO_SENSOR
+        vsensor.aec(h,w,(uint8_t*)buf.m.userptr);
+#endif;
 
 		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
@@ -473,9 +475,18 @@ void run()
 		XDAS_Int8* bs = NULL;
 
 		if (!to_skip) {
+            // too keep encoded framrate we have to know 
+            // current framerate 
+#if VIDEO_SENSOR
+            float current_fps = vsensor.get_framerate();/* frames per second */
+            float correction = 25.6 / current_fps; /* base fps is 25.6 for e2v 48MHz*/
+            correction = correction < 1.0 ? 1.0 : correction; /* just in case */ 
+#else
+            float correction = 1.0;
+#endif
 			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
 			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
-			to_skip = to_skip * fps_divider + fps_divider-1;
+			to_skip = to_skip * fps_divider * correction + (fps_divider * correction)-1;
 //			log() << "Frame encoded " << coded_size;
 		} else {
 			if (to_skip>0) // to_skip < 0 means no video is sent at all
