@@ -21,7 +21,21 @@
 #define EV76C661_MAX_EXPOSURE ( 1.0 / MINIMAL_FPS )
 #define EV76C661_DIGITAL_GAIN_STEP ((15.875-1.0)/255.0)
 
+/*
+ * Line length quant is 8 CLK_CTRL's tacts.
+ * 
+ * Exposure_time = 112*8*Lines_Number + 8*Tacts_Number; Dimmention: [Tacts of CLK_CTRL clock]
+ * 112*8 Tacts is line length
+ * Maximum Exposure = 65534 * 112 * 8 + 255 * 8 = 58718464 + 2040 = 58 720 504;
+ * 24000000 / (8 * 16) = 187500 steps of exposure control for 16Hz frame rate (0.333uS step)
+ * 187500 / 112 = 1674.10714286 lines. 
+ * Minimum exposure is 1.5 uS or ceil(1.5/0.333)= 5 points.
+ * Exposure range is 5 to 187500 for 16 fps.
+ * 
+ */
+
 static const double analog_gain_table[8] = { 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0, 8.0 };
+static const double max_fps_table[8] = { 24.0, 24.0, 20.0, 20.0, 16.0, 8.0, 8.0, 8.0 };
 
 struct reg_val_t {
     uint16_t reg;
@@ -273,6 +287,29 @@ void VSensor::set_gain(int analog, int digital)
    set_regs(agc_reg_list);
 }
 
+void VSensor::set_state(char type, int value)
+{
+    switch(type){
+        case 'A': /* analog gain */
+            aec_state[0].ROI_ANA_GAIN = (uint16_t)value;
+            break;
+        case 'D': /* digital gain */
+            aec_state[0].ROI_DIG_GAIN = (uint16_t)value;
+            break;
+        case 'I': /* integration time integer part */
+            aec_state[0].ROI_T_INT_II = (uint16_t)value;
+            break;
+        case 'F': /* integration time fractional part */
+            aec_state[0].ROI_T_INT_CLK = (uint16_t)value;
+            break;
+        default:
+            assert(0);
+            return;
+    }
+    aec_state[0].EXPOSURE = aec_time(0);
+    aec_state[0].GAIN = aec_gain(0);
+}
+
 void VSensor::increment_analog_gain(void)
 {
     uint16_t x = (agc_reg_list[0].val & 0xFF00)>>8;
@@ -361,12 +398,127 @@ double VSensor::aec_time(int i)
     return time;
 }
 
+static uint16_t e2v_magic[8/2];
+static uint16_t e2v_header[26/2];
+static uint16_t e2v_histogram[512/2];
+static uint16_t e2v_footer[ 6/2];
+
+inline static uint16_t swap16(uint16_t x)
+{
+    return ((x<<8)&0xFF00)|((x>>8)&0x00FF);    
+}
+
+static int read_metadata_emif(void)
+{
+	int fd,i,show=1;
+    volatile int delay;
+
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+		log() << "cannot open /dev/mem. su?";
+		return 0;
+	}
+
+	void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+
+	uint8_t* regs = (uint8_t*)map_base;
+    uint16_t datum, tmp;
+
+    //log() << std::hex << "reg 0x" << i << " : 0x" << *(uint16_t*)(regs+i);
+    datum = *(uint16_t*)(regs+0x30);
+    //if( 0x4652 != datum ) return 0;
+    
+    // flush garbage from fpga's fifo
+    /*
+     * this code hangs app 
+    if( 0x4652 != datum ){
+       do{
+        tmp = *(uint16_t*)(regs+0x2e);
+       }while( 0xFAAC != *(uint16_t*)(regs+0x30));
+       return 0;
+    }
+    */
+    
+reset_fifo_and_exit:    
+    if( 0x4652 != datum ){
+        if( 0xFAAC != datum )
+            *(uint16_t*)(regs+0x30) = 0x0000;// write any value to reset fifo and statemachine
+        munmap((void*)map_base, 1024);
+        close(fd);
+        return 0;
+    }
+    
+
+    printf("\n ************ Read Meta Data ***********\n");
+    printf("\n *** FRAME COUNTER ***\n");
+    e2v_magic[0] = datum;
+    printf(" %04x", e2v_magic[0]);
+	for(i=1; i<4; i++){ 
+        datum = *(uint16_t*)(regs+0x30);
+        tmp = *(uint16_t*)(regs+0x2E);
+        if( datum == 0xFAAC || datum==0x4652 ){
+            printf("\n ERR: %d %04x\n",i,datum);
+            goto reset_fifo_and_exit;
+        }
+        e2v_magic[i] = datum; 
+        e2v_magic[i] = swap16(e2v_magic[i]);
+        printf(" %04x", e2v_magic[i]);
+    }
+    printf("\n");
+	
+    printf(" *** HEADER ***\n");
+	for(i=0; i<13; i++){ 
+        datum = *(uint16_t*)(regs+0x30);
+        tmp = *(uint16_t*)(regs+0x2E);
+        if( datum == 0xFAAC || datum==0x4652 ){
+            printf("\n ERR: %d %04x\n",i,datum);
+            goto reset_fifo_and_exit;
+        }
+        e2v_header[i] = datum;
+        e2v_header[i] = swap16(e2v_header[i]);
+        printf(" %04x", e2v_header[i]);
+    }
+    printf("\n");
+	
+    if(show)printf(" *** HISTOGRAM ***\n");
+	for(i=0; i<256; i++){ 
+        datum = *(uint16_t*)(regs+0x30);
+        tmp = *(uint16_t*)(regs+0x2E);
+        if( datum == 0xFAAC || datum==0x4652 ){
+            printf("\n ERR: %d %04x\n",i,datum);
+            goto reset_fifo_and_exit;
+        }
+        e2v_histogram[i] = datum;
+        if(show)printf(" %04x", e2v_histogram[i]);
+        //for(delay=100;delay>0;delay--);
+    }
+    if(show)printf("\n");
+    
+    printf(" *** FOOTER ***\n");
+	for(i=0; i<3; i++){
+        datum = *(uint16_t*)(regs+0x30);
+        tmp = *(uint16_t*)(regs+0x2E);
+        if( datum==0xFAAC || datum==0x4652 ){ 
+            printf("\n ERR: %d %04x\n",i,datum);
+            goto reset_fifo_and_exit;
+        }
+        e2v_footer[i] = datum;
+        e2v_footer[i] = swap16(e2v_footer[i]);
+        printf(" %04x", e2v_footer[i]);
+    }
+    printf("\n");
+    
+    // total 4+13+256+3 = 276 
+
+	munmap((void*)map_base, 1024);
+	close(fd);
+    return 1;
+}
+
 // get_histogram(const void *luma_plane, uint32_t *histogram, int w, int h)
 // w - image width
 // h - image height
 //#define FIRST_LINE_OK
-
-static void get_histogram(void *luma_plane, uint32_t *histogram, int w, int h)
+static int get_histogram(void *luma_plane, uint32_t *histogram, int w, int h)
 {
     uint8_t* ptl_luma_plane = (uint8_t*)luma_plane;
 #ifdef FIRST_LINE_OK
@@ -385,9 +537,8 @@ static void get_histogram(void *luma_plane, uint32_t *histogram, int w, int h)
 
     assert(luma_plane);
     assert(histogram);
-    assert(1280==w);
-    assert(1024==h);
-    
+    assert( (1280==w && (1024==h ||512==h)) || (640==w && (512==h || 256==h)) );
+  
     // Вот ТУТ, из (uint8_t*)buf.m.userptr надо доставать 1ую и 2 последние строки.
     // Подробное, с излишним количеством локальных переменных, описание
     // сделано исключительно для тупящих.
@@ -475,8 +626,111 @@ static void get_histogram(void *luma_plane, uint32_t *histogram, int w, int h)
         // Histogram is ok
         // TODO: correct histogram
     } 
-    return;
+    return 1;
 }
+
+static int get_histogram_emif(void *luma_plane, uint32_t *histogram, int w, int h)
+{
+    uint8_t* ptl_luma_plane = (uint8_t*)luma_plane;
+    uint8_t* ptr_footer_line;
+    uint8_t* ptr_magic_line;
+    
+    uint16_t Blacks,Whites;
+    uint16_t tmp;
+    uint32_t x,y;
+    uint32_t *H64 = histogram;
+
+    int i,j,oe,ue,Mediana;
+
+    assert(luma_plane);
+    assert(histogram);
+    assert( (1280==w && (1024==h ||512==h)) || (640==w && (512==h || 256==h)) );
+
+    if( !read_metadata_emif() ) return 0;
+    
+    ptr_magic_line = (uint8_t*)e2v_magic;
+    ptr_footer_line = (uint8_t*)e2v_footer;
+    
+    printf("\n *** MAGIC ***\n");
+    for(i=0;i<8;i++) {
+        printf(" %02X", ptr_magic_line[i]);
+    }
+    printf("\n");
+    
+    uint32_t frame_number;
+    frame_number = ((((uint32_t)e2v_magic[3])<<16)&0xFFFF0000) | (((uint32_t)e2v_magic[2])&0x0000FFFF);
+    printf(" FRM# %08x ( %10d )\n", frame_number, frame_number);
+
+    printf(" -- Footer -- w=%d h=%d\n", w, h);
+    for(i=0; i<5; i++) printf(" %02X",ptr_footer_line[i]);
+    printf("\n");
+    
+    printf("Error flags: 0x%02X\n",ptr_footer_line[0]);
+    tmp = ((uint16_t)ptr_footer_line[1]<<8 | (uint16_t)ptr_footer_line[2]);
+    printf("0x00 pixels: %d\n",tmp);
+    
+    Blacks = tmp;
+    tmp = ((uint16_t)ptr_footer_line[3]<<8 | (uint16_t)ptr_footer_line[4]);
+    printf("0xFF pixels: %d\n",tmp);
+    Whites = tmp;
+    oe = 0;
+    ue = 0;
+    for(i=0; i<64; i++) {
+        uint32_t bin=0;
+        /* use all 4 gistorgamms */
+        tmp = e2v_histogram[i+64*0];
+        if(tmp==0xFFFF && i==0)oe++;
+        if(tmp==0xFFFF && i==63)ue++;
+        bin += (int)tmp;
+        tmp = e2v_histogram[i+64*1];;
+        if(tmp==0xFFFF && i==0)oe++;
+        if(tmp==0xFFFF && i==63)ue++;
+        bin += (int)tmp;
+        tmp = e2v_histogram[i+64*2];;
+        if(tmp==0xFFFF && i==0)oe++;
+        if(tmp==0xFFFF && i==63)ue++;
+        bin += (int)tmp;
+        tmp = e2v_histogram[i+64*3];;
+        if(tmp==0xFFFF && i==0)oe++;
+        if(tmp==0xFFFF && i==63)ue++;
+        bin += (int)tmp;
+        H64[63-i] = bin;
+    }
+    /* Check e2v histogramm overflow */
+    x=0;
+    y=0;
+    for(i=0; i<64; i++) {
+        x += H64[i];
+        if(i!=0 && i!=63) y += H64[i];
+    }
+    if( ((w*h)-x)>((w*h)*0.1) ) { //If Histogramm error bigger than 10%..
+        if(oe!=0 && ue!=0) {
+            // Histogram has wrong black and white sides
+            // Decrese gain
+            // Rough histogramm correction
+            H64[0]  = (w*h - y)/2;
+            H64[63] = (w*h - y)/2;
+        } else if(oe!=0 && ue==0) {
+            // Histogram has wrong white side
+            // Decrease gain or exposure time
+            // Correct histogram:
+            H64[63] = w*h - y - H64[0];
+        } else if(oe==0 && ue!=0) {
+            // Histogram has wrong black side
+            // Increase gain or exposure time
+            // Correct histogram:
+            H64[0] = w*h - y - H64[63];
+        } else {
+            // Histogramm may be ok if other bins has no overflow
+            // TODO: correct histogram
+        }
+    } else {
+        // Histogram is ok
+        // TODO: correct histogram
+    } 
+    return 1;
+}
+
 
 // get_cdf(uint32_t *histogram, uint32_t *CDF, int buckets)
 // create CDF for histogram with 64 buckets and 10-bits value size
@@ -509,13 +763,19 @@ double VSensor::get_framerate(void)
 }
 
 
-#define Y_TOP_LIM (149)
-#define Y_BOT_LIM (141)
+#define Y_TOP_LIM (139)
+#define Y_BOT_LIM (131)
 #define Y_MEDIAN  ( (float)(Y_TOP_LIM + Y_BOT_LIM) / 2.0 )
 #define FPS_MINIMUM ((float)2.5)
 #define EXPOSURE_DELTA_INCR ((uint16_t)(4*6))
 #define EXPOSURE_DELTA_DECR ((uint16_t)(4*4))
 #define EXPOSURE_TOP_LIMIT (3200)
+
+inline float get_min_fps(int index)
+{
+    assert(index<7);
+    return max_fps_table[index];
+}
 
 void VSensor::aec_agc_algorithm_A(uint32_t *H64, int Mediana, int w, int h)
 {
@@ -664,6 +924,8 @@ void VSensor::aec_agc_algorithm_A(uint32_t *H64, int Mediana, int w, int h)
           );    
 }
 
+
+
 /* aec_agc_algorithm_AA()           */
 /* !!! Only for 64-bin histogram    */
 /* Если следить за медианой в границах Y_TOP_LIM (155), Y_BOT_LIM (135) то при снижении освещенности
@@ -675,17 +937,19 @@ void VSensor::aec_agc_algorithm_A(uint32_t *H64, int Mediana, int w, int h)
 bool VSensor::aec_agc_algorithm_AA(uint32_t *H64, uint32_t *CDF, int Mediana, int w, int h)
 {
     char exposure_command = ' ';
-    static bool need_gain_correction = false;
+    static int need_gain_correction = 0;
  
     int i;
     float exposure;// [seconds]
-    float gain = 1.0;
+    float gain;
     float Yratio;
     
-    if(aec_state[0].FRAME < aec_state[0].NEXT) goto quit_aec;
+    if(aec_state[0].FRAME < aec_state[0].NEXT) {
+        exposure_command = ' ';
+        goto quit_aec_AA;
+    }
 
     Yratio = Y_MEDIAN/Mediana;
-    
     
     if(Mediana<Y_BOT_LIM)
         exposure_command = '+';
@@ -693,7 +957,7 @@ bool VSensor::aec_agc_algorithm_AA(uint32_t *H64, uint32_t *CDF, int Mediana, in
         exposure_command = '-';
     else{
         exposure_command = ' ';
-        goto quit_aec;
+        goto quit_aec_AA;
     }
         
     /* smooth change */
@@ -701,67 +965,175 @@ bool VSensor::aec_agc_algorithm_AA(uint32_t *H64, uint32_t *CDF, int Mediana, in
     if( Yratio < 0.25) Yratio = 0.25;
     
     exposure = aec_state[0].EXPOSURE * Yratio;
+    gain = aec_gain(0);
         
-    if( FPS_MINIMUM > (1.0/exposure) ) {
+    if( get_min_fps(aec_state[0].ROI_ANA_GAIN) > (1.0/exposure) ) {
         printf("  gain Up [e %8.3f]\n", 1000.0*exposure);
-        need_gain_correction = true;
-        exposure = 1.0 / FPS_MINIMUM; 
-        //gain = aec_state[0].GAIN + ((exposure / aec_state[0].EXPOSURE) - aec_state[0].GAIN) * 0.5;
-        //exposure = exposure * 0.25; 
+        need_gain_correction = 1;
+        exposure = 1.0/get_min_fps(aec_state[0].ROI_ANA_GAIN);
     }else if(exposure < 0.0000015){// minimum exposure is 1.5 uS
         printf("  gain Down [e %8.3f]\n", 1000.0*exposure );
-        need_gain_correction = true;
-        //gain = exposure / (aec_state[0].EXPOSURE * aec_state[0].GAIN);
-        exposure = 0.75 / FPS_MINIMUM;
+        need_gain_correction = -1;
+        exposure = 0.0000015;
     }else{
-        need_gain_correction = false;
+        need_gain_correction = 0;
     }
     
     if(exposure < 0.0000015) exposure = 0.0000015;// minimum exposure is 1.5 uS
     if(gain < 1.0) gain = 1.0;
+    if(gain > 8*15.875) gain = 8*15.875;
       
     aec_state[0].EXPOSURE  = exposure;
     aec_state[0].GAIN      = gain; 
     aec_state[0].NEXT = aec_state[0].FRAME + 1/* .FRAME will be incremented later */ + 1/* video pipe depth */;
         
-quit_aec:        
-    printf(" -- FPS %4.1f    EXPOSURE(%c) %8.3f ms [x %6.3f] Ga=%6.3f (%8.3f) %s\n",
+quit_aec_AA:        
+    printf(" -- FPS %4.1f    EXPOSURE(%c) %8.3f ms [x %6.3f] G=%6.3f (%8.3f)  Gain%s\n",
            get_framerate(),
            exposure_command,
            aec_state[0].EXPOSURE * 1000.0,Yratio,
            aec_state[0].GAIN,gain,
-           need_gain_correction? " GAIN!" : " "
+           (need_gain_correction>0)? " +" : ((need_gain_correction<0)?" -":" OK")
           ); 
 
     return ' '==exposure_command ? 0 : 1;   
 }
 
+bool VSensor::aec_agc_algorithm_AAA(uint32_t *H64, uint32_t *CDF, int Mediana, int w, int h)
+{
+    char exposure_command = ' ';
+    static int need_gain_correction = 0;
+ 
+    int i;
+    float exposure;// [seconds]
+    float gain = 1.0;
+    float Yratio;
+    
+    
+    Yratio = Y_MEDIAN/Mediana;
+    
+    if(aec_state[0].FRAME < aec_state[0].NEXT) {
+        exposure_command = ' ';
+        goto quit_aec_AAA;
+    }    
+    
+    //if( (float)(CDF[63]-CDF[61])/(float)CDF[63] > 0.1 ){
+    //   exposure_command = ' '; 
+    //   Yratio = 0.25;
+    //}else{
+    if(Mediana<Y_BOT_LIM)
+        exposure_command = '+';
+    else if(Mediana>Y_TOP_LIM)
+        exposure_command = '-';
+    else{
+        exposure_command = ' ';
+        goto quit_aec_AAA;
+    }
+    //}
+        
+    /* smooth change */
+    if( Yratio > 2) Yratio = 2;
+    if( Yratio < 0.5) Yratio = 0.5;
+    
+    exposure = aec_state[0].EXPOSURE * Yratio;
+        
+    if( get_min_fps(aec_state[0].ROI_ANA_GAIN) > (1.0/exposure) ) {
+        printf("  Gain Up [e %8.3f]\n", 1000.0*exposure);
+        need_gain_correction = 1;
+        if( 6 > aec_state[0].ROI_ANA_GAIN ){
+            aec_state[0].ROI_ANA_GAIN++;
+            aec_state[0].EXPOSURE = 0.05/get_min_fps(aec_state[0].ROI_ANA_GAIN);
+            exposure = aec_state[0].EXPOSURE;//keep exposure
+        }else if( 255 > aec_state[0].ROI_DIG_GAIN ){
+            printf("  Gain[D] Up [e %8.3f]\n", 1000.0*exposure);
+            aec_state[0].ROI_DIG_GAIN = ((aec_state[0].ROI_DIG_GAIN+1) * Yratio)-1;
+            if( 255 < aec_state[0].ROI_DIG_GAIN ) aec_state[0].ROI_DIG_GAIN = 255;
+            exposure = aec_state[0].EXPOSURE;//keep exposure
+        }else{
+            exposure = 1.0/get_min_fps(aec_state[0].ROI_ANA_GAIN);
+        }
+    }else if(exposure < 0.0000015){// minimum exposure is 1.5 uS
+        printf("  gain Down [e %8.3f]\n", 1000.0*exposure );
+        need_gain_correction = -1;
+        if( 0 < aec_state[0].ROI_DIG_GAIN ){
+           aec_state[0].ROI_DIG_GAIN = ((aec_state[0].ROI_DIG_GAIN+1) * Yratio)-1;
+           exposure = aec_state[0].EXPOSURE;//keep exposure
+        }else if( 0 < aec_state[0].ROI_ANA_GAIN ){
+            aec_state[0].ROI_ANA_GAIN--;
+            aec_state[0].EXPOSURE = 0.05/get_min_fps(aec_state[0].ROI_ANA_GAIN);
+            exposure = aec_state[0].EXPOSURE;//keep exposure
+        }else{
+            exposure = 0.0000015;
+        }
+    }else{
+        need_gain_correction = 0;
+    }
+    
+    if(exposure < 0.0000015) exposure = 0.0000015;// minimum exposure is 1.5 uS
+    if(gain < 1.0) gain = 1.0;
+    if(gain > 8*15.875) gain = 8*15.875;
+      
+    aec_state[0].GAIN = 1.0/*aec_gain(0)*/; 
+    aec_state[0].NEXT = aec_state[0].FRAME + 1/* .FRAME will be incremented later */ + 1/* video pipe depth */;
+    
+    aec_state[0].EXPOSURE  = exposure;
+    exposure_set(exposure);
+    
+    set_gain(aec_state[0].ROI_ANA_GAIN, aec_state[0].ROI_DIG_GAIN);
+    
+quit_aec_AAA:        
+    printf(" -- FPS %4.1f    EXPOSURE(%c) %8.3f ms [x %6.3f] G=%6.3f (%8.3f)  Gain%s\n",
+           get_framerate(),
+           exposure_command,
+           aec_state[0].EXPOSURE * 1000.0,Yratio,
+           aec_state[0].GAIN,gain,
+           (need_gain_correction>0)? " +" : ((need_gain_correction<0)?" -":" OK")
+          ); 
+
+    return ' '==exposure_command ? 0 : 1;   
+}
 // aec_agc_algorithm_B(uint32_t *cdf, int b)
 // Reference is http://fcam.garage.maemo.org/apiDocs.html
 // b - histogram buckets number
 // smoothness 1.0 .... 0.0
-void VSensor::aec_agc_algorithm_B(uint32_t *cdf, int b, float smoothness)
+bool VSensor::aec_agc_algorithm_B(uint32_t *cdf, int b, float smoothness)
 {
+    char exposure_command;
+    float exposure;
+    float gain;
+    
     assert(64==b);
     assert(cdf);
     
     int brightPixels = cdf[b-1] - cdf[b-21]; // top 20 buckets
     int targetBrightPixels = cdf[b-1]/50;
-    int maxSaturatedPixels = cdf[b-1]/200;
+    int maxSaturatedPixels = cdf[b-1]/100;//200
     int saturatedPixels = cdf[b-1] - cdf[b-6]; // top 5 buckets  
-
+    
+    float brightness;
+    float desiredBrightness;
+    float shotBrightness;
+    float exposureKnee;
+    float adjustment;
+    
     printf("AutoExposure: totalPixels: %d,"
             "brightPixels: %d, targetBrightPixels: %d,"
             "saturatedPixels: %d, maxSaturatedPixels: %d\n",
             cdf[b-1], brightPixels, targetBrightPixels,
             saturatedPixels, maxSaturatedPixels);
+     
+    // how much should I change brightness by
+    adjustment = 1.0f;
+    
+    if(aec_state[0].FRAME < aec_state[0].NEXT) {
+        exposure_command = ' ';
+        goto quit_aec_B;
+    }
             
-     // how much should I change brightness by
-     float adjustment = 1.0f;
- 
      if (saturatedPixels > maxSaturatedPixels) {
          // first don't let things saturate too much
          adjustment = 1.0f - ((float)(saturatedPixels - maxSaturatedPixels))/cdf[b-1];
+         exposure_command = '-';
      } else if (brightPixels < targetBrightPixels) {
          // increase brightness to try and hit the desired number of well exposed pixels
          int l = b-11;
@@ -773,38 +1145,37 @@ void VSensor::aec_agc_algorithm_B(uint32_t *cdf, int b, float smoothness)
  
          // that level is supposed to be at b-11;
          adjustment = float(b-11+1)/(l+1);
+         exposure_command = '+';
      } else {
          // we're not oversaturated, and we have enough bright pixels. Do nothing.
+         exposure_command = ' ';
      }
  
      if (adjustment > 4.0) { adjustment = 4.0; }
      if (adjustment < 1/16.0f) { adjustment = 1/16.0f; }
- 
-     printf("AutoExposure: adjustment: %f\n", adjustment);
-     
-     float brightness = aec_gain(0) * aec_time(0);
-     float desiredBrightness = brightness * adjustment;
-     float exposure;
-     float gain;
-      
-     // Apply the smoothness constraint
-     float shotBrightness = aec_state[0].GAIN * aec_state[0].EXPOSURE;
-     desiredBrightness = shotBrightness * smoothness + desiredBrightness * (1-smoothness);
- 
-     // whats the largest we can raise exposure without negatively
-     // impacting frame-rate or introducing handshake. We use 8 fps
-    float exposureKnee;
-    if(aec_state[0].ROI_ANA_GAIN>5) exposureKnee = 1.0/8.0;
-    else exposureKnee = 1.0/21.5; 
 
-     if (desiredBrightness > exposureKnee) {
-         exposure = exposureKnee;
-         gain = desiredBrightness / exposureKnee;
-     } else {
-         gain = 1.0f;
-         exposure = desiredBrightness;
-     }
+    brightness = aec_gain(0) * aec_time(0);
+    desiredBrightness = brightness * adjustment;
+
+      
+    // Apply the smoothness constraint
+    //shotBrightness = aec_state[0].GAIN * aec_state[0].EXPOSURE;
+    shotBrightness = aec_gain(0) * aec_time(0);
+    desiredBrightness = shotBrightness * smoothness + desiredBrightness * (1-smoothness);
  
+    // whats the largest we can raise exposure without negatively
+    // impacting frame-rate or introducing handshake.
+    exposureKnee = 1.0/get_min_fps(aec_state[0].ROI_ANA_GAIN);
+    
+    if (desiredBrightness > exposureKnee) {
+        exposure = exposureKnee;
+        gain = desiredBrightness / exposureKnee;
+    } else {
+        gain = 1.0f;
+        exposure = desiredBrightness / gain;
+    }
+ 
+    /*
      // Clamp the gain at max, and try to make up for it with exposure
      if (gain > EV76C661_MAX_GAIN) {
          exposure = desiredBrightness/EV76C661_MAX_GAIN;
@@ -815,12 +1186,20 @@ void VSensor::aec_agc_algorithm_B(uint32_t *cdf, int b, float smoothness)
      if (exposure > EV76C661_MAX_EXPOSURE) {
          exposure = EV76C661_MAX_EXPOSURE;
      }
+    */
+
+    //printf("AutoExposure: old e %8.3f, g %8.3f. new: e %8.3f, g %8.3f  adjustment %6.3f\n",
+    //         aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, exposure*1000.0, gain, adjustment);
  
-     printf("AutoExposure: old exposure, gain: %8.3f, %8.3f. new: %8.3f, %8.3f\n",
-             aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, exposure*1000.0, gain);
- 
-     aec_state[0].EXPOSURE  = exposure;
-     aec_state[0].GAIN      = gain; 
+    aec_state[0].EXPOSURE  = exposure;
+    aec_state[0].GAIN      = gain;
+    aec_state[0].NEXT      = aec_state[0].FRAME + 1/* .FRAME will be incremented later */ + 1/* video pipe depth */;
+    
+quit_aec_B:
+     printf("AutoExposure: old e %8.3f, g %8.3f. new: e %8.3f, g %8.3f adjustment %6.3f\n",
+             aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, exposure*1000.0, gain, adjustment);
+
+    return ' '==exposure_command ? 0 : 1;
 }
 
 bool VSensor::aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoothness)
@@ -895,8 +1274,8 @@ bool VSensor::aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoot
      // whats the largest we can raise exposure without negatively
      // impacting frame-rate or introducing handshake. We use 8 fps
     float exposureKnee;
-    if(aec_state[0].ROI_ANA_GAIN>5) exposureKnee = 1.0/8.0;
-    else exposureKnee = 1.0/21.5; 
+    
+    exposureKnee = 1.0 / get_min_fps(aec_state[0].ROI_ANA_GAIN); 
 
      if (desiredBrightness > exposureKnee) {
          exposure = exposureKnee;
@@ -923,92 +1302,117 @@ bool VSensor::aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoot
      aec_state[0].EXPOSURE  = exposure;
      aec_state[0].GAIN      = gain; 
      
-     aec_state[0].NEXT = aec_state[0].FRAME + 1 + 2;
+     aec_state[0].NEXT = aec_state[0].FRAME + 1 + 1;
      
      return 1;
 }
 
-
-void VSensor::aec_agc_set(float Gain, float Exposure)
+//aec_agc_set() - translate exposure time and gain from phisical units
+// to sensor's units and send these data to sensor
+//command == 0  NOP, do nothing
+//command == 1 do exposure
+//command == 2 do gain
+//command == 1 | 2 do exposure and gain
+void VSensor::aec_agc_set(float Gain, float Exposure, int command)
 {
-        float gain = Gain;
-        float exposure = Exposure;
-        // 1. select gain: analog gain should be minimal
-        float  a;
-        float  binning_gain; // TODO: CHECK fucking binning !!!
-        int    a_int;
-        int    ana_gain;
-        int    dig_gain;
+    float gain = Gain;
+    float exposure = Exposure;
+    // 1. select gain: analog gain should be minimal
+    float  a;
+    float  binning_gain; // TODO: CHECK fucking binning !!!
+    int    a_int;
+    int    ana_gain_index;
+    int    dig_gain_index;
         
+    if(0 == aec_state[0].BINNING) binning_gain = 1.0;
+    else binning_gain = 4.0 / (float)aec_state[0].BINNING;
         
-        
-        if(0 == aec_state[0].BINNING) binning_gain = 1.0;
-        else binning_gain = 4.0 / (double)aec_state[0].BINNING;
-        
-        a = (gain / binning_gain) / EV76C661_MAX_GAIN_D;
-        a_int = floor(a);
-         
-         switch(a_int){
-             case 0:
-                ana_gain = 0;
-                break;
-             case 1:
-                ana_gain = 0;
-                break;
-             case 2:
-                ana_gain = 2;
-                break;
-             case 3:
-                ana_gain = 3;
-                break;
-             case 4:
-                ana_gain = 4;
-                break;             
-             case 5:
-                ana_gain = 5;
-                break;
-             case 6:
-                ana_gain = 5;
-                break;
-             case 7:
-                ana_gain = 6;
-                break;
-             case 8:
-                ana_gain = 6;
-                break;                
-             default:
-                assert(0);
-         }
-        
-        dig_gain = floor((gain / (analog_gain_table[ana_gain]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
-        
-        //TODO:
-        //assert( 256 > (int)dig_gain );// TODO: handler for dig_gain>255
-        if( 255 < (int)dig_gain ) {
-            printf(" !!! ERROR: dig_gain %d\n",(int)dig_gain );
-            dig_gain = 255;
+    /*
+    a = (gain / binning_gain) / EV76C661_MAX_GAIN_D;
+    a_int = floor(a);
+    switch(a_int){
+        case 0:ana_gain_index = 0;break;
+        case 1:ana_gain_index = 0;break;
+        case 2:ana_gain_index = 2;break;
+        case 3:ana_gain_index = 3;break;
+        case 4:ana_gain_index = 4;break;             
+        case 5:ana_gain_index = 5;break;
+        case 6:ana_gain_index = 5;break;
+        case 7:ana_gain_index = 6;break;
+        case 8:ana_gain_index = 6;break;                
+        default:assert(0);
+    }
+    dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
+    */
+    
+    if( gain/binning_gain <= 1.0 ){
+        ana_gain_index = 0;
+        dig_gain_index = 0;
+    }else{
+        if(gain/binning_gain > 8){//Use digital gain
+            //Set analog gain to maximum
+            ana_gain_index = 6;
+            dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
+        }else{
+            int i;
+            for(i=0;i<5;i++){
+                if( ceil((gain/binning_gain)*100.0) > (100.0*analog_gain_table[i]) &&
+                    ceil((gain/binning_gain)*100.0) <= (100.0*analog_gain_table[i+1]) ) break;
+            }
+            ana_gain_index = i+1;
+            dig_gain_index = 0;
         }
+    }
+    if( 255 < (int)dig_gain_index ) {
+        printf(" !!! ERROR: dig_gain_index %d\n",(int)dig_gain_index );
+        dig_gain_index = 255;
+    }
         
-        // 2. correct exposure with new gain
-        exposure = (exposure * gain) / (analog_gain_table[ana_gain]*binning_gain*(1.0 + ((double)dig_gain * EV76C661_DIGITAL_GAIN_STEP)));
+    // 2. correct exposure
+    if( command & 2 ){
+        exposure = (exposure * gain) / (analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP)));
+    }
+    aec_state[0].EXPOSURE  = exposure;
+    aec_state[0].GAIN      = analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP));
 
-        int int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
-        int frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
+    int int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
+    int frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
 
-        //assert(65535 > int_part);
-        //assert(256 > frac_part);
+    if(65534 < int_part){
+        printf(" WARNING: ROI_T_INT_II limited to 65534\n");
+        int_part = 65534;
+    }
+    if(255 < frac_part){
+        printf(" WARNING: ROI_T_INT_CLK limited to 255\n");
+        frac_part = 255;
+    }
+                
+    if(command & 2){
+        aec_state[0].ROI_ANA_GAIN = ana_gain_index;
+        aec_state[0].ROI_DIG_GAIN = dig_gain_index>255 ? 255:dig_gain_index;
+        set_gain(aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN);
+    }
         
-        //move this printf outside this function
-        //printf("AutoExposure e2v: AG %2d   DG %3d   EL %5d   EC %3d   FPS %4.1f\n",ana_gain,dig_gain,int_part,frac_part,get_framerate() ); 
-        
-        aec_state[0].ROI_ANA_GAIN = ana_gain;
-        aec_state[0].ROI_DIG_GAIN = dig_gain>255?255:dig_gain;
-        set_gain(ana_gain,dig_gain);
+    if(command & 1){
         aec_state[0].ROI_T_INT_II = int_part;
         aec_state[0].ROI_T_INT_CLK = frac_part;
-        set_time(int_part,frac_part);
+        set_time(aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK);
+    }
 }
 
+void VSensor::exposure_set(float exposure)
+{
+    int    int_part;
+    int    frac_part;
+
+    int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
+    frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
+
+    aec_state[0].ROI_T_INT_II = int_part;
+    aec_state[0].ROI_T_INT_CLK = frac_part;
+        
+    set_time(aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK);
+}
 
 void VSensor::aec(int h, int w, uint8_t *pYplane)
 {
@@ -1026,7 +1430,8 @@ void VSensor::aec(int h, int w, uint8_t *pYplane)
     memset(CDF,0,64*sizeof(uint32_t));
     memset(H64,0,64*sizeof(uint32_t));
 ////////////////////////////////////////////////////////////////////////////////////
-    get_histogram(ptl_luma_plane,H64,w,h);
+    //if( !get_histogram(ptl_luma_plane,H64,w,h) ) goto aec_tune_final;
+    if( !get_histogram_emif(ptl_luma_plane,H64,w,h) ) goto aec_tune_final;
     get_cdf(H64,CDF, &summ_luma);
 ////////////////////////////////////////////////////////////////////////////////////
     
@@ -1065,14 +1470,23 @@ void VSensor::aec(int h, int w, uint8_t *pYplane)
      * integration time base step is 8*24000000 = 0.33(3) uS
      */
 //////////////////////////////////////////////////////////////////////
-    //aec_agc_algorithm_B(CDF, 64, 0.5);
-    //if( aec_agc_algorithm_C(CDF,Mediana,64,0.5) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE);
     //aec_agc_algorithm_A(H64,Mediana,w,h);
-    if( aec_agc_algorithm_AA(H64,CDF,Mediana,w,h) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE); 
+    
+    /* FrancenCam algorithm */
+    //if( aec_agc_algorithm_B(CDF, 64, 0.8) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3/* set gain and exposure */);
+    if( aec_agc_algorithm_B(CDF, 64, 0.25) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3/* set exposure only*/);
+    
+    /* Modified FrankenCam: Y mediana used */
+    //if( aec_agc_algorithm_C(CDF,Mediana,64,0.5) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3);
+    
+    /* Controls integration time only (AA), Ga and Gd fixed */
+    //if( aec_agc_algorithm_AA(H64,CDF,Mediana,w,h) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3); 
+    
+    //aec_agc_algorithm_AAA(H64,CDF,Mediana,w,h);//does not works
 //////////////////////////////////////////////////////////////////////
-    printf("AutoExposure e2v: AG %2d   DG %3d [%6.3f]  EL %5d   EC %3d [%8.3f ms]  FPS %4.1f \n",
-            aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN,aec_state[0].GAIN,
-            aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK,aec_state[0].EXPOSURE*1000.0,
+    printf("AutoExposure e2v: AG %2d   DG %3d [GAIN %6.3f / %6.3f]  EL %5d   EC %3d [EXPOSURE %8.3f / %8.3f]  FPS %4.1f \n",
+            aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN, aec_state[0].GAIN, aec_gain(0),
+            aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK,aec_state[0].EXPOSURE*1000.0, aec_time(0)*1000.0,
             get_framerate() 
           ); 
         

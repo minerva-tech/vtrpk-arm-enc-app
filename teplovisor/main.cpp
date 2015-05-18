@@ -57,6 +57,8 @@ void setReg(uint8_t addr, uint16_t val)
 	close(fd);
 }
 
+static uint16_t spi_addr = 0,spi_data = 0;
+
 #if not VIDEO_SENSOR
 void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir)
 #else
@@ -86,6 +88,38 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, VSensor& v
 			Auxiliary::RegisterValData reg = Auxiliary::RegisterVal(payload);
 			log() << "Set reg 0x" << std::hex << (int)reg.addr << " to 0x" << reg.val << std::dec;
 			setReg(reg.addr, reg.val);
+        
+        #if VIDEO_SENSOR
+            // Это КОСТЫЛИ: DANGER!
+            if( reg.addr == 0x3A ){// SPI data register
+                // save SPI data value reg.val
+                spi_data = reg.val;
+            }
+            if( reg.addr == 0x38 ){// SPI address register
+                // save SPI address (reg.val & 0x007F);
+                if( reg.val & 0x0280 ){
+                    spi_addr = reg.val & 0x007F;
+                    switch(spi_addr){
+                        case 0x000E:/* roi1_t_int_II */
+                            vsensor.set_state('I', spi_data);
+                            break;
+                        case 0x000F:/* roi1_t_int_clk */
+                            vsensor.set_state('F', spi_data&0x00FF);
+                            break;
+                        case 0x0011:/* Gain (analog and digital) */
+                            vsensor.set_state('A', ((spi_data>>8))&0x00FF );
+                            vsensor.set_state('D', (spi_data)&0x00FF );
+                            break;
+                        default: break;
+                    }
+                }
+            }
+            // HyperMega Костыть
+            if(reg.addr == 0x0666){
+                ;
+            }
+        #endif;
+        
 			break;
 		}
 		case Auxiliary::CameraRegisterValType : {
@@ -150,6 +184,63 @@ void dumpRegs()
 	munmap((void*)map_base, 1024);
 	close(fd);
 }
+
+
+void histo_dump_emif()
+{
+	int fd,i;
+
+	if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
+		log() << "cannot open /dev/mem. su?";
+		return;
+	}
+
+	void * volatile map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
+
+	uint8_t* regs = (uint8_t*)map_base;
+    uint16_t first;
+
+    //log() << std::hex << "reg 0x" << i << " : 0x" << *(uint16_t*)(regs+i);
+    first = *(uint16_t*)(regs+0x30);
+    if( 0xFAAC == first ) {
+        printf("     Histogram data is not ready\n\n");
+        return;
+    }
+    
+    printf(" *** FRAME COUNTER ***\n");
+    printf(" %04x", first);
+	for (i=1; i<4; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+	}
+    printf("\n *** HEADER ***\n");
+	for (i=0; i<13; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+	}
+    printf("\n *** HISTOGRAM ***\n");
+	for (i=0; i<64; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+	}printf("\n");
+	for (i=0; i<64; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+	}printf("\n");
+	for (i=0; i<64; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+	}printf("\n");
+	for (i=0; i<64; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+	}printf("\n");
+    
+    printf(" *** FOOTER ***\n");
+	for (i=0; i<3; i++) {
+        printf(" %04x", *(uint16_t*)(regs+0x30));
+    }
+    printf("\n");
+	//log() << "end dump" << std::dec;
+
+	munmap((void*)map_base, 1024);
+	close(fd);
+}
+ 
 
 void restartFpga()
 {
@@ -291,13 +382,25 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 
 void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h, int chroma_val)
 {
+    int height;
+    int height_increment;
+    
 	std::vector<uint8_t>::iterator it_info = info.begin();
 	std::vector<uint8_t>::const_iterator it_info_mask = info_mask.begin();
+/*
+ * PC side uses Image_heght/2 analitic. Hack it for e2v here
+ */
+    height = h;
+#if VIDEO_SENSOR
+    height_increment = 1;
+#else
+    height_increment = 1;
+#endif;
 
 // move detector data two pixels up-left
 
-	for (int y=2; y<h; y++) {
-		uint8_t *p = data + y*s + 2;
+	for (int y=2; y<height; y += height_increment) {
+		uint8_t *p = data + y*(s*height_increment) + 2;
 		for (int x=2; x<w; x+=16, p+=16) {
 			uint8_t b = 0;
 			const int pels_left = w-x > 16 ? 16 : w-x;
@@ -315,7 +418,8 @@ void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask,
 		it_info_mask += s/8;
 	}
 
-	memset(&info[(h-2)*s/2/8], 0, w/2*2/8); // set last two lines to zeroes
+	memset(&info[(height-2)*s/2/8], 0, w/2*2/8); // set last two lines to zeroes
+
 
 //	while (it_info != info.end())
 //		*it_info++ = *it_info_mask++;
@@ -389,15 +493,20 @@ void run()
 
 		fps_divider = vs_set.fps_divider;
 	}
-#endif
-
+	if (res.src_w <= 0 || res.src_h <= 0 || res.dst_w <= 0 || res.dst_h <= 0) {
+		res.src_w = 1280;
+		res.src_h = 1024;
+		res.dst_w = 1280;
+		res.dst_h = 1024;
+	}    
+#else    
 	if (res.src_w <= 0 || res.src_h <= 0 || res.dst_w <= 0 || res.dst_h <= 0) {
 		res.src_w = SRC_WIDTH;
 		res.src_h = SRC_HEIGHT;
 		res.dst_w = TARGET_WIDTH;
 		res.dst_h = TARGET_HEIGHT;
 	}
-  res.dst_h = 1024;// TODO: ЭТО ЧИСТО ДЕБАЖНОЕ!!!! ЗАМЕНИТЬ!!!!!
+#endif    
 	const int w = res.dst_w;
 	const int h = res.dst_h;
 
@@ -465,10 +574,26 @@ void run()
 		}
         
 #if VIDEO_SENSOR
-        vsensor.aec(h,w,(uint8_t*)buf.m.userptr);
+        vsensor.aec(res.src_h,res.src_w,(uint8_t*)buf.m.userptr);
+        //histo_dump_emif();
+        /* 
+        {
+           int x,y;
+            uint8_t *p=(uint8_t*)(buf.m.userptr + w*h);
+            
+            for(y=0;y<h/2;y++)
+                for(x=0;x<w;x++)
+                    if(x=y) p[ y*w + x] = 0xFF;
+                    else p[ y*w + x] = 0x00;
+                    
+            //memset( (void*)((uint8_t*)(buf.m.userptr + w*h)), 0x82,w*h/2);
+        }
+        */
+        fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
+#else
+        fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 #endif;
 
-		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
 		size_t coded_size=0;
 
@@ -652,3 +777,5 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+class VideoSensorResolutionData;
