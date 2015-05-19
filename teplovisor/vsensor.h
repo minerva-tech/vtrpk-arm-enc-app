@@ -31,7 +31,7 @@ private:
     void aec_agc_algorithm_A(uint32_t *H64, int Mediana, int w, int h);// 1st algo
     bool aec_agc_algorithm_AA(uint32_t *H64, uint32_t *CDF, int Mediana, int w, int h);
     bool aec_agc_algorithm_AAA(uint32_t *H64, uint32_t *CDF, int Mediana, int w, int h);
-    bool aec_agc_algorithm_B(uint32_t *cdf, int b, float smoothness);// Francecam (FCam) algo
+    bool aec_agc_algorithm_B(uint32_t *cdf, int Ymean, int b, float smoothness);// Francecam (FCam) algo
     bool aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoothness);
     void aec_agc_set(float Gain, float Exposure, int command);// writes to sensor registers appropriate values
     
