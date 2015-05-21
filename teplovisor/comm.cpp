@@ -24,10 +24,10 @@ Log::PrintLine& operator << (Log& log, const Comm::Pkt& pkt)
 	
 	static_assert(sizeof(pkt) == 15, "Packet size should be 15 bytes.");
 	
-	       log << /*Log::Dump/*/Log::Debug << std::hex << (int)p[0] << (int)p[1] << (int)p[2]  << (int)p[3]  << 
-																(int)p[4]  << (int)p[5]  << (int)p[6]  << (int)p[7] << std::dec;
-	return log << /*Log::Dump/*/Log::Debug << std::hex << (int)p[8] << (int)p[9] << (int)p[10] << (int)p[11] << 
-																(int)p[12] << (int)p[13] << (int)p[14] << std::dec;
+	       log << /*Log::Dump/*/Log::Debug << std::hex << (int)p[0] << " " << (int)p[1] << " " << (int)p[2] << " " << (int)p[3] << " " << 
+																(int)p[4] << " " << (int)p[5] << " " << (int)p[6] << " " << (int)p[7] << " " << std::dec;
+	return log << /*Log::Dump/*/Log::Debug << std::hex << (int)p[8] << " " << (int)p[9] << " " << (int)p[10] << " " << (int)p[11] << " " << 
+																(int)p[12] << " " << (int)p[13] << " " << (int)p[14] << std::dec;
 	
 //	return log << Log::Dump << "Packet transmitted, addr = " << pkt.address << 
 //		", payload : " << std::hex << pkt.payload[0] << pkt.payload[1] << pkt.payload[2] << pkt.payload[3] << std::dec;
