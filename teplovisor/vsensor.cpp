@@ -21,6 +21,9 @@
 #define EV76C661_MAX_EXPOSURE ( 1.0 / MINIMAL_FPS )
 #define EV76C661_DIGITAL_GAIN_STEP ((15.875-1.0)/255.0)
 
+#define DO_GAIN (2)
+#define DO_EXPOSURE (1)
+
 /*
  * Line length quant is 8 CLK_CTRL's tacts.
  * 
@@ -768,8 +771,8 @@ double VSensor::get_framerate(void)
 }
 
 
-#define Y_TOP_LIM (139+4)
-#define Y_BOT_LIM (131-4)
+#define Y_TOP_LIM (133+3)
+#define Y_BOT_LIM (125-3)
 #define Y_MEDIAN  ( (float)(Y_TOP_LIM + Y_BOT_LIM) / 2.0 )
 #define FPS_MINIMUM ((float)2.5)
 #define EXPOSURE_DELTA_INCR ((uint16_t)(4*6))
@@ -1173,8 +1176,10 @@ quit_aec_B:
 float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
 {
     char exposure_command;
-    float exposure;
-    float gain;
+    float current_exposure, desired_exposure;
+    float current_gain, desired_gain;
+    float gain, exposure;
+    float adjustment,delta;
     
     assert(64==b);
     assert(cdf);
@@ -1183,9 +1188,6 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
     int targetBrightPixels = cdf[b-1]/50;
     int maxSaturatedPixels = cdf[b-1]/100;//200
     int saturatedPixels = cdf[b-1] - cdf[b-6]; // top 5 buckets  
-    
-    float desired_exposure;
-    float adjustment,delta;
     
     printf("AutoExposure: totalPixels: %d,"
             "brightPixels: %d, targetBrightPixels: %d,"
@@ -1259,51 +1261,112 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
     
     printf("AutoExposure: old e %8.3f, g %8.3f  ", aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN);
 
-    desired_exposure = aec_time(0) * adjustment;
-    gain = aec_gain(0);
-      
+    
+    current_gain = aec_gain(0);
+    current_exposure = aec_time(0);
+    
+    desired_exposure = current_exposure * adjustment;
+    desired_gain = current_gain * adjustment;
 /*
  * правильно распределить приоритеты: что меняем в первую очередь?
  * повышаем кадровую или понижаем коэф. усиления?
 */  
-if( exposure_command != ' ' )
+if( /*exposure_command != ' '*/0 ){ // этот кот не очень хорошо работает. осциллирует экспозиция. недоделан.
     if( desired_exposure > 1.0/get_min_fps(aec_state[0].ROI_ANA_GAIN) ){
         /* increase gain */
         if( aec_state[0].ROI_ANA_GAIN >= 6 /* current analog gain is maximum */ ){
-            ;/* increase digital gain */
+            /*
+            if( aec_state[0].ROI_DIG_GAIN < 255 ){
+                ;// TODO: increase digital gain and increase exposure if need
+            }else{
+                ;// TODO: set maximum exposure
+            }
+            */
         }else{
             /* increment analog gain */
             aec_state[0].ROI_ANA_GAIN++;
-            aec_state[0].GAIN = aec_gain(0);
+            aec_state[0].GAIN = aec_gain(0); /* recalculate gain */
+            /* Do we need to adjust exposure ? */
         }
+        set_gain(aec_state[0].ROI_ANA_GAIN, aec_state[0].ROI_DIG_GAIN);
+        /* exposure will be corrected at the next frame(s) */
     }else if(desired_exposure < 0.0000015){
         /* decrease gain */
         if( aec_state[0].ROI_ANA_GAIN == 0/* current analog gain is minimum */ ){
-            ;/* decrease digital gain */
+            /* decrease digital gain */
+            if( aec_state[0].ROI_DIG_GAIN == 0 ){
+                ;// TODO: ...
+            }else{
+                ;// TODO: ...
+            }
         }else{
             /* decrement analog gain */
             aec_state[0].ROI_ANA_GAIN--;
-            aec_state[0].GAIN = aec_gain(0); 
+            aec_state[0].GAIN = aec_gain(0); /* recalculate gain */
         }
+        set_gain(aec_state[0].ROI_ANA_GAIN, aec_state[0].ROI_DIG_GAIN);
+        /* exposure will be corrected at the next frame(s) */
     }else{
-        float desired_gain = aec_gain(0) * adjustment;
-        /* Try to decrease gain */
-        if( '-' == exposure_command || 'v' == exposure_command ){
-            /*
-            if( aec_state[0].ROI_DIG_GAIN > 0 ){
-                ;// TODO
+        if( current_gain == 1 ){ /* уменьшать усиление некуда */
+            /* Keep gain */
+            aec_state[0].EXPOSURE = desired_exposure; /* смело используем новую экспозицию т.к. уже проверили ее */
+            exposure_set(desired_exposure); /* setup sensors's registers */    
+        }else{
+            /* Try to decrease gain */
+            if( '-' == exposure_command || 'v' == exposure_command ){
+                if( desired_gain > 1 ){
+                    aec_agc_set(desired_gain, current_exposure, DO_GAIN);
+                    /* exposure will be corrected at the next frame(s) */
+                }else{
+                    /* set gain 1.0 */
+                    desired_gain = 1.0;
+                    aec_agc_set(desired_gain, current_exposure, DO_GAIN);
+                    /* exposure will be corrected at the next frame(s) */
+                }
             }
-            if( aec_state[0].ROI_ANA_GAIN > 0 ){
-                ;// TODO: ...
+            /* R.F.U, do not deleate
+            if( '+' == exposure_command || '^' == exposure_command ){
+                if( desired_gain > 8 ){
+                    // increase digital gain
+                }else{
+                    // increase analog dain
+                }
             }
             */
-            
+            /* Keep gain */
+            aec_state[0].EXPOSURE = desired_exposure; /* смело используем новую экспозицию т.к. уже проверили ее */
+            exposure_set(desired_exposure); /* setup sensors's registers */              
         }
-        /* ...or keep gain */
-        aec_state[0].EXPOSURE = desired_exposure;
-        exposure_set(desired_exposure);        
+                
     }
+    /* apply new gain and exposure */
+}
     
+/* limit frame rate to 16 fps for all gains */
+if(exposure_command != ' '){
+    if( exposure_command == '+' || exposure_command == '^' ){
+        if( desired_exposure < 1.0/16.0 ){
+            exposure = desired_exposure;
+            gain = current_gain;
+            aec_agc_set(gain, exposure, DO_EXPOSURE);//exposure_set(exposure);            
+        }else{
+            exposure = 1.0/16.0;
+            gain = current_exposure * current_gain * adjustment / exposure;
+            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);            
+        }
+    }
+    if( exposure_command == '-' || exposure_command == 'v' ){
+        if( desired_gain < 1.0 ){
+            gain = 1.0;
+            exposure = current_exposure * current_gain * adjustment / gain;
+            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
+        }else{
+            gain = current_gain * adjustment;
+            exposure = current_exposure;
+            aec_agc_set(gain, exposure, DO_GAIN);
+        }
+    }
+}
     printf("New: e %8.3f, g %8.3f adjustment %6.3f [%c]\n",
              aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, 
              adjustment, exposure_command);
@@ -1433,27 +1496,10 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
     int    ana_gain_index;
     int    dig_gain_index;
         
+    /* 1. Compute GAIN */
     if(0 == aec_state[0].BINNING) binning_gain = 1.0;
     else binning_gain = 4.0 / (float)aec_state[0].BINNING;
         
-    /*
-    a = (gain / binning_gain) / EV76C661_MAX_GAIN_D;
-    a_int = floor(a);
-    switch(a_int){
-        case 0:ana_gain_index = 0;break;
-        case 1:ana_gain_index = 0;break;
-        case 2:ana_gain_index = 2;break;
-        case 3:ana_gain_index = 3;break;
-        case 4:ana_gain_index = 4;break;             
-        case 5:ana_gain_index = 5;break;
-        case 6:ana_gain_index = 5;break;
-        case 7:ana_gain_index = 6;break;
-        case 8:ana_gain_index = 6;break;                
-        default:assert(0);
-    }
-    dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
-    */
-    
     if( gain/binning_gain <= 1.0 ){
         ana_gain_index = 0;
         dig_gain_index = 0;
@@ -1473,17 +1519,15 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
         }
     }
     if( 255 < (int)dig_gain_index ) {
-        printf(" !!! ERROR: dig_gain_index %d\n",(int)dig_gain_index );
+        printf(" WARNING: dig_gain_index %d\n",(int)dig_gain_index );
         dig_gain_index = 255;
     }
         
-    // 2. correct exposure
-    if( command & 2 ){
-        exposure = (exposure * gain) / (analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP)));
-    }
-    aec_state[0].EXPOSURE  = exposure;
-    aec_state[0].GAIN      = analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP));
-
+    /* 2. Compute EXPOSURE */
+    
+    // correct exposure with new gain
+    exposure = (exposure * gain) / (analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP)));
+    
     int int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
     int frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
 
@@ -1496,13 +1540,15 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
         frac_part = 255;
     }
                 
-    if(command & 2){
+    if( command & DO_GAIN ){
+        aec_state[0].GAIN      = analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP));
         aec_state[0].ROI_ANA_GAIN = ana_gain_index;
-        aec_state[0].ROI_DIG_GAIN = dig_gain_index>255 ? 255:dig_gain_index;
+        aec_state[0].ROI_DIG_GAIN = dig_gain_index;
         set_gain(aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN);
     }
         
-    if(command & 1){
+    if( command & DO_EXPOSURE ){
+        aec_state[0].EXPOSURE  = exposure;
         aec_state[0].ROI_T_INT_II = int_part;
         aec_state[0].ROI_T_INT_CLK = frac_part;
         set_time(aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK);
