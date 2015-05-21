@@ -574,7 +574,8 @@ void run()
 		}
         
 #if VIDEO_SENSOR
-        vsensor.aec(res.src_h,res.src_w,(uint8_t*)buf.m.userptr);
+        //vsensor.aec(res.src_h,res.src_w,(uint8_t*)buf.m.userptr);
+        vsensor.aec_II(res.src_h,res.src_w);
         //histo_dump_emif();
         /* 
         {

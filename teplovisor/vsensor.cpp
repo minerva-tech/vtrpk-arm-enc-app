@@ -641,16 +641,18 @@ static int get_histogram_emif(uint32_t *pframe_number, uint32_t *histogram, int 
     ptr_magic_line = (uint8_t*)e2v_magic;
     ptr_footer_line = (uint8_t*)e2v_footer;
     
+    uint32_t frame_number;
+    frame_number = ((((uint32_t)e2v_magic[3])<<16)&0xFFFF0000) | (((uint32_t)e2v_magic[2])&0x0000FFFF);
+    *pframe_number = frame_number;
+    
+    /*
     printf("\n *** MAGIC ***\n");
     for(i=0;i<8;i++) {
         printf(" %02X", ptr_magic_line[i]);
     }
     printf("\n");
-    
-    uint32_t frame_number;
-    frame_number = ((((uint32_t)e2v_magic[3])<<16)&0xFFFF0000) | (((uint32_t)e2v_magic[2])&0x0000FFFF);
     printf(" FRM# %08x ( %10d )\n", frame_number, frame_number);
-    *pframe_number = frame_number;
+    */
     
     printf(" -- Footer -- w=%d h=%d\n", w, h);
     for(i=0; i<5; i++) printf(" %02X",ptr_footer_line[i]);
@@ -736,9 +738,21 @@ static void get_cdf(uint32_t *histogram, uint32_t *CDF, uint32_t *cv)
     for(i; i<64; i++) {
         summ_luma += (i+1)*histogram[i]*4;
         summ_histo += histogram[i];
-        CDF[i] = summ_histo; 
+        CDF[i] = summ_histo;
     } 
     *cv = summ_luma;
+}
+
+static int get_mediana(uint32_t *H64, int w, int h)
+{
+    int x;;
+    int i;
+    for(i=0,x=0; i<64; i++) {
+        x += H64[i];
+        if(x>((/*CDF[63]*/w*h)/2))break;
+    }
+    //printf(" GetMediana() %d %d\n",i,x);
+    return (i+1)*4;// Why "4": Histogram has 64 buckets, Video has 10 bits, Rendered video has 8 bits    
 }
 
 double VSensor::get_framerate(void)
@@ -1012,7 +1026,7 @@ bool VSensor::aec_agc_algorithm_B(uint32_t *cdf, int Ymean, int b, float smoothn
     float desiredBrightness;
     float shotBrightness;
     float exposureKnee;
-    float adjustment;
+    float adjustment,delta;
     
     printf("AutoExposure: totalPixels: %d,"
             "brightPixels: %d, targetBrightPixels: %d,"
@@ -1085,14 +1099,14 @@ bool VSensor::aec_agc_algorithm_B(uint32_t *cdf, int Ymean, int b, float smoothn
             if( Ymean/4-1 < Y_BOT_LIM/4-1 )
                 adjustment = 1.0 + (float)(cdf[Y_BOT_LIM/4-1] - cdf[Ymean/4-1]) / (float)cdf[63];
             else
-                adjustment = 1.0 + 0.03;
+                adjustment = 1.0 + 0.06;
                 
             exposure_command = '^';
         }else if(Ymean>Y_TOP_LIM){
             if( Ymean/4-1 > Y_TOP_LIM/4-1 )
                 adjustment = 1.0 - (float)( cdf[Ymean/4-1] - cdf[Y_TOP_LIM/4-1] ) / (float)cdf[63];
             else
-                adjustment = 1.0 - 0.03;
+                adjustment = 1.0 - 0.06;
                 
             exposure_command = 'v';
         }else{
@@ -1104,15 +1118,26 @@ bool VSensor::aec_agc_algorithm_B(uint32_t *cdf, int Ymean, int b, float smoothn
  
      if (adjustment > 4.0) { adjustment = 4.0; }
      if (adjustment < 1/16.0f) { adjustment = 1/16.0f; }
+     
+     if (adjustment>1.0) delta = adjustment-1.0;
+     else delta = 1.0-adjustment;
+     
+    if( delta < 0.05 ) exposure_command = ' '; 
 
     brightness = aec_gain(0) * aec_time(0);
     desiredBrightness = brightness * adjustment;
 
-      
     // Apply the smoothness constraint
     //shotBrightness = aec_state[0].GAIN * aec_state[0].EXPOSURE;
     shotBrightness = aec_gain(0) * aec_time(0);
     desiredBrightness = shotBrightness * smoothness + desiredBrightness * (1-smoothness);
+    
+    /*
+
+    desiredBrightness = aec_gain(0) * aec_time(0) * smoothness + 
+                        aec_gain(0) * aec_time(0) * (1-smoothness) * adjustment;
+        
+    */
  
     // whats the largest we can raise exposure without negatively
     // impacting frame-rate or introducing handshake.
@@ -1125,20 +1150,165 @@ bool VSensor::aec_agc_algorithm_B(uint32_t *cdf, int Ymean, int b, float smoothn
         gain = 1.0f;
         exposure = desiredBrightness / gain;
     }
-
-    if( ' '!=exposure_command ){
-        aec_state[0].EXPOSURE  = exposure;
-        aec_state[0].GAIN      = gain;
-    }
-    aec_state[0].NEXT      = aec_state[0].FRAME + 1/* .FRAME will be incremented later */ + 1/* video pipe depth */;
     
 quit_aec_B:
-     printf("AutoExposure: old e %8.3f, g %8.3f. new: e %8.3f, g %8.3f adjustment %6.3f [%c]\n",
+    printf("AutoExposure: old e %8.3f, g %8.3f. new: e %8.3f, g %8.3f adjustment %6.3f [%c]\n",
              aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, 
              exposure*1000.0, gain, adjustment,
              exposure_command);
+             
+    if( ' '==exposure_command ){
+        return 0;
+    }else{
+        aec_state[0].EXPOSURE  = exposure;
+        aec_state[0].GAIN      = gain;
+        aec_state[0].NEXT = aec_state[0].FRAME + 1/* .FRAME will be incremented later */ + 1/* video pipe depth */;
+        return 1;
+    }
+}
 
-    return ' '==exposure_command ? 0 : 1;
+/*
+ * 
+ */
+float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
+{
+    char exposure_command;
+    float exposure;
+    float gain;
+    
+    assert(64==b);
+    assert(cdf);
+    
+    int brightPixels = cdf[b-1] - cdf[b-21]; // top 20 buckets
+    int targetBrightPixels = cdf[b-1]/50;
+    int maxSaturatedPixels = cdf[b-1]/100;//200
+    int saturatedPixels = cdf[b-1] - cdf[b-6]; // top 5 buckets  
+    
+    float desired_exposure;
+    float adjustment,delta;
+    
+    printf("AutoExposure: totalPixels: %d,"
+            "brightPixels: %d, targetBrightPixels: %d,"
+            "saturatedPixels: %d, maxSaturatedPixels: %d\n",
+            cdf[b-1], brightPixels, targetBrightPixels,
+            saturatedPixels, maxSaturatedPixels);
+     
+    // how much should I change brightness by
+    adjustment = 1.0f;
+    
+    if(aec_state[0].FRAME < aec_state[0].NEXT) {
+        return adjustment;
+    }
+            
+     if (saturatedPixels > maxSaturatedPixels) {
+         // first don't let things saturate too much
+         adjustment = 1.0f - ((float)(saturatedPixels - maxSaturatedPixels))/cdf[b-1];
+         exposure_command = '-';
+     } else if (brightPixels < targetBrightPixels) {
+         // increase brightness to try and hit the desired number of well exposed pixels
+         int l = b-11;
+         while (brightPixels < targetBrightPixels && l > 0) {
+             brightPixels += cdf[l];
+             brightPixels -= cdf[l-1];
+             l--;
+         }
+ 
+         // that level is supposed to be at b-11;
+         adjustment = float(b-11+1)/(l+1);
+         exposure_command = '+';
+     } else {
+        if(Ymean<Y_BOT_LIM){ 
+            if( Ymean/4-1 < Y_BOT_LIM/4-1 )
+                adjustment = 1.0 + (float)(cdf[Y_BOT_LIM/4-1] - cdf[Ymean/4-1]) / (float)cdf[63];
+            else
+                adjustment = 1.0 + 0.06;
+                
+            exposure_command = '^';
+        }else if(Ymean>Y_TOP_LIM){
+            if( Ymean/4-1 > Y_TOP_LIM/4-1 )
+                adjustment = 1.0 - (float)( cdf[Ymean/4-1] - cdf[Y_TOP_LIM/4-1] ) / (float)cdf[63];
+            else
+                adjustment = 1.0 - 0.06;
+                
+            exposure_command = 'v';
+        }else{
+            exposure_command = ' ';
+        }
+     }
+ 
+     if (adjustment > 4.0) { adjustment = 4.0; }
+     if (adjustment < 1/16.0f) { adjustment = 1/16.0f; }
+     
+     if (adjustment>1.0) delta = adjustment-1.0;
+     else delta = 1.0-adjustment;
+     
+    if( delta < 1/16.0f ) {
+        exposure_command = ' '; 
+        adjustment = 1.0;
+    }
+    
+    /*
+    desired_exposure = aec_gain(0) * aec_time(0) * smoothness + 
+                       aec_gain(0) * aec_time(0) * (1-smoothness) * adjustment;
+    
+    desired_exposure = aec_gain(0) * aec_time(0) * ( smoothness + (1-smoothness) * adjustment );
+    desired_exposure = aec_gain(0) * aec_time(0) * ( smoothness + adjustment - smoothness * adjustment );            
+    desired_adjustment = smoothness + (1-smoothness) * adjustment;
+    хуйня эта гладкость.
+    */
+    
+    printf("AutoExposure: old e %8.3f, g %8.3f  ", aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN);
+
+    desired_exposure = aec_time(0) * adjustment;
+    gain = aec_gain(0);
+      
+/*
+ * правильно распределить приоритеты: что меняем в первую очередь?
+ * повышаем кадровую или понижаем коэф. усиления?
+*/  
+if( exposure_command != ' ' )
+    if( desired_exposure > 1.0/get_min_fps(aec_state[0].ROI_ANA_GAIN) ){
+        /* increase gain */
+        if( aec_state[0].ROI_ANA_GAIN >= 6 /* current analog gain is maximum */ ){
+            ;/* increase digital gain */
+        }else{
+            /* increment analog gain */
+            aec_state[0].ROI_ANA_GAIN++;
+            aec_state[0].GAIN = aec_gain(0);
+        }
+    }else if(desired_exposure < 0.0000015){
+        /* decrease gain */
+        if( aec_state[0].ROI_ANA_GAIN == 0/* current analog gain is minimum */ ){
+            ;/* decrease digital gain */
+        }else{
+            /* decrement analog gain */
+            aec_state[0].ROI_ANA_GAIN--;
+            aec_state[0].GAIN = aec_gain(0); 
+        }
+    }else{
+        float desired_gain = aec_gain(0) * adjustment;
+        /* Try to decrease gain */
+        if( '-' == exposure_command || 'v' == exposure_command ){
+            /*
+            if( aec_state[0].ROI_DIG_GAIN > 0 ){
+                ;// TODO
+            }
+            if( aec_state[0].ROI_ANA_GAIN > 0 ){
+                ;// TODO: ...
+            }
+            */
+            
+        }
+        /* ...or keep gain */
+        aec_state[0].EXPOSURE = desired_exposure;
+        exposure_set(desired_exposure);        
+    }
+    
+    printf("New: e %8.3f, g %8.3f adjustment %6.3f [%c]\n",
+             aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, 
+             adjustment, exposure_command);
+    
+    return adjustment;
 }
 
 bool VSensor::aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoothness)
@@ -1421,6 +1591,7 @@ void VSensor::aec(int h, int w, uint8_t *pYplane)
     /* Controls integration time only (AA), Ga and Gd fixed */
     //if( aec_agc_algorithm_AA(H64,CDF,Mediana,w,h) ) aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3); 
 //////////////////////////////////////////////////////////////////////
+
     printf("AutoExposure e2v: AG %2d   DG %3d [GAIN %6.3f / %6.3f]  EL %5d   EC %3d [EXPOSURE %8.3f / %8.3f]  FPS %4.1f Frame# %10d\n",
             aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN, aec_state[0].GAIN, aec_gain(0),
             aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK,aec_state[0].EXPOSURE*1000.0, aec_time(0)*1000.0,
@@ -1440,7 +1611,11 @@ void VSensor::aec(int h, int w, uint8_t *pYplane)
             for(i=0;i<64;i++)printf(" %0X", (uint8_t)((ptl_luma_plane + (w*(h-2)))[i]) );
             printf("\nLine h-1\n");
             for(i=0;i<64;i++)printf(" %0X", (uint8_t)((ptl_luma_plane + (w*(h-1)))[i]) );
-    */
+    */    
+aec_tune_final:
+    /*
+     * TODO: for h=1024 it is better hide these lines.
+     * Main task - to avoid blinking of these lines.
 #ifdef FIRST_LINE_OK
     memcpy(ptl_luma_plane, ptl_luma_plane + w, w);
     memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-3)), w);
@@ -1450,9 +1625,48 @@ void VSensor::aec(int h, int w, uint8_t *pYplane)
     memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-4)), w);
     memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-4)), w);
 #endif
+    */
 
-    // на всякий случай, на будущее...
-aec_tune_final:
     aec_state[0].FRAME++;// на всякий случай, на будущее...
     for(i=7; i>1; i--) memcpy( (void*)&aec_state[i], (void*)&aec_state[i-1], sizeof(aec_state[0]));
+}
+
+void VSensor::aec_II(int h, int w)
+{
+    uint32_t summ_luma= 0;
+    uint32_t H64[64];// Histogram with 64  backets
+    uint32_t CDF[64];// Cumulative Distribution Function
+    uint32_t x,frame_number;
+    int i,j;
+    int Mediana, Mean;
+    
+    memset(CDF,0,64*sizeof(uint32_t));
+    memset(H64,0,64*sizeof(uint32_t));
+
+    if( get_histogram_emif(&frame_number,H64,w,h) ){
+        
+        if( frame_number - aec_state[1].FRAME > 2){
+            aec_state[0].FRAME = frame_number;
+            aec_state[0].NEXT = frame_number;//to enable aec_agc_algorithm_B() processing
+            get_cdf(H64,CDF, &summ_luma);
+            Mean = CDF[63]==0?0:summ_luma/CDF[63];
+            Mediana = get_mediana(H64,w,h);
+            printf("Frame %10d : Ymean=%4d(%4.1f) Ymediana=%4d(%4.1f)\n",frame_number,Mean,(float)CDF[Mean/4-1]/CDF[63] ,Mediana, (float)CDF[Mediana/4-1]/CDF[63]);
+            
+            //if( aec_agc_algorithm_B(CDF, Mediana, 64, 0.9) ) 
+            //    aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3);
+            aec_agc_algorithm_BB(CDF, Mediana, 64);
+            
+            printf("AutoExposure e2v: AG %2d   DG %3d [GAIN %6.3f / %6.3f]  EL %5d   EC %3d [EXPOSURE %8.3f / %8.3f]  FPS %4.1f Frame# %10d\n",
+                aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN, aec_state[0].GAIN, aec_gain(0),
+                aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK,aec_state[0].EXPOSURE*1000.0, aec_time(0)*1000.0,
+                get_framerate(), frame_number 
+            );
+ 
+            for(i=7; i>1; i--) memcpy( (void*)&aec_state[i], (void*)&aec_state[i-1], sizeof(aec_state[0]));
+        
+        }
+    }
+    
+    
 }

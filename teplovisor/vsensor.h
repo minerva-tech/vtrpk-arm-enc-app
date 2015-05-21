@@ -9,6 +9,7 @@ public:
 	void set(const Auxiliary::VideoSensorSettingsData&);
     /* aec() - auto exposure control: tune integration time  and gain of the sensor */
     void aec(int h, int w, uint8_t *pYplane);
+    void aec_II(int h, int w);
     double get_framerate(void);
     
     void set_state(char type, int value);
@@ -32,6 +33,7 @@ private:
     bool aec_agc_algorithm_AA(uint32_t *H64, uint32_t *CDF, int Mediana, int w, int h);
     bool aec_agc_algorithm_AAA(uint32_t *H64, uint32_t *CDF, int Mediana, int w, int h);
     bool aec_agc_algorithm_B(uint32_t *cdf, int Ymean, int b, float smoothness);// Francecam (FCam) algo
+    float aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b);
     bool aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoothness);
     void aec_agc_set(float Gain, float Exposure, int command);// writes to sensor registers appropriate values
     
