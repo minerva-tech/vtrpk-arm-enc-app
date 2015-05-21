@@ -431,6 +431,14 @@ void Comm::recv_pkt(const Pkt* pkt)
 
 	log() << "Packet was received";
 	log() << *pkt;
+
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(&pkt);
+	
+	//static_assert(sizeof(pkt) == 15, "Packet size should be 15 bytes.");
+	
+	log() << std::hex << (int)p[0] << " " << (int)p[1] << " " <<(int)p[2] << " " << (int)p[3]  << " " <<
+	(int)p[4] << " " << (int)p[5] << " " <<(int)p[6] << " " << (int)p[7] << " " << (int)p[8] << " " << 
+    (int)p[9] << " " <<(int)p[10] << " " <<(int)p[11] << " " << (int)p[12] << " " <<(int)p[13] << " " <<(int)p[14] << std::dec;
 }
 
 void Comm::recv_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
