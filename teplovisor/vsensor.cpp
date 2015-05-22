@@ -758,6 +758,29 @@ static int get_mediana(uint32_t *H64, int w, int h)
     return (i+1)*4;// Why "4": Histogram has 64 buckets, Video has 10 bits, Rendered video has 8 bits    
 }
 
+static void draw_histogram(uint32_t *H64, uint32_t *CDF, int w, int h)
+{
+    int i,j;
+    /* Draw Histogramm */
+    printf(" -- Histogramma -- %5.1f %5.1f %5.1f\n", 
+                100.*((float)H64[0]/(float)(w*h)),
+                100.*((float)(CDF[62]-H64[0])/(float)(w*h)),
+                100.*((float)H64[63]/(float)(w*h)) );
+                
+    for(i=0; i<64; i++) {
+        int stars;
+        stars = (int)((((float)H64[i])/((float)w))*0.8 + 0.5); /* 0.8 is empirical value */
+        printf( " %8d ",H64[i]);
+        stars = stars>202?203:stars;
+        for(j=0; j<stars; j++) {
+            if(j<202) printf("*");
+            else printf("##");
+        }
+        printf("\n");
+    }
+    
+}
+
 double VSensor::get_framerate(void)
 {
     double Treadout, Texposure;
@@ -1185,8 +1208,8 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
     assert(cdf);
     
     int brightPixels = cdf[b-1] - cdf[b-21]; // top 20 buckets
-    int targetBrightPixels = cdf[b-1]/50;
-    int maxSaturatedPixels = cdf[b-1]/100;//200
+    int targetBrightPixels = cdf[b-1]*3/100;
+    int maxSaturatedPixels = cdf[b-1]*7/100;//200
     int saturatedPixels = cdf[b-1] - cdf[b-6]; // top 5 buckets  
     
     printf("AutoExposure: totalPixels: %d,"
@@ -1223,14 +1246,14 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
             if( Ymean/4-1 < Y_BOT_LIM/4-1 )
                 adjustment = 1.0 + (float)(cdf[Y_BOT_LIM/4-1] - cdf[Ymean/4-1]) / (float)cdf[63];
             else
-                adjustment = 1.0 + 0.06;
+                adjustment = 1.0 + (1.0/16.0 + 1.0/32);// to make difference greater than 1/16
                 
             exposure_command = '^';
         }else if(Ymean>Y_TOP_LIM){
             if( Ymean/4-1 > Y_TOP_LIM/4-1 )
                 adjustment = 1.0 - (float)( cdf[Ymean/4-1] - cdf[Y_TOP_LIM/4-1] ) / (float)cdf[63];
             else
-                adjustment = 1.0 - 0.06;
+                adjustment = 1.0 - (1.0/16.0 + 1.0/32);
                 
             exposure_command = 'v';
         }else{
@@ -1244,10 +1267,18 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
      if (adjustment>1.0) delta = adjustment-1.0;
      else delta = 1.0-adjustment;
      
-    if( delta < 1/16.0f ) {
+    /*
+    Похоже это мешает при малых экспозициях подстраиваться плавно 
+    на пример камера направленная в небо не очень хорошо работает...
+    Но когда убрал стало хуже. Постоянно меняет экспозицию, "мыргает",
+    делает сильно тёмным когда есть яркие объекты...
+    По-этому обратно всё вернул..
+    */
+    if( delta < 1.0/16.0 ) {
         exposure_command = ' '; 
-        adjustment = 1.0;
+        //adjustment = 1.0;
     }
+    
     
     /*
     desired_exposure = aec_gain(0) * aec_time(0) * smoothness + 
@@ -1527,6 +1558,7 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
     
     // correct exposure with new gain
     exposure = (exposure * gain) / (analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP)));
+    if( exposure < EV76C661_MIN_TIME) exposure = EV76C661_MIN_TIME; 
     
     int int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
     int frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
@@ -1539,6 +1571,8 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
         printf(" WARNING: ROI_T_INT_CLK limited to 255\n");
         frac_part = 255;
     }
+    //5 = ceil(EV76C661_MIN_TIME * EV76C661_CLK_CTRL / EV76C661_MULT_FACTOR)
+    if(0 == int_part && 5 > frac_part) frac_part = 5; /* sunny rain bug fix */
                 
     if( command & DO_GAIN ){
         aec_state[0].GAIN      = analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP));
@@ -1698,12 +1732,12 @@ void VSensor::aec_II(int h, int w)
             Mean = CDF[63]==0?0:summ_luma/CDF[63];
             Mediana = get_mediana(H64,w,h);
             printf("Frame %10d : Ymean=%4d(%4.1f) Ymediana=%4d(%4.1f)\n",frame_number,Mean,(float)CDF[Mean/4-1]/CDF[63] ,Mediana, (float)CDF[Mediana/4-1]/CDF[63]);
-            
+            draw_histogram(H64,CDF,w,h);            
             //if( aec_agc_algorithm_B(CDF, Mediana, 64, 0.9) ) 
             //    aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3);
             aec_agc_algorithm_BB(CDF, Mediana, 64);
             
-            printf("AutoExposure e2v: AG %2d   DG %3d [GAIN %6.3f / %6.3f]  EL %5d   EC %3d [EXPOSURE %8.3f / %8.3f]  FPS %4.1f Frame# %10d\n",
+            printf("AutoExposure e2v: AG %2d   DG %3d [GAIN %6.3f / %6.3f] - EL %5d   EC %3d [EXPOSURE %9.4f / %9.4f]  FPS %4.1f Frame# %10d\n",
                 aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN, aec_state[0].GAIN, aec_gain(0),
                 aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK,aec_state[0].EXPOSURE*1000.0, aec_time(0)*1000.0,
                 get_framerate(), frame_number 
