@@ -28,7 +28,10 @@ extern "C" {
 #include "cabac.h"
 }*/
 
-extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
+/************** vbv */
+#include <jbig-codec.h>
+/************** vbv */
+//extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
 
 volatile bool g_stop = false;
 volatile int  g_bitrate = -1;
@@ -626,8 +629,19 @@ void run()
         ptrdiff_t info_size = 0;
 
         if (!to_skip_motion) {
-            const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
-            info_size = cur - &info_out[0];
+            /******************** vbv*/
+            jbig85Codec enc;
+            enc.init(w/2, h/2);
+            
+            info_size = enc.encode(&info[0], &info_out[0], w*h/8);
+            if ( info_size < 0 ){
+                printf("GBIG:ENC:ERROR %d\n", info_size);
+                info_size = 0;
+            }
+            
+            /******************** vbv*/
+//            const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
+//            info_size = cur - &info_out[0];
             to_skip_motion = fps_divider-1;
         } else {
             if (to_skip_motion > 0)

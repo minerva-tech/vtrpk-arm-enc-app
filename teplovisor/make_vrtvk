@@ -44,6 +44,7 @@ OBJ = main.o \
       proto.o \
       flir.o \
       default_enc_cfg.o \
+      jbig-codec.o \
 	  servercmds.o \
 	  vsensor.o
 
@@ -129,8 +130,9 @@ LDFLAGS_X86 += $(BOOST_LDFLAGS) -lpthread -static
 
 teplovisor: $(CONFIGPKG) $(OBJ)
 	@echo $$(($$(cat $(BUILD_NUMBER_FILE)) + 1)) > $(BUILD_NUMBER_FILE)
-	$(LINK) -o vrtvk_app $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o pbmtojbg85.o jbig85.o jbig_ar.o $(LDFLAGS)
+	$(LINK) -o vrtvk_app $(OBJ) h264venc.o alg_create.o alg_control.o alg_malloc.o cmem.o jbig85.o jbig_ar.o $(LDFLAGS)
 	$(STRIP) vrtvk_app --strip-unneeded
+#pbmtojbg85.o 
 
 $(CONFIGPKG):
 	$(CONFIGURO) -c $(MVTOOL_DIR) -o $(CONFIGPKG) -t $(XDCTARGET) -p $(XDCPLATFORM) -b ./config.bld ./$(CONFIGPKG).cfg
@@ -141,7 +143,8 @@ $(CONFIGPKG):
 	$(CC) $(CPPFLAGS) -c alg_control.c
 	$(CC) $(CPPFLAGS) -c alg_malloc.c
 	$(CC) $(CPPFLAGS) -c cmem.c
-	$(CC) $(CPPFLAGS) -c pbmtojbg85.c
+#	$(CC) $(CPPFLAGS) -c pbmtojbg85.c
+	$(CPPC) $(CPPFLAGS) -c jbig-codec.cpp
 	$(CC) $(CPPFLAGS) -c jbig85.c
 	$(CC) $(CPPFLAGS) -c jbig_ar.c
 #	$(CC) $(CPPFLAGS) -c bs.c

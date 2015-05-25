@@ -1732,7 +1732,7 @@ void VSensor::aec_II(int h, int w)
             Mean = CDF[63]==0?0:summ_luma/CDF[63];
             Mediana = get_mediana(H64,w,h);
             printf("Frame %10d : Ymean=%4d(%4.1f) Ymediana=%4d(%4.1f)\n",frame_number,Mean,(float)CDF[Mean/4-1]/CDF[63] ,Mediana, (float)CDF[Mediana/4-1]/CDF[63]);
-            draw_histogram(H64,CDF,w,h);            
+            //draw_histogram(H64,CDF,w,h);            
             //if( aec_agc_algorithm_B(CDF, Mediana, 64, 0.9) ) 
             //    aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3);
             aec_agc_algorithm_BB(CDF, Mediana, 64);

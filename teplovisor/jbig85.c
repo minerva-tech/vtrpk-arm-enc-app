@@ -1,9 +1,7 @@
 /*
  *  T.85 "light" version of the portable JBIG image compression library
  *
- *  Copyright 1995-2008 -- Markus Kuhn -- http://www.cl.cam.ac.uk/~mgk25/
- *
- *  $Id: jbig85.c 1303 2008-08-30 20:16:20Z mgk25 $
+ *  Copyright 1995-2014 -- Markus Kuhn -- http://www.cl.cam.ac.uk/~mgk25/
  *
  *  This module implements a portable standard C encoder and decoder
  *  using the JBIG1 lossless bi-level image compression algorithm
@@ -27,15 +25,6 @@
  * 
  *  If you want to use this program under different license conditions,
  *  then contact the author for an arrangement.
- *
- *  It is possible that certain products which can be built using this
- *  software module might form inventions protected by patent rights in
- *  some countries (e.g., by patents about arithmetic coding algorithms
- *  owned by IBM and AT&T in the USA). Provision of this software by the
- *  author does NOT include any licences for any patents. In those
- *  countries where a patent licence is required for certain applications
- *  of this software module, you will have to obtain such a licence
- *  yourself.
  */
 
 #ifdef DEBUG
@@ -62,15 +51,13 @@
 #define MARKER_NEWLEN   0x05
 #define MARKER_ATMOVE   0x06
 #define MARKER_COMMENT  0x07
-#define MARKER_START	0xaa
 #define MARKER_ESC      0xff
 
 /* object code version id */
 
 const char jbg85_version[] = 
-  "JBIG-KIT " JBG85_VERSION " (T.85 version) -- (c) 1995-2008 Markus Kuhn -- "
-  "Licence: " JBG85_LICENCE "\n"
-  "$Id: jbig85.c 1303 2008-08-30 20:16:20Z mgk25 $\n";
+  "JBIG-KIT " JBG85_VERSION " (T.85 version) -- (c) 1995-2014 Markus Kuhn -- "
+  "Licence: " JBG85_LICENCE "\n";
 
 #define _(String) String  /* to mark translatable string for GNU gettext */
 
@@ -107,15 +94,15 @@ static void enc_byte_out(int byte, void *s)
 void jbg85_enc_init(struct jbg85_enc_state *s,
 		    unsigned long x0, unsigned long y0,
 		    void (*data_out)(unsigned char *start, size_t len,
-				     unsigned char **out),
-		    unsigned char *out)
+				     void *file),
+		    void *file)
 {
   assert(x0 > 0 && y0 > 0);
   s->x0 = x0;
   s->y0 = y0;
   s->newlen = 0;       /* no NEWLEN pending or output */
   s->data_out = data_out;
-  s->file = out;
+  s->file = file;
 
   s->l0 = s->y0 / 35;             /* 35 stripes/image suggested default */
   if (s->l0 > 128) s->l0 = 128;
@@ -220,32 +207,29 @@ void jbg85_enc_lineout(struct jbg85_enc_state *s, unsigned char *line,
   /* things that need to be done before the first line is encoded */
   if (s->y == 0) {
     /* prepare BIH */
-    //buf[0]  = 0;   /* DL = initial layer to be transmitted */
-    //buf[1]  = 0;   /* D  = number of differential layers */
-    //buf[2]  = 1;   /* P  = number of bit planes */
-    //buf[3]  = 0;
-    //buf[4]  =  s->x0 >> 24;
-    //buf[5]  = (s->x0 >> 16) & 0xff;
-    //buf[6]  = (s->x0 >>  8) & 0xff;
-    //buf[7]  =  s->x0        & 0xff;
-    //buf[8]  =  s->y0 >> 24;
-    //buf[9]  = (s->y0 >> 16) & 0xff;
-    //buf[10] = (s->y0 >>  8) & 0xff;
-    //buf[11] =  s->y0 & 0xff;
-    //buf[12] =  s->l0 >> 24;
-    //buf[13] = (s->l0 >> 16) & 0xff;
-    //buf[14] = (s->l0 >>  8) & 0xff;
-    //buf[15] =  s->l0 & 0xff;
-    //buf[16] = s->mx;
-    //buf[17] = 0;   /* MY = maximum vertical offset allowed for AT pixel */
-    //buf[18] = 0;   /* order: HITOLO = SEQ = ILEAVE = SMID = 0 */
-    //buf[19] = s->options & (JBG_LRLTWO | JBG_VLENGTH | JBG_TPBON);
-	  buf[0]  = MARKER_ESC;
-	  buf[1]  = MARKER_START;
-
+    buf[0]  = 0;   /* DL = initial layer to be transmitted */
+    buf[1]  = 0;   /* D  = number of differential layers */
+    buf[2]  = 1;   /* P  = number of bit planes */
+    buf[3]  = 0;
+    buf[4]  =  s->x0 >> 24;
+    buf[5]  = (s->x0 >> 16) & 0xff;
+    buf[6]  = (s->x0 >>  8) & 0xff;
+    buf[7]  =  s->x0        & 0xff;
+    buf[8]  =  s->y0 >> 24;
+    buf[9]  = (s->y0 >> 16) & 0xff;
+    buf[10] = (s->y0 >>  8) & 0xff;
+    buf[11] =  s->y0 & 0xff;
+    buf[12] =  s->l0 >> 24;
+    buf[13] = (s->l0 >> 16) & 0xff;
+    buf[14] = (s->l0 >>  8) & 0xff;
+    buf[15] =  s->l0 & 0xff;
+    buf[16] = s->mx;
+    buf[17] = 0;   /* MY = maximum vertical offset allowed for AT pixel */
+    buf[18] = 0;   /* order: HITOLO = SEQ = ILEAVE = SMID = 0 */
+    buf[19] = s->options & (JBG_LRLTWO | JBG_VLENGTH | JBG_TPBON);
 
     /* output BIH */
-    s->data_out(buf, 2, s->file);
+    s->data_out(buf, 20, s->file);
   }
 
   /* things that need to be done before the next SDE is encoded */
@@ -315,9 +299,9 @@ void jbg85_enc_lineout(struct jbg85_enc_state *s, unsigned char *line,
     q1 = prevline;
     ltp = 1;
     if (q1)
-      while (p1 < line + bpl && (ltp = (*p1++ == *q1++)) != 0);
+      while (p1 < line + bpl && (ltp = (*p1++ == *q1++)) != 0) ;
     else
-      while (p1 < line + bpl && (ltp = (*p1++ == 0    )) != 0);
+      while (p1 < line + bpl && (ltp = (*p1++ == 0    )) != 0) ;
     arith_encode(&s->s, (s->options & JBG_LRLTWO) ? TPB2CX : TPB3CX,
 		 ltp == s->ltp_old);
 #ifdef DEBUG
@@ -487,7 +471,7 @@ void jbg85_enc_lineout(struct jbg85_enc_state *s, unsigned char *line,
       /* we have decided to perform an ATMOVE */
       s->new_tx = tmax;
 #ifdef DEBUG
-      fprintf(stderr, "ATMOVE: tx=%d, c_all=%d\n",
+      fprintf(stderr, "ATMOVE: tx=%d, c_all=%lu\n",
 	      s->new_tx, s->c_all);
 #endif
     } else {
@@ -574,8 +558,8 @@ void jbg85_dec_init(struct jbg85_dec_state *s,
 		    unsigned char *buf, size_t buflen,
 		    int (*line_out)(const struct jbg85_dec_state *s,
 				    unsigned char *start, size_t len,
-				    unsigned long y, unsigned char **file),
-		    unsigned char **file)
+				    unsigned long y, void *file),
+		    void *file)
 {
   s->x0 = 0;
   s->y0 = 0;
@@ -585,6 +569,19 @@ void jbg85_dec_init(struct jbg85_dec_state *s,
   s->file = file;
   s->bie_len = 0;
   s->end_of_bie = 0;
+  s->x = 0;
+  s->y = 0;
+  s->i = 0;
+  s->comment_skip = 0;
+  s->buf_len = 0;
+  s->pseudo = 1;
+  s->at_moves = 0;
+  s->tx = 0;
+  s->lntp = 1;
+  s->p[0] = 0;
+  s->p[1] = -1;
+  s->p[2] = -1;
+  arith_decode_init(&s->s, 0);
   return;
 }
 
@@ -655,7 +652,7 @@ static size_t decode_pscd(struct jbg85_dec_state *s, unsigned char *data,
 	/* this line is 'typical' (i.e. identical to the previous one) */
 	if (s->p[1] < 0) {
 	  /* first line of page or (following SDRST) of stripe */
-	  for (p1 = hp1; p1 < hp1 + s->bpl; *p1++ = 0);
+	  for (p1 = hp1; p1 < hp1 + s->bpl; *p1++ = 0) ;
 	  s->intr = s->line_out(s, hp1, s->bpl, s->y, s->file);
 	  /* rotate the ring buffer that holds the last three lines */
 	  s->p[2] = s->p[1];
@@ -848,29 +845,32 @@ int jbg85_dec_in(struct jbg85_dec_state *s, unsigned char *data, size_t len,
   *cnt = 0;
 
   /* read in 20-byte BIH */
-  if (s->bie_len < 2) {
+  if (s->bie_len < 20) {
     while (s->bie_len < 20 && *cnt < len)
       s->buffer[s->bie_len++] = data[(*cnt)++];
     if (s->bie_len < 20) 
       return JBG_EAGAIN;
-	
-    /* test whether this looks like a valid JBIG header at all */
-    if (s->buffer[1] < s->buffer[0]) return JBG_EINVAL | 1;
-    /* are padding bits zero as required? */
-    if (s->buffer[3] != 0)           return JBG_EINVAL | 2; /* padding != 0 */
-    if ((s->buffer[18] & 0xf0) != 0) return JBG_EINVAL | 3; /* padding != 0 */
-    if ((s->buffer[19] & 0x80) != 0) return JBG_EINVAL | 4; /* padding != 0 */
+    /* parse header parameters */
     s->x0 = (((long) s->buffer[ 4] << 24) | ((long) s->buffer[ 5] << 16) |
 	     ((long) s->buffer[ 6] <<  8) | (long) s->buffer[ 7]);
     s->y0 = (((long) s->buffer[ 8] << 24) | ((long) s->buffer[ 9] << 16) |
 	     ((long) s->buffer[10] <<  8) | (long) s->buffer[11]);
     s->l0 = (((long) s->buffer[12] << 24) | ((long) s->buffer[13] << 16) |
 	     ((long) s->buffer[14] <<  8) | (long) s->buffer[15]);
+    s->bpl = (s->x0 >> 3) + !!(s->x0 & 7); /* bytes per line */
+    s->mx = s->buffer[16];
+    s->options = s->buffer[19];
+    s->s.nopadding = s->options & JBG_VLENGTH;
+    /* test whether this looks like a valid JBIG header at all */
+    if (s->buffer[1] < s->buffer[0]) return JBG_EINVAL | 1;
+    /* are padding bits zero as required? */
+    if (s->buffer[3] != 0)           return JBG_EINVAL | 2; /* padding != 0 */
+    if ((s->buffer[18] & 0xf0) != 0) return JBG_EINVAL | 3; /* padding != 0 */
+    if ((s->buffer[19] & 0x80) != 0) return JBG_EINVAL | 4; /* padding != 0 */
     if (!s->buffer[2]) return JBG_EINVAL | 5;
     if (!s->x0)        return JBG_EINVAL | 6;
     if (!s->y0)        return JBG_EINVAL | 7;
     if (!s->l0)        return JBG_EINVAL | 8;
-    s->mx = s->buffer[16];
     if (s->mx > 127)
       return JBG_EINVAL | 9;
     if (s->buffer[ 0] != 0) return JBG_EIMPL | 8; /* parameter outside T.85 */
@@ -880,25 +880,9 @@ int jbg85_dec_in(struct jbg85_dec_state *s, unsigned char *data, size_t len,
 #if JBG85_STRICT_ORDER_BITS
     if (s->buffer[18] != 0) return JBG_EIMPL |12; /* parameter outside T.85 */
 #endif
-    s->options = s->buffer[19];
     if (s->options & 0x17)  return JBG_EIMPL |13; /* parameter outside T.85 */
     if (s->x0 > (s->linebuf_len / ((s->options & JBG_LRLTWO) ? 2 : 3)) * 8)
       return JBG_ENOMEM; /* provided line buffer is too short */
-    arith_decode_init(&s->s, 0);
-    s->s.nopadding = s->options & JBG_VLENGTH;
-    s->comment_skip = 0;
-    s->buf_len = 0;
-    s->x = 0;
-    s->y = 0;
-    s->i = 0;
-    s->pseudo = 1;
-    s->at_moves = 0;
-    s->tx = 0;
-    s->lntp = 1;
-    s->bpl = (s->x0 >> 3) + !!(s->x0 & 7); /* bytes per line */
-    s->p[0] = 0;
-    s->p[1] = -1;
-    s->p[2] = -1;
   }
 
   /*
@@ -952,7 +936,7 @@ int jbg85_dec_in(struct jbg85_dec_state *s, unsigned char *data, size_t len,
 	return JBG_EABORT;
       case MARKER_STUFF:
 	/* forward stuffed 0xff to arithmetic decoder */
-	if (decode_pscd(s, s->buffer, 2) == 2)
+	if (decode_pscd(s, s->buffer, 2) == 2 || !s->intr)
 	  s->buf_len = 0;
 	if (s->intr)
 	  return JBG_EOK_INTR;  /* line_out() requested interrupt */

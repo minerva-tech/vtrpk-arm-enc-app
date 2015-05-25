@@ -2,9 +2,7 @@
  *  Header file for the T.85 "light" version of the portable
  *  JBIG image compression library
  *
- *  Copyright 1995-2008 -- Markus Kuhn -- http://www.cl.cam.ac.uk/~mgk25/
- *
- *  $Id: jbig85.h 1303 2008-08-30 20:16:20Z mgk25 $
+ *  Copyright 1995-2014 -- Markus Kuhn -- http://www.cl.cam.ac.uk/~mgk25/
  */
 
 #ifndef JBG85_H
@@ -17,7 +15,9 @@
  * JBIG-KIT version number
  */
 
-#define JBG85_VERSION    "2.0"
+#define JBG85_VERSION    "2.1"
+#define JBG85_VERSION_MAJOR 2
+#define JBG85_VERSION_MINOR 1
 
 /*
  * JBIG-KIT licence agreement reference code:
@@ -79,9 +79,9 @@ struct jbg85_enc_state {
   int new_tx;            /* -1 = no ATMOVE pending, otherwise new TX value */
   int ltp_old;                           /* true if line y-1 was "typical" */
   struct jbg_arenc_state s;                   /* arithmetic encoder status */
-  void (*data_out)(unsigned char *start, size_t len, unsigned char **file);
+  void (*data_out)(unsigned char *start, size_t len, void *file);
                                                     /* data write callback */
-  unsigned char **file;                            /* parameter passed to data_out() */
+  void *file;                            /* parameter passed to data_out() */
   unsigned char *comment; /* content of comment marker segment to be added
                              at next opportunity (will be reset to NULL
                              as soon as comment has been written)          */
@@ -125,9 +125,9 @@ struct jbg85_dec_state {
   int lntp;                            /* flag for TP: line is not typical */
   int (*line_out)(const struct jbg85_dec_state *s,
 		  unsigned char *start, size_t len,
-		  unsigned long y, unsigned char **file);
+		  unsigned long y, void *file);
                                                     /* data write callback */
-  unsigned char **file;                            /* parameter passed to data_out() */
+  void *file;                            /* parameter passed to data_out() */
   int intr;                      /* flag that line_out requested interrupt */
   int end_of_bie;       /* flag that the end of the BIE has been signalled */
 };
@@ -138,8 +138,8 @@ struct jbg85_dec_state {
 void jbg85_enc_init(struct jbg85_enc_state *s,
 		    unsigned long x0, unsigned long y0,
 		    void (*data_out)(unsigned char *start, size_t len,
-				     unsigned char **out),
-		    unsigned char *out);
+				     void *file),
+		    void *file);
 void jbg85_enc_options(struct jbg85_enc_state *s, int options,
 		       unsigned long l0, int mx);
 void jbg85_enc_lineout(struct jbg85_enc_state *s, unsigned char *line,
@@ -151,8 +151,8 @@ void jbg85_dec_init(struct jbg85_dec_state *s,
 		    unsigned char *buf, size_t buflen,
 		    int (*line_out)(const struct jbg85_dec_state *s,
 				    unsigned char *start, size_t len,
-				    unsigned long y, unsigned char **file),
-		    unsigned char **file);
+				    unsigned long y, void *file),
+		    void *file);
 int  jbg85_dec_in(struct jbg85_dec_state *s, unsigned char *data, size_t len,
 		  size_t *cnt);
 int  jbg85_dec_end(struct jbg85_dec_state *s);
