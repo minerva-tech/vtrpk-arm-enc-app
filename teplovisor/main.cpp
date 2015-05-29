@@ -580,6 +580,13 @@ void run()
         //vsensor.aec(res.src_h,res.src_w,(uint8_t*)buf.m.userptr);
         vsensor.aec_II(res.src_h,res.src_w);
         //histo_dump_emif();
+        {
+            /* clean metadata from video */
+            uint8_t* ptl_luma_plane = (uint8_t*)buf.m.userptr;
+            memcpy(ptl_luma_plane + (w*(h-3)), ptl_luma_plane + (w*(h-4)), w);
+            memcpy(ptl_luma_plane + (w*(h-2)), ptl_luma_plane + (w*(h-4)), w);
+            memcpy(ptl_luma_plane + (w*(h-1)), ptl_luma_plane + (w*(h-4)), w);             
+        }
         /* 
         {
            int x,y;
@@ -638,6 +645,7 @@ void run()
                 printf("GBIG:ENC:ERROR %d\n", info_size);
                 info_size = 0;
             }
+            //enc.decode(&info_out[0], info_size);
             
             /******************** vbv*/
 //            const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);

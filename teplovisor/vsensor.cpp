@@ -21,6 +21,10 @@
 #define EV76C661_MAX_EXPOSURE ( 1.0 / MINIMAL_FPS )
 #define EV76C661_DIGITAL_GAIN_STEP ((15.875-1.0)/255.0)
 
+/* There is several equal defines. It's ok, not mistake */
+#define MINIMUM_FRAME_RATE (8.0)
+#define MAXIMUM_FRAME_PERIOD (1.0/MINIMUM_FRAME_RATE)
+
 #define DO_GAIN (2)
 #define DO_EXPOSURE (1)
 
@@ -140,9 +144,10 @@ const reg_val_t resolution_half_reg_list[] = {
     {0x22, 0x0280},//Picture width in hex (640)
 	{0x24, 0x0200},//Picture height in hex (512)
 	{0x26, 0x0b80},//Pictire start Hor (3584-640)
-	{0x28, 0x000A},//Picture start Vert (522-512)
+	{0x28, 0x0008},//Picture start Vert (520-512)
+    {0x2C, 0x0004},//SOF start position    
 	{0x34, 0x0e00},//Frame width (3584)
-	{0x36, 0x020c}//Frame height (524)
+	{0x36, 0x0208}//Frame height (520)
 };
 
 const reg_val_t resolution_full_reg_list[] = {
@@ -217,6 +222,7 @@ VSensor::VSensor()
 
 void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
 {
+    int binning_gain[4] = {0, 1, 2, 4};
     set_regs(idle_state_reg_list);
 
     log() << "Binning: " << (int)settings.binning << " compression: "
@@ -225,11 +231,14 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
     if (settings.binning) {
         log() << "binning is on";
         set_regs(resolution_half_reg_list);
-        bcc_reg_list[0].val |= (0x0001);// reg 0x0A bit 0
+        bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
+        bcc_reg_list[0].val &= 0x00FF;// clean binning div factor
+        bcc_reg_list[0].val |= ((settings.binning-1)<<8)&0x0300;
     } else {
         log() << "binning is off";
         set_regs(resolution_full_reg_list);
-        bcc_reg_list[0].val &= ~(0x0001);// reg 0x0A bit 0
+        bcc_reg_list[0].val &= ~0x0001;// reg 0x0A bit 0
+        bcc_reg_list[0].val &= ~0x0300;// clean binning div factor
     }
 
 //    set_regs(binning_reg_list);
@@ -244,7 +253,8 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
     set_regs(start_sensor_reg_list);
 
     /* initialize e2v aec */
-    aec_init((int)settings.binning);
+    
+    aec_init(binning_gain[(int)settings.binning]);
 }
 
 void VSensor::increment_integration_time(uint16_t delta)
@@ -347,6 +357,7 @@ void VSensor::decrement_integration_time(float N_times)
 */
 void VSensor::aec_init(int binning)
 {
+    printf(" aec_init(%d)\n",binning);
     assert( binning==0 || binning==1 || binning==2 || binning==4 );
     
     int i;
@@ -430,8 +441,10 @@ static int read_metadata_emif(void)
 
 reset_fifo_and_exit:    
     if( 0x4652 != datum ){
-        if( 0xFAAC != datum )
+        if( 0xFAAC != datum ){
             *(uint16_t*)(regs+0x30) = 0x0000;// write any value to reset fifo and statemachine
+            printf("\n ERR #0: %5d %04x\n",datum, datum);
+        }
         munmap((void*)map_base, 1024);
         close(fd);
         return 0;
@@ -447,37 +460,40 @@ reset_fifo_and_exit:
     printf(" %04x", e2v_magic[0]);
 	for(i=1; i<4; i++){ 
         datum = *(uint16_t*)(regs+0x30);
-        tmp = *(uint16_t*)(regs+0x2E);
+        //tmp = *(uint16_t*)(regs+0x2E);// does not work
+        *(uint16_t*)(regs+0x2E) = 0x0000;
         if( datum == 0xFAAC || datum==0x4652 ){
-            printf("\n ERR: %d %04x\n",i,datum);
+            printf("\n ERR #1: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
         }
         e2v_magic[i] = datum; 
         e2v_magic[i] = swap16(e2v_magic[i]);
-        printf(" %04x", e2v_magic[i]);
+        if(show)printf(" %04x", e2v_magic[i]);
     }
     printf("\n");
 	
     printf(" *** HEADER ***\n");
 	for(i=0; i<13; i++){ 
         datum = *(uint16_t*)(regs+0x30);
-        tmp = *(uint16_t*)(regs+0x2E);
+        //tmp = *(uint16_t*)(regs+0x2E);// does not work
+        *(uint16_t*)(regs+0x2E) = 0x0000;
         if( datum == 0xFAAC || datum==0x4652 ){
-            printf("\n ERR: %d %04x\n",i,datum);
+            printf("\n ERR #2: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
         }
         e2v_header[i] = datum;
         e2v_header[i] = swap16(e2v_header[i]);
-        printf(" %04x", e2v_header[i]);
+        if(show)printf(" %04x", e2v_header[i]);
     }
     printf("\n");
 	
     if(show)printf(" *** HISTOGRAM ***\n");
 	for(i=0; i<256; i++){ 
         datum = *(uint16_t*)(regs+0x30);
-        tmp = *(uint16_t*)(regs+0x2E);
+        //tmp = *(uint16_t*)(regs+0x2E);// does not work
+        *(uint16_t*)(regs+0x2E) = 0x0000;
         if( datum == 0xFAAC || datum==0x4652 ){
-            printf("\n ERR: %d %04x\n",i,datum);
+            printf("\n ERR #3: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
         }
         e2v_histogram[i] = datum;
@@ -489,14 +505,15 @@ reset_fifo_and_exit:
     printf(" *** FOOTER ***\n");
 	for(i=0; i<3; i++){
         datum = *(uint16_t*)(regs+0x30);
-        tmp = *(uint16_t*)(regs+0x2E);
+        //tmp = *(uint16_t*)(regs+0x2E);// does not work
+        *(uint16_t*)(regs+0x2E) = 0x0000;
         if( datum==0xFAAC || datum==0x4652 ){ 
-            printf("\n ERR: %d %04x\n",i,datum);
+            printf("\n ERR #4: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
         }
         e2v_footer[i] = datum;
         e2v_footer[i] = swap16(e2v_footer[i]);
-        printf(" %04x", e2v_footer[i]);
+        if(show)printf(" %04x", e2v_footer[i]);
     }
     printf("\n");
     
@@ -1376,25 +1393,30 @@ if( /*exposure_command != ' '*/0 ){ // этот кот не очень хоро�
 /* limit frame rate to 16 fps for all gains */
 if(exposure_command != ' '){
     if( exposure_command == '+' || exposure_command == '^' ){
-        if( desired_exposure < 1.0/16.0 ){
+        if( desired_exposure < MAXIMUM_FRAME_PERIOD){
             exposure = desired_exposure;
             gain = current_gain;
-            aec_agc_set(gain, exposure, DO_EXPOSURE);//exposure_set(exposure);            
+            aec_agc_set(gain, exposure, DO_EXPOSURE);//exposure_set(exposure);
         }else{
-            exposure = 1.0/16.0;
+            exposure = MAXIMUM_FRAME_PERIOD;
             gain = current_exposure * current_gain * adjustment / exposure;
-            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);            
+            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
         }
     }
     if( exposure_command == '-' || exposure_command == 'v' ){
         if( desired_gain < 1.0 ){
             gain = 1.0;
             exposure = current_exposure * current_gain * adjustment / gain;
+            if( exposure > MAXIMUM_FRAME_PERIOD ){
+                exposure = MAXIMUM_FRAME_PERIOD;
+                gain = current_exposure * current_gain * adjustment/exposure;
+            }
             aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
         }else{
             gain = current_gain * adjustment;
             exposure = current_exposure;
             aec_agc_set(gain, exposure, DO_GAIN);
+            assert( exposure <= MAXIMUM_FRAME_PERIOD );
         }
     }
 }
@@ -1523,45 +1545,98 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
     // 1. select gain: analog gain should be minimal
     float  a;
     float  binning_gain; // TODO: CHECK fucking binning !!!
+    float  current_gain, new_binning_gain;
     int    a_int;
     int    ana_gain_index;
     int    dig_gain_index;
+    int    i;
+    int    int_part;
+    int    frac_part;
         
     /* 1. Compute GAIN */
     if(0 == aec_state[0].BINNING) binning_gain = 1.0;
     else binning_gain = 4.0 / (float)aec_state[0].BINNING;
         
-    if( gain/binning_gain <= 1.0 ){
-        ana_gain_index = 0;
-        dig_gain_index = 0;
-    }else{
-        if(gain/binning_gain > 8){//Use digital gain
-            //Set analog gain to maximum
-            ana_gain_index = 6;
-            dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
+    if( 0 < aec_state[0].BINNING ){
+        printf(" -- BINNING CORRECTION %d --> ",aec_state[0].BINNING);
+        
+        current_gain = aec_gain(0) / binning_gain;
+        new_binning_gain = gain / current_gain;
+        
+        if( new_binning_gain > binning_gain && binning_gain < 4 ){
+            /* increment binning gain, if possible*/
+            aec_state[0].BINNING = aec_state[0].BINNING>>1;
+        }else if( new_binning_gain < binning_gain && binning_gain > 1 ){
+            /* decrement binning gain, if possible */
+            aec_state[0].BINNING = aec_state[0].BINNING<<1;
         }else{
-            int i;
-            for(i=0;i<5;i++){
-                if( ceil((gain/binning_gain)*100.0) > (100.0*analog_gain_table[i]) &&
-                    ceil((gain/binning_gain)*100.0) <= (100.0*analog_gain_table[i+1]) ) break;
-            }
-            ana_gain_index = i+1;
+            /* no binning correction */
+            printf("%d %04x -- ",aec_state[0].BINNING, bcc_reg_list[0].val);
+            goto Point_2;
+        }
+    
+        /* keep analog and digital gain, change only binning */
+        ana_gain_index = aec_state[0].ROI_ANA_GAIN;
+        dig_gain_index = aec_state[0].ROI_DIG_GAIN;
+        /* keep current exposure, change only binning */
+        exposure  = aec_state[0].EXPOSURE;
+        int_part  = aec_state[0].ROI_T_INT_II;
+        frac_part = aec_state[0].ROI_T_INT_CLK;        
+        
+        binning_gain = 4.0 / (float)aec_state[0].BINNING;
+    
+        bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
+        bcc_reg_list[0].val &= ~0x0300;// clean binning div factor
+        bcc_reg_list[0].val |= ((aec_state[0].BINNING>>1)<<8)&0x0300;
+        set_regs(bcc_reg_list);
+        printf("%d %04x -- ",aec_state[0].BINNING, bcc_reg_list[0].val);
+        goto Point_3;
+    }
+    
+Point_2:
+    {
+        if( gain/binning_gain <= 1.0 ){
+            ana_gain_index = 0;
             dig_gain_index = 0;
+        }else{
+            if(gain/binning_gain > 8){//Use digital gain
+                //Set analog gain to maximum
+                ana_gain_index = 6;
+                if( dig_gain_index<255){
+                    dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
+                }else{
+                    /* increment binning gain */
+                    if( 0 < aec_state[0].BINNING && aec_state[0].BINNING < 4 ){
+                        aec_state[0].BINNING = aec_state[0].BINNING<<1;
+                        bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
+                        bcc_reg_list[0].val &= ~0x0300;// clean binning div factor
+                        bcc_reg_list[0].val |= ((aec_state[0].BINNING>>1)<<8)&0x0300;
+                        set_regs(bcc_reg_list);
+                        printf("%d %04x",aec_state[0].BINNING, bcc_reg_list[0].val);
+                    }
+                }
+            }else{
+                for(i=0;i<5;i++){
+                    if( ceil((gain/binning_gain)*100.0) > (100.0*analog_gain_table[i]) &&
+                        ceil((gain/binning_gain)*100.0) <= (100.0*analog_gain_table[i+1]) ) break;
+                }
+                ana_gain_index = i+1;
+                dig_gain_index = 0;
+            }
         }
     }
-    if( 255 < (int)dig_gain_index ) {
-        printf(" WARNING: dig_gain_index %d\n",(int)dig_gain_index );
-        dig_gain_index = 255;
-    }
-        
+            
     /* 2. Compute EXPOSURE */
     
     // correct exposure with new gain
     exposure = (exposure * gain) / (analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP)));
-    if( exposure < EV76C661_MIN_TIME) exposure = EV76C661_MIN_TIME; 
+    if( exposure < EV76C661_MIN_TIME) exposure = EV76C661_MIN_TIME;
+    if( exposure > MAXIMUM_FRAME_PERIOD ) exposure = MAXIMUM_FRAME_PERIOD;
     
-    int int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
-    int frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
+    int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
+    frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
+
+Point_3:
 
     if(65534 < int_part){
         printf(" WARNING: ROI_T_INT_II limited to 65534\n");
@@ -1572,8 +1647,14 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
         frac_part = 255;
     }
     //5 = ceil(EV76C661_MIN_TIME * EV76C661_CLK_CTRL / EV76C661_MULT_FACTOR)
-    if(0 == int_part && 5 > frac_part) frac_part = 5; /* sunny rain bug fix */
-                
+    if( (0 == int_part) && (5 > frac_part) ) frac_part = 5; /* sunny rain bug fix */
+    
+    if( 255 < (int)dig_gain_index ) {
+        printf(" WARNING: dig_gain_index %d\n",(int)dig_gain_index );
+        dig_gain_index = 255;
+    }    
+       
+         
     if( command & DO_GAIN ){
         aec_state[0].GAIN      = analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP));
         aec_state[0].ROI_ANA_GAIN = ana_gain_index;
@@ -1724,7 +1805,6 @@ void VSensor::aec_II(int h, int w)
     memset(H64,0,64*sizeof(uint32_t));
 
     if( get_histogram_emif(&frame_number,H64,w,h) ){
-        
         if( frame_number - aec_state[1].FRAME > 2){
             aec_state[0].FRAME = frame_number;
             aec_state[0].NEXT = frame_number;//to enable aec_agc_algorithm_B() processing
@@ -1732,21 +1812,18 @@ void VSensor::aec_II(int h, int w)
             Mean = CDF[63]==0?0:summ_luma/CDF[63];
             Mediana = get_mediana(H64,w,h);
             printf("Frame %10d : Ymean=%4d(%4.1f) Ymediana=%4d(%4.1f)\n",frame_number,Mean,(float)CDF[Mean/4-1]/CDF[63] ,Mediana, (float)CDF[Mediana/4-1]/CDF[63]);
-            //draw_histogram(H64,CDF,w,h);            
+            draw_histogram(H64,CDF,w,h);            
             //if( aec_agc_algorithm_B(CDF, Mediana, 64, 0.9) ) 
             //    aec_agc_set(aec_state[0].GAIN, aec_state[0].EXPOSURE, 3);
             aec_agc_algorithm_BB(CDF, Mediana, 64);
             
-            printf("AutoExposure e2v: AG %2d   DG %3d [GAIN %6.3f / %6.3f] - EL %5d   EC %3d [EXPOSURE %9.4f / %9.4f]  FPS %4.1f Frame# %10d\n",
-                aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN, aec_state[0].GAIN, aec_gain(0),
+            printf("AutoExposure e2v: AG %3d  DG %3d  BG %3d   [GAIN %6.3f / %6.3f] --- EL %5d   EC %3d [EXPOSURE %9.4f / %9.4f]  FPS %4.1f Frame# %10d\n",
+                aec_state[0].ROI_ANA_GAIN,aec_state[0].ROI_DIG_GAIN, aec_state[0].BINNING==0?1:4/aec_state[0].BINNING, aec_state[0].GAIN, aec_gain(0),
                 aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK,aec_state[0].EXPOSURE*1000.0, aec_time(0)*1000.0,
                 get_framerate(), frame_number 
             );
  
             for(i=7; i>1; i--) memcpy( (void*)&aec_state[i], (void*)&aec_state[i-1], sizeof(aec_state[0]));
-        
         }
-    }
-    
-    
+    }   
 }
