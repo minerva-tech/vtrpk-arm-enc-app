@@ -20,7 +20,7 @@ private slots:
 
     void on_setButton_clicked();
 
-    void on_Apply_clicked();
+  //  void on_Apply_clicked();
 
 signals:
     void Play();

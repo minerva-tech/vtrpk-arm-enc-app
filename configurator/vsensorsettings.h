@@ -21,6 +21,8 @@ private slots:
 
     void on_Binning_currentIndexChanged(int index);
 
+    void on_Apply_clicked();
+
 private:
     Ui::VSensorSettings *ui;
 };

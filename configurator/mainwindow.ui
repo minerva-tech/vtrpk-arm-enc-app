@@ -215,6 +215,40 @@
       <string>Clear ROI</string>
      </property>
     </widget>
+    <widget class="QPushButton" name="dropQueueBtn">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>80</y>
+       <width>20</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>DQ</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="bitrateEdt">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>50</x>
+       <y>80</y>
+       <width>20</width>
+       <height>20</height>
+      </rect>
+     </property>
+    </widget>
+    <zorder>dropQueueBtn</zorder>
+    <zorder>bitrateEdt</zorder>
+    <zorder>clearROI</zorder>
+    <zorder>uploadROI</zorder>
+    <zorder>downloadROI</zorder>
    </widget>
    <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
@@ -403,29 +437,6 @@
      <string>Connect</string>
     </property>
    </widget>
-   <widget class="QLineEdit" name="bitrateEdt">
-    <property name="geometry">
-     <rect>
-      <x>470</x>
-      <y>280</y>
-      <width>113</width>
-      <height>20</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="dropQueueBtn">
-    <property name="geometry">
-     <rect>
-      <x>420</x>
-      <y>280</y>
-      <width>41</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>DQ</string>
-    </property>
-   </widget>
    <zorder>groupBox_3</zorder>
    <zorder>DSWidget</zorder>
    <zorder>groupBox</zorder>
@@ -434,8 +445,6 @@
    <zorder>statText</zorder>
    <zorder>groupBox_5</zorder>
    <zorder>connectButton</zorder>
-   <zorder>bitrateEdt</zorder>
-   <zorder>dropQueueBtn</zorder>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
@@ -443,7 +452,7 @@
      <x>0</x>
      <y>0</y>
      <width>590</width>
-     <height>21</height>
+     <height>18</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuSettings">
@@ -466,8 +475,8 @@
      <rect>
       <x>397</x>
       <y>99</y>
-      <width>135</width>
-      <height>94</height>
+      <width>107</width>
+      <height>82</height>
      </rect>
     </property>
     <property name="title">
