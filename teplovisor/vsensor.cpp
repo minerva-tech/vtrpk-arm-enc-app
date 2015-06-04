@@ -298,8 +298,8 @@ void VSensor::set_gain(int analog, int digital)
    uint16_t a = (uint16_t)analog;
    uint16_t d = (uint16_t)digital;
 
-   assert( a < 8 );
-   assert( d < 256 );
+   assert( a < (uint16_t)8 );
+   assert( d < (uint16_t)256 );
 
    agc_reg_list[0].val = (a<<8)|d;
    set_regs(agc_reg_list);
@@ -1499,6 +1499,7 @@ bool VSensor::aec_agc_algorithm_C(uint32_t *cdf, int Mediana, int b, float smoot
 //command == 1 do exposure
 //command == 2 do gain
 //command == 1 | 2 do exposure and gain
+#if 0
 void VSensor::aec_agc_set(float Gain, float Exposure, int command)
 {
     float gain = Gain;
@@ -1508,8 +1509,8 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
     float  binning_gain; // TODO: CHECK fucking binning !!!
     float  current_gain, new_binning_gain;
     int    a_int;
-    int    ana_gain_index;
-    int    dig_gain_index;
+    uint16_t    ana_gain_index;
+    uint16_t    dig_gain_index;
     int    i;
     int    int_part;
     int    frac_part;
@@ -1563,7 +1564,7 @@ Point_2:
             if(gain/binning_gain > 8){//Use digital gain
                 //Set analog gain to maximum
                 ana_gain_index = 6;
-                if( dig_gain_index<255){
+                if( dig_gain_index < (uint16_t)255){
                     dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
                 }else{
                     /* increment binning gain */
@@ -1630,6 +1631,111 @@ Point_3:
         set_time(aec_state[0].ROI_T_INT_II,aec_state[0].ROI_T_INT_CLK);
     }
 }
+#else
+void VSensor::aec_agc_set(float Gain, float Exposure, int command)
+{
+    float gain = Gain;
+    float exposure = Exposure;
+    // 1. select gain: analog gain should be minimal
+    float  a;
+    float  binning_gain; // TODO: CHECK fucking binning !!!
+    float  current_gain, new_binning_gain;
+    int    a_int;
+    uint16_t    ana_gain_index;
+    uint16_t    dig_gain_index;
+    int    i;
+    int    int_part;
+    int    frac_part;
+        
+    /* 1. Compute GAIN */
+    if(0 == aec_state[0].BINNING) binning_gain = 1.0;
+    else binning_gain = 4.0 / (float)aec_state[0].BINNING;
+            
+    if( gain <= 1.0 ){
+        ana_gain_index = 0;
+        dig_gain_index = 0;
+    }else{
+        if(gain > 8){//Use binning and digital gain
+            //Set analog gain to maximum
+            ana_gain_index = 6;
+                
+            if( aec_state[0].BINNING ){
+                printf(" -- BINNING CORRECTION %d --> ",aec_state[0].BINNING);
+                new_binning_gain = gain / analog_gain_table[ana_gain_index];
+                if(new_binning_gain > 4)
+                    aec_state[0].BINNING = 1;
+                else if(new_binning_gain > 2)
+                    aec_state[0].BINNING = 2;
+                else if(new_binning_gain > 1)
+                    aec_state[0].BINNING = 4;
+                else
+                    aec_state[0].BINNING = 4;
+                        
+                binning_gain = 4.0 / (float)aec_state[0].BINNING;
+                bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
+                bcc_reg_list[0].val &= ~0x0300;// clean binning div factor
+                bcc_reg_list[0].val |= ((aec_state[0].BINNING>>1)<<8)&0x0300;
+                set_regs(bcc_reg_list); 
+                printf("%d %04x",aec_state[0].BINNING, bcc_reg_list[0].val);
+            }
+                
+            if( dig_gain_index<(uint16_t)255){
+                dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
+            }
+        }else{
+            for(i=0;i<5;i++){
+                if( ceil((gain/binning_gain)*100.0) > (100.0*analog_gain_table[i]) &&
+                    ceil((gain/binning_gain)*100.0) <= (100.0*analog_gain_table[i+1]) ) break;
+            }
+            ana_gain_index = i+1;
+            //dig_gain_index = 0;
+            if( dig_gain_index<(uint16_t)255){
+                dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
+            }
+        }
+    }
+
+    /* 2. Compute EXPOSURE */
+    
+    // correct exposure with new gain
+    exposure = (exposure * gain) / (analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP)));
+    if( exposure < EV76C661_MIN_TIME) exposure = EV76C661_MIN_TIME;
+    if( exposure > MAXIMUM_FRAME_PERIOD ) exposure = MAXIMUM_FRAME_PERIOD;
+    
+    int_part = (int)(exposure * EV76C661_CLK_CTRL) / (int)EV76C661_LINE_LENGTH;
+    frac_part = (int)((exposure * EV76C661_CLK_CTRL) - (int_part*(int)EV76C661_LINE_LENGTH))/EV76C661_MULT_FACTOR;
+
+    if((int)65534 < int_part){
+        printf(" WARNING: ROI_T_INT_II limited to 65534\n");
+        int_part = (int)65534;
+    }
+    if((int)255 < frac_part){
+        printf(" WARNING: ROI_T_INT_CLK limited to 255\n");
+        frac_part = (int)255;
+    }
+    //5 = ceil(EV76C661_MIN_TIME * EV76C661_CLK_CTRL / EV76C661_MULT_FACTOR)
+    if( (0 == int_part) && (9 > frac_part) ) frac_part = 9; /* sunny rain bug fix */
+    
+    if( (int)255 < (int)dig_gain_index ) {
+        printf(" WARNING: dig_gain_index %d\n",(int)dig_gain_index );
+        dig_gain_index = (uint16_t)255;
+    }    
+       
+    if( command & DO_GAIN ){
+        aec_state[0].GAIN      = analog_gain_table[ana_gain_index]*binning_gain*(1.0 + ((float)dig_gain_index * EV76C661_DIGITAL_GAIN_STEP));
+        aec_state[0].ROI_ANA_GAIN = ana_gain_index;
+        aec_state[0].ROI_DIG_GAIN = dig_gain_index;
+        set_gain(ana_gain_index,dig_gain_index);
+    }
+        
+    if( command & DO_EXPOSURE ){
+        aec_state[0].EXPOSURE  = exposure;
+        aec_state[0].ROI_T_INT_II = int_part;
+        aec_state[0].ROI_T_INT_CLK = frac_part;
+        set_time(int_part,frac_part);
+    }
+}
+#endif
 
 void VSensor::exposure_set(float exposure)
 {
