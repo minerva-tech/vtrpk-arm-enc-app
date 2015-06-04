@@ -215,6 +215,7 @@ static void set_registers(const reg_val_t* reg_list, size_t len)
 
 VSensor::VSensor()
 {
+    autoexposure_enable = true;
     set_regs(idle_state_reg_list);
     set_regs(init_reg_list);
 //    set_regs(start_sensor_reg_list);
@@ -225,9 +226,13 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
     int binning_gain[4] = {0, 1, 2, 4};
     set_regs(idle_state_reg_list);
 
-    log() << "Binning: " << (int)settings.binning << " compression: "
-            << (int)settings.ten_bit_compression << " correction: " << (int)settings.pixel_correction;
+    log() << "Binning: " << (int)settings.binning 
+            << " compression: " << (int)settings.ten_bit_compression 
+            << " correction: " << (int)settings.pixel_correction
+            << " auto exposure: " << (int)settings.ae_enable;
 
+    autoexposure_enable = (bool)settings.ae_enable;
+    
     if (settings.binning) {
         log() << "binning is on";
         set_regs(resolution_half_reg_list);
@@ -461,7 +466,7 @@ reset_fifo_and_exit:
 	for(i=1; i<4; i++){ 
         datum = *(uint16_t*)(regs+0x30);
         //tmp = *(uint16_t*)(regs+0x2E);// does not work
-        *(uint16_t*)(regs+0x2E) = 0x0000;
+        //*(uint16_t*)(regs+0x2E) = 0x0000;
         if( datum == 0xFAAC || datum==0x4652 ){
             printf("\n ERR #1: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
@@ -476,7 +481,7 @@ reset_fifo_and_exit:
 	for(i=0; i<13; i++){ 
         datum = *(uint16_t*)(regs+0x30);
         //tmp = *(uint16_t*)(regs+0x2E);// does not work
-        *(uint16_t*)(regs+0x2E) = 0x0000;
+        //*(uint16_t*)(regs+0x2E) = 0x0000;
         if( datum == 0xFAAC || datum==0x4652 ){
             printf("\n ERR #2: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
@@ -491,7 +496,7 @@ reset_fifo_and_exit:
 	for(i=0; i<256; i++){ 
         datum = *(uint16_t*)(regs+0x30);
         //tmp = *(uint16_t*)(regs+0x2E);// does not work
-        *(uint16_t*)(regs+0x2E) = 0x0000;
+        //*(uint16_t*)(regs+0x2E) = 0x0000;// does not help
         if( datum == 0xFAAC || datum==0x4652 ){
             printf("\n ERR #3: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
@@ -506,7 +511,7 @@ reset_fifo_and_exit:
 	for(i=0; i<3; i++){
         datum = *(uint16_t*)(regs+0x30);
         //tmp = *(uint16_t*)(regs+0x2E);// does not work
-        *(uint16_t*)(regs+0x2E) = 0x0000;
+        //*(uint16_t*)(regs+0x2E) = 0x0000;// does not help
         if( datum==0xFAAC || datum==0x4652 ){ 
             printf("\n ERR #4: %d %04x\n",i,datum);
             goto reset_fifo_and_exit;
@@ -1225,8 +1230,8 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
     assert(cdf);
     
     int brightPixels = cdf[b-1] - cdf[b-21]; // top 20 buckets
-    int targetBrightPixels = cdf[b-1]*3/100;
-    int maxSaturatedPixels = cdf[b-1]*7/100;//200
+    int targetBrightPixels = cdf[b-1]*2/100;
+    int maxSaturatedPixels = cdf[b-1]*5/100;//200
     int saturatedPixels = cdf[b-1] - cdf[b-6]; // top 5 buckets  
     
     printf("AutoExposure: totalPixels: %d,"
@@ -1259,19 +1264,31 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
          adjustment = float(b-11+1)/(l+1);
          exposure_command = '+';
      } else {
+        /* this is cause of exposure oscillation in lo light */
+        
         if(Ymean<Y_BOT_LIM){ 
-            if( Ymean/4-1 < Y_BOT_LIM/4-1 )
-                adjustment = 1.0 + (float)(cdf[Y_BOT_LIM/4-1] - cdf[Ymean/4-1]) / (float)cdf[63];
-            else
-                adjustment = 1.0 + (1.0/16.0 + 1.0/32);// to make difference greater than 1/16
-                
+            if( Ymean/4-1 < Y_BOT_LIM/4-1 ) adjustment = 1.0 + (1.0/16.0 + 1.0/32);
+            
+            // bad work
+            //if( Ymean/4-1 < Y_BOT_LIM/4-1 )
+            //    adjustment = 1.0 + (float)(cdf[Y_BOT_LIM/4-1] - cdf[Ymean/4-1]) / (float)cdf[b-1];
+            //else
+            //    adjustment = 1.0 + (1.0/16.0 + 1.0/32);// to make difference greater than 1/16            
+            
+            //adjustment = (float)( (Y_TOP_LIM+Y_BOT_LIM)/(4*2)-1)/(Ymean/4-1);
+            //printf(" ^ %f", (float)( (Y_TOP_LIM+Y_BOT_LIM)/(4*2)-1)/(Ymean/4-1));    
             exposure_command = '^';
         }else if(Ymean>Y_TOP_LIM){
-            if( Ymean/4-1 > Y_TOP_LIM/4-1 )
-                adjustment = 1.0 - (float)( cdf[Ymean/4-1] - cdf[Y_TOP_LIM/4-1] ) / (float)cdf[63];
-            else
-                adjustment = 1.0 - (1.0/16.0 + 1.0/32);
-                
+            if( Ymean/4-1 > Y_TOP_LIM/4-1 ) adjustment = 1.0 - (1.0/16.0 + 1.0/32);
+            
+            // bad work
+            //if( Ymean/4-1 > Y_TOP_LIM/4-1 )
+            //    adjustment = 1.0 - (float)( cdf[Ymean/4-1] - cdf[Y_TOP_LIM/4-1] ) / (float)cdf[b-1];
+            //else
+            //    adjustment = 1.0 - (1.0/16.0 + 1.0/32);
+            
+            //adjustment = (float)( (Y_TOP_LIM+Y_BOT_LIM)/(4*2)-1)/(Ymean/4-1);
+            //printf(" v %f", (float)( (Y_TOP_LIM+Y_BOT_LIM)/(4*2)-1)/(Ymean/4-1));      
             exposure_command = 'v';
         }else{
             exposure_command = ' ';
@@ -1315,88 +1332,15 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
     
     desired_exposure = current_exposure * adjustment;
     desired_gain = current_gain * adjustment;
-/*
- * правильно распределить приоритеты: что меняем в первую очередь?
- * повышаем кадровую или понижаем коэф. усиления?
-*/  
-if( /*exposure_command != ' '*/0 ){ // этот кот не очень хорошо работает. осциллирует экспозиция. недоделан.
-    if( desired_exposure > 1.0/get_min_fps(aec_state[0].ROI_ANA_GAIN) ){
-        /* increase gain */
-        if( aec_state[0].ROI_ANA_GAIN >= 6 /* current analog gain is maximum */ ){
-            /*
-            if( aec_state[0].ROI_DIG_GAIN < 255 ){
-                ;// TODO: increase digital gain and increase exposure if need
-            }else{
-                ;// TODO: set maximum exposure
-            }
-            */
-        }else{
-            /* increment analog gain */
-            aec_state[0].ROI_ANA_GAIN++;
-            aec_state[0].GAIN = aec_gain(0); /* recalculate gain */
-            /* Do we need to adjust exposure ? */
-        }
-        set_gain(aec_state[0].ROI_ANA_GAIN, aec_state[0].ROI_DIG_GAIN);
-        /* exposure will be corrected at the next frame(s) */
-    }else if(desired_exposure < 0.0000015){
-        /* decrease gain */
-        if( aec_state[0].ROI_ANA_GAIN == 0/* current analog gain is minimum */ ){
-            /* decrease digital gain */
-            if( aec_state[0].ROI_DIG_GAIN == 0 ){
-                ;// TODO: ...
-            }else{
-                ;// TODO: ...
-            }
-        }else{
-            /* decrement analog gain */
-            aec_state[0].ROI_ANA_GAIN--;
-            aec_state[0].GAIN = aec_gain(0); /* recalculate gain */
-        }
-        set_gain(aec_state[0].ROI_ANA_GAIN, aec_state[0].ROI_DIG_GAIN);
-        /* exposure will be corrected at the next frame(s) */
-    }else{
-        if( current_gain == 1 ){ /* уменьшать усиление некуда */
-            /* Keep gain */
-            aec_state[0].EXPOSURE = desired_exposure; /* смело используем новую экспозицию т.к. уже проверили ее */
-            exposure_set(desired_exposure); /* setup sensors's registers */    
-        }else{
-            /* Try to decrease gain */
-            if( '-' == exposure_command || 'v' == exposure_command ){
-                if( desired_gain > 1 ){
-                    aec_agc_set(desired_gain, current_exposure, DO_GAIN);
-                    /* exposure will be corrected at the next frame(s) */
-                }else{
-                    /* set gain 1.0 */
-                    desired_gain = 1.0;
-                    aec_agc_set(desired_gain, current_exposure, DO_GAIN);
-                    /* exposure will be corrected at the next frame(s) */
-                }
-            }
-            /* R.F.U, do not deleate
-            if( '+' == exposure_command || '^' == exposure_command ){
-                if( desired_gain > 8 ){
-                    // increase digital gain
-                }else{
-                    // increase analog dain
-                }
-            }
-            */
-            /* Keep gain */
-            aec_state[0].EXPOSURE = desired_exposure; /* смело используем новую экспозицию т.к. уже проверили ее */
-            exposure_set(desired_exposure); /* setup sensors's registers */              
-        }
-                
-    }
-    /* apply new gain and exposure */
-}
-    
-/* limit frame rate to 16 fps for all gains */
+ 
+/* limit frame rate to 1/MAXIMUM_FRAME_PERIOD for all gains */
 if(exposure_command != ' '){
     if( exposure_command == '+' || exposure_command == '^' ){
         if( desired_exposure < MAXIMUM_FRAME_PERIOD){
             exposure = desired_exposure;
             gain = current_gain;
-            aec_agc_set(gain, exposure, DO_EXPOSURE);//exposure_set(exposure);
+            //aec_agc_set(gain, exposure, DO_EXPOSURE);//exposure_set(exposure);.
+            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
         }else{
             exposure = MAXIMUM_FRAME_PERIOD;
             gain = current_exposure * current_gain * adjustment / exposure;
@@ -1404,25 +1348,42 @@ if(exposure_command != ' '){
         }
     }
     if( exposure_command == '-' || exposure_command == 'v' ){
-        if( desired_gain < 1.0 ){
+        if(1.0 < current_gain){
+            if( desired_gain < 1.0 ){
+                gain = 1.0;
+                exposure = current_exposure * current_gain * adjustment / gain;
+                if( exposure > MAXIMUM_FRAME_PERIOD ){
+                    exposure = MAXIMUM_FRAME_PERIOD;
+                    gain = current_exposure * current_gain * adjustment/exposure;
+                }
+                aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
+            }else{
+                gain = current_gain * adjustment;
+                exposure = current_exposure; //this is binning gain oscillation cause
+                /*
+                if( desired_exposure > EV76C661_MIN_TIME )
+                    exposure = current_exposure * adjustment;
+                else
+                    exposure = current_exposure; 
+                */
+                //aec_agc_set(gain, exposure, DO_GAIN);
+                aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
+                assert( exposure <= MAXIMUM_FRAME_PERIOD );
+            }            
+        }else{
             gain = 1.0;
             exposure = current_exposure * current_gain * adjustment / gain;
             if( exposure > MAXIMUM_FRAME_PERIOD ){
                 exposure = MAXIMUM_FRAME_PERIOD;
                 gain = current_exposure * current_gain * adjustment/exposure;
             }
-            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);
-        }else{
-            gain = current_gain * adjustment;
-            exposure = current_exposure;
-            aec_agc_set(gain, exposure, DO_GAIN);
-            assert( exposure <= MAXIMUM_FRAME_PERIOD );
+            aec_agc_set(gain, exposure, DO_GAIN|DO_EXPOSURE);            
         }
     }
 }
-    printf("New: e %8.3f, g %8.3f adjustment %6.3f [%c]\n",
+    printf("New: e %8.3f, g %8.3f adjustment %6.3f [%c] delta %6.3f (%6.3f)\n",
              aec_state[0].EXPOSURE*1000.0, aec_state[0].GAIN, 
-             adjustment, exposure_command);
+             adjustment, exposure_command, delta, (float)1.0/16.0 );
     
     return adjustment;
 }
@@ -1570,8 +1531,8 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
             /* decrement binning gain, if possible */
             aec_state[0].BINNING = aec_state[0].BINNING<<1;
         }else{
-            /* no binning correction */
-            printf("%d %04x -- ",aec_state[0].BINNING, bcc_reg_list[0].val);
+            /* no binning correction is possible*/
+            printf("%d %04x (no correction) -- ",aec_state[0].BINNING, bcc_reg_list[0].val);
             goto Point_2;
         }
     
@@ -1647,7 +1608,7 @@ Point_3:
         frac_part = 255;
     }
     //5 = ceil(EV76C661_MIN_TIME * EV76C661_CLK_CTRL / EV76C661_MULT_FACTOR)
-    if( (0 == int_part) && (5 > frac_part) ) frac_part = 5; /* sunny rain bug fix */
+    if( (0 == int_part) && (9 > frac_part) ) frac_part = 9; /* sunny rain bug fix */
     
     if( 255 < (int)dig_gain_index ) {
         printf(" WARNING: dig_gain_index %d\n",(int)dig_gain_index );
@@ -1800,6 +1761,8 @@ void VSensor::aec_II(int h, int w)
     uint32_t x,frame_number;
     int i,j;
     int Mediana, Mean;
+    
+    if(!autoexposure_enable) return;
     
     memset(CDF,0,64*sizeof(uint32_t));
     memset(H64,0,64*sizeof(uint32_t));

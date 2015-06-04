@@ -50,6 +50,7 @@ namespace Auxiliary {
 		uint8_t ten_bit_compression;
 		uint8_t pixel_correction;
 		uint8_t fps_divider;
+        uint8_t ae_enable;
 	};
 
 	struct VideoSensorParameters {

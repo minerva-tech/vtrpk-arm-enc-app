@@ -38,4 +38,6 @@ private:
     void aec_agc_set(float Gain, float Exposure, int command);// writes to sensor registers appropriate values
     
     void exposure_set(float exposure);
+    
+    bool autoexposure_enable;
 };

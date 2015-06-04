@@ -269,6 +269,8 @@ void restartFpga()
 	uint16_t* p = (uint16_t*)map_base;
 	for(int i = 0; i<regs_num; i++)
 		regs[i] = *p++;
+
+
 /*
 	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
 	fprintf(fexport, "8");
@@ -320,7 +322,22 @@ void initMD()
 
 	log() << "MD config : " << val1 << ", " << val2 << ", " << val3 << ", " << val4 << ", " << val5;
 
+#ifdef VIDEO_SENSOR
+    *(uint16_t*)(regs + 0x040) = 0x827e;//Enable MD data in the croma (EC96 fix)
+#endif
+    
 	if (val1 < 0 || val2 < 0 || val3 < 0 || val4 < 0 || val5 < 0) {
+#ifdef VIDEO_SENSOR
+        /* setup default MD settings for video sensor (EC96 fix) */
+        *(uint16_t*)(regs + 0x008) = 0x0000;
+        *(uint16_t*)(regs + 0x00A) = 0x0000;        
+        *(uint16_t*)(regs + 0x00C) = 0x001F;
+        *(uint16_t*)(regs + 0x00E) = 0x0000;
+        *(uint16_t*)(regs + 0x010) = 0x2140;
+        *(uint16_t*)(regs + 0x012) = 0x0081;
+        *(uint16_t*)(regs + 0x014) = 0x1500;
+        *(uint16_t*)(regs + 0x016) = 0x0000;
+#endif
 		dumpRegs();
 		return;
 	}
