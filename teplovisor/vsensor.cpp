@@ -14,7 +14,7 @@
 #define EV76C661_CLK_CTRL (24000000.0) /* [Hz], defined by sensor's pll configuration */
 #define EV76C661_LINE_LENGTH (112.0 * 8.0) /* [CLK_CTRL cycles], register 0x04 content */
 #define EV76C661_MULT_FACTOR (8.0) /* t_int_clk_mult_factor, register 0x0A */
-#define EV76C661_MIN_TIME (0.0000015) /* 1.5 uS */
+#define EV76C661_MIN_TIME (0.0000081) /* 1.5 uS - datasheet, 8.1 - real*/
 #define EV76C661_MAX_GAIN_D (15.875)
 #define EV76C661_MAX_GAIN_A (8.0)
 #define EV76C661_MAX_GAIN (EV76C661_MAX_GAIN_D * EV76C661_MAX_GAIN_A)
@@ -1265,7 +1265,7 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
          exposure_command = '+';
      } else {
         /* this is cause of exposure oscillation in lo light */
-        
+        /*
         if(Ymean<Y_BOT_LIM){ 
             if( Ymean/4-1 < Y_BOT_LIM/4-1 ) adjustment = 1.0 + (1.0/16.0 + 1.0/32);
             
@@ -1293,6 +1293,8 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
         }else{
             exposure_command = ' ';
         }
+        */
+        exposure_command = ' ';
      }
  
      if (adjustment > 4.0) { adjustment = 4.0; }
@@ -1311,6 +1313,14 @@ float VSensor::aec_agc_algorithm_BB(uint32_t *cdf, int Ymean, int b)
     if( delta < 1.0/16.0 ) {
         exposure_command = ' '; 
         //adjustment = 1.0;
+    }
+    
+    if( delta < 0.9 ){
+        if(delta > 0.1){
+            delta = 0.1;
+            if (adjustment>1.0) adjustment = 1.1;
+            else adjustment = 0.9;
+        }
     }
     
     
@@ -1654,6 +1664,14 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
     if( gain <= 1.0 ){
         ana_gain_index = 0;
         dig_gain_index = 0;
+        if( aec_state[0].BINNING ){
+            aec_state[0].BINNING = 4;
+            binning_gain = 1.0;
+            bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
+            bcc_reg_list[0].val &= ~0x0300;// clean binning div factor
+            bcc_reg_list[0].val &= ~0x0200;// set divider 1/4 (binning gain 1) 
+            set_regs(bcc_reg_list);
+        }
     }else{
         if(gain > 8){//Use binning and digital gain
             //Set analog gain to maximum
@@ -1678,20 +1696,26 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
                 set_regs(bcc_reg_list); 
                 printf("%d %04x",aec_state[0].BINNING, bcc_reg_list[0].val);
             }
-                
-            if( dig_gain_index<(uint16_t)255){
-                dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
-            }
+            dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
         }else{
+            /* if gain less or equal to maximum possible analog gain than disable 
+             * (set to 1) binning gain 
+             */
+            if( aec_state[0].BINNING ){
+                aec_state[0].BINNING = 4;
+                binning_gain = 1.0;
+                bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
+                bcc_reg_list[0].val &= ~0x0300;// clean binning div factor
+                bcc_reg_list[0].val &= ~0x0200;// set divider 1/4 (binning gain 1) 
+                set_regs(bcc_reg_list);
+            }            
             for(i=0;i<5;i++){
                 if( ceil((gain/binning_gain)*100.0) > (100.0*analog_gain_table[i]) &&
                     ceil((gain/binning_gain)*100.0) <= (100.0*analog_gain_table[i+1]) ) break;
             }
             ana_gain_index = i+1;
             //dig_gain_index = 0;
-            if( dig_gain_index<(uint16_t)255){
-                dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
-            }
+            dig_gain_index = floor((gain / (analog_gain_table[ana_gain_index]*binning_gain)) - 1) / EV76C661_DIGITAL_GAIN_STEP;
         }
     }
 
@@ -1714,7 +1738,7 @@ void VSensor::aec_agc_set(float Gain, float Exposure, int command)
         frac_part = (int)255;
     }
     //5 = ceil(EV76C661_MIN_TIME * EV76C661_CLK_CTRL / EV76C661_MULT_FACTOR)
-    if( (0 == int_part) && (9 > frac_part) ) frac_part = 9; /* sunny rain bug fix */
+    if( (0 == int_part) && (25 > frac_part) ) frac_part = 25; /* sunny rain bug fix; 25, not 5*/
     
     if( (int)255 < (int)dig_gain_index ) {
         printf(" WARNING: dig_gain_index %d\n",(int)dig_gain_index );
