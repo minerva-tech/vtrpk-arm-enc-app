@@ -18,6 +18,7 @@ public:
 	virtual std::string GetVersionInfo() = 0;
 	virtual uint16_t GetRegister(uint8_t addr) = 0;
 	virtual uint8_t GetCameraID() = 0;
+    virtual std::string GetVSensorConfig() = 0;
 
 	virtual void SetEncCfg(const std::string&) = 0;
 	virtual void SetMDCfg(const std::string&) = 0;
@@ -45,6 +46,7 @@ public:
 		RequestRegister,
         ToggleStreams,
         SetID,
+        RequestVSensorConfig,
         BufferClear = 0x10,
         SetBitrate = 0x11
 	};
@@ -58,7 +60,7 @@ public:
 	static void SendMDCfg(const std::string&);
 	static void SendROI(const std::vector<uint8_t>&);
 	static void SendVersionInfo(const std::string&);
-	
+    static void SendVSensorConfig(const std::string&);
 	static void SendID(int id);
 	
 private:
@@ -70,6 +72,7 @@ private:
 		MDConfig,
 		VersionInfo,
 		Command,
+        VSensSettings,
 		NumberOfMessageTypes
 	};
 
@@ -93,6 +96,7 @@ private:
 	std::string m_md_cfg;
 	std::vector<uint8_t> m_roi;
 	std::string m_version_info;
+    std::string m_vsensor_settings;
 
 //	static const int msg_type_to_config_idx[NumberOfMessageTypes];
 	bool m_first_packet_was_received[NumberOfMessageTypes];
@@ -116,7 +120,7 @@ class Client {
 
 	class Cmds : public IServerCmds {
 	public:
-        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_version_info_received(false), m_streams_enable(-1) {}
+        Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_version_info_received(false), m_vsensor_settings_received(false), m_streams_enable(-1) {}
 
         virtual bool Hello(int id) {m_hello_received = true; log() << "Camera ID received : " << id; m_camera_id = id; return false;}
 		virtual void Start() {assert(0);}
@@ -126,6 +130,7 @@ class Client {
 		virtual std::string GetMDCfg() {assert(0); return std::string();}
 		virtual std::vector<uint8_t> GetROI() {assert(0); return std::vector<uint8_t>();}
 		virtual std::string GetVersionInfo() {assert(0); return std::string();}
+        virtual std::string GetVSensorConfig() {assert(0); return std::string();}
 		virtual uint16_t GetRegister(uint8_t addr) { assert(0); return 0; }
 		virtual uint8_t GetCameraID() { assert(0); return 0; }
 
@@ -143,12 +148,15 @@ class Client {
 		bool m_md_cfg_received;
 		bool m_roi_received;
 		bool m_version_info_received;
+        bool m_vsensor_settings_received;
+
 		int  m_camera_id;
         int  m_streams_enable;
 		std::string m_enc_cfg;
 		std::string m_md_cfg;
 		std::vector<uint8_t> m_roi;
 		std::string m_version_info;
+        std::string m_vsensor_settings;
 	};
 
 public:
@@ -160,6 +168,7 @@ public:
 	static std::string GetMDCfg(IObserver* observer = NULL);
 	static std::vector<uint8_t> GetROI(IObserver* observer = NULL);
 	static std::string GetVersionInfo(IObserver* observer = NULL);
+    static std::string GetVSensorConfig(IObserver* observer = NULL);
 };
 
 namespace Auxiliary {
@@ -170,8 +179,8 @@ namespace Auxiliary {
 		TimestampType,
 		RegisterValType,
 		CameraRegisterValType,
-		VideoSensorResolutionType,
-		VideoSensorSettingsType
+        VideoSensorResolutionType,
+        VideoSensorSettingsType
 	};
 
 	template <typename T>

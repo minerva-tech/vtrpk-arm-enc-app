@@ -15,6 +15,28 @@ VSensorSettings::VSensorSettings(QWidget *parent) :
     ui->analogGain->setText("0");
     ui->digitalGain->setText("0");
     ui->expo->setText("0.9");
+    //
+    {
+        Stop();
+
+        int val = -1;
+
+        Comm::instance().setCallback(boost::bind(AuxCb, _1, _2, _3, reinterpret_cast<uint16_t*>(&val)), 3);
+        Server::SendCommand(Server::RequestVSensorConfig);
+
+        chrono::steady_clock::time_point start = chrono::steady_clock::now();
+        while (val == -1 && chrono::steady_clock::now() - start < Client::timeout)
+            boost::this_thread::yield();
+
+        //Vova! use it as example
+        //if (val != -1)
+        //    ui->val->setText(QString::number((uint16_t)val, 16));
+
+        Comm::instance().setCallback(NULL, 3);
+
+        Play();
+    }
+    //
 }
 
 VSensorSettings::~VSensorSettings()

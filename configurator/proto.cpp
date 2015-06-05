@@ -95,6 +95,9 @@ void Server::execute(uint8_t command, uint8_t arg0, uint8_t arg1)
         log() << "Set streams enable flag command : " << (int)arg0;
         m_callbacks->SetStreamsEnableFlag(arg0);
         break;
+    case RequestVSensorConfig:
+        boost::thread(boost::bind(&Server::SendVSensorConfig, m_callbacks->GetVSensorConfig()));
+        break;
     case BufferClear:
         m_callbacks->BufferClear();
         break;
@@ -191,6 +194,12 @@ void Server::SendVersionInfo(const std::string& version_info)
 {
     SendCfg(version_info, VersionInfo);
 }
+
+void Server::SendVSensorConfig(const std::string& vsensset)
+{
+    SendCfg(vsensset, VSensSettings);
+}
+
 
 void Server::SendID(int id)
 {
@@ -304,4 +313,23 @@ std::string Client::GetVersionInfo(IObserver* observer)
     cmds.m_version_info_received = false;
 
     return cmds.m_version_info;
+}
+
+std::string Client::GetVSensorConfig(IObserver* observer)
+{
+    Cmds cmds;
+    Server server(&cmds);
+
+    server.SendCommand(Server::RequestVSensorConfig);
+
+    chrono::steady_clock::time_point start = chrono::steady_clock::now();
+    while(!cmds.m_vsensor_settings_received && chrono::steady_clock::now() - start < timeout) {
+        if (observer)
+            observer->progress();
+        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    }
+
+    cmds.m_vsensor_settings_received = false;
+
+    return cmds.m_vsensor_settings;
 }
