@@ -11,7 +11,10 @@ VSensorSettings::VSensorSettings(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    ui->Binning->insertItems(0, QStringList() << tr("No") << "x/1" << "x/2" << "x/4");\
+    ui->Binning->insertItems(0, QStringList() << tr("No") << "x/1" << "x/2" << "x/4");
+    ui->analogGain->setText("0");
+    ui->digitalGain->setText("0");
+    ui->expo->setText("0.9");
 }
 
 VSensorSettings::~VSensorSettings()
@@ -21,6 +24,7 @@ VSensorSettings::~VSensorSettings()
 
 void VSensorSettings::on_buttonBox_accepted()
 {
+    /*
     Auxiliary::VideoSensorResolutionData res;
 
     res.src_w = ui->SensorResX->text().toInt();
@@ -36,8 +40,11 @@ void VSensorSettings::on_buttonBox_accepted()
     set.fps_divider = ui->FramerateDivider->text().toInt();
     set.pixel_correction = ui->PixelCorrection->isChecked() ? 1 : 0;
     set.ten_bit_compression = ui->Compression->isChecked() ? 1 : 0;
+    set.ae_enable = ui->AE->isChecked() ? 1 : 0;
 
     Auxiliary::SendVideoSensorSettings(set);
+    */
+    on_Apply_clicked();
 }
 
 void VSensorSettings::on_Binning_currentIndexChanged(int index)
@@ -56,6 +63,7 @@ void VSensorSettings::on_Binning_currentIndexChanged(int index)
     }
 }
 
+
 void VSensorSettings::on_Apply_clicked()
 {
   //   Stop();
@@ -65,23 +73,41 @@ void VSensorSettings::on_Apply_clicked()
     uint16_t x;
     static const float Ga[] = {1., 1.5, 2., 3., 4., 6., 8., 8. };
 
-    const uint8_t valGa = ui->analogGain->text().toInt(NULL,10);
-    const uint8_t valGd = ui->digitalGain->text().toInt(NULL,10);
-    const double Tint = ui->expo->text().toDouble();// in miliseconds
+    uint8_t valGa = ui->analogGain->text().toInt(NULL,10);
+    uint16_t valGd = ui->digitalGain->text().toInt(NULL,10);
+    double Tint = ui->expo->text().toDouble();// in miliseconds
 
-    assert(valGa<7);
-    assert(valGd<256);
+    if(valGa>6){
+        valGa=6;
+        ui->analogGain->setText("6");
+    }
+    if(valGd>255){
+        valGd=255;
+        ui->digitalGain->setText("255");
+    }
+    if(Tint<0.0081){
+        Tint=0.0081;
+        ui->expo->setText("0.0015");
+    }
+    if(Tint>((double)(65534*112*8 + 255*8))/24000.0){
+        Tint=((double)(65534*112*8 + 255*8))/24000.0;
+        ui->expo->setText("2446.688");
+    }
 
     x = (((uint8_t)valGa)<<8) | ((uint8_t)valGd);
     Auxiliary::SendRegisterVal(data, x);
     Auxiliary::SendRegisterVal(addr_wr, addr_e2v_wr|0x0011);
 
-    uint32_t clocks = (Tint*0.001*24000000.0)/8;
-    uint32_t lines = clocks / 112;
-    uint32_t tacts = lines % 112;
+    /* 112*8 tacts of 24MHz clock are in line */
+    double clocks = (Tint*0.001*24000000.0)/8.0;
+    uint32_t lines = (uint32_t)floor(clocks / 112.0);
+    uint32_t tacts = (uint32_t)ceil(clocks - (double)(lines * 112));
 
     if(lines>65534) lines = 65534;
     if(tacts>255) tacts = 255;
+    if(lines==0)
+        if(tacts<25)
+            tacts = 25;
 
     Auxiliary::SendRegisterVal(data, (uint16_t)lines);
     Auxiliary::SendRegisterVal(addr_wr, addr_e2v_wr|0x000E);
@@ -99,6 +125,45 @@ void VSensorSettings::on_Apply_clicked()
     sprintf(text_string," %5.3f", 1.0 + ((float)valGd*((15.875-1)/255.0)) );
     ui->ValGd->setText(text_string);
 
-    //   Play();
+    /* resolution, ae, binning, frame divider, compression */
+    Auxiliary::VideoSensorResolutionData res;
 
+    res.src_w = ui->SensorResX->text().toInt();
+    res.src_h = ui->SensorResY->text().toInt();
+    res.dst_w = ui->TargetResX->text().toInt();
+    res.dst_h = ui->TargetResY->text().toInt()/2;
+
+    Auxiliary::SendVideoSensorResolution(res);
+
+    Auxiliary::VideoSensorSettingsData set;
+
+    set.binning = ui->Binning->currentIndex();
+    set.fps_divider = ui->FramerateDivider->text().toInt();
+    set.pixel_correction = ui->PixelCorrection->isChecked() ? 1 : 0;
+    set.ten_bit_compression = ui->Compression->isChecked() ? 1 : 0;
+    set.ae_enable = ui->AE->isChecked() ? 1 : 0;
+
+    Auxiliary::SendVideoSensorSettings(set);
+
+}
+
+void VSensorSettings::on_AE_stateChanged(int ae)
+{
+    if (ae == 0) {
+        ui->expo->setEnabled(true);
+        ui->digitalGain->setEnabled(true);
+        ui->analogGain->setEnabled(true);
+        ui->Lines->setEnabled(true);
+        ui->Tacts->setEnabled(true);
+        ui->ValGa->setEnabled(true);
+        ui->ValGd->setEnabled(true);
+    } else {
+        ui->expo->setEnabled(false);
+        ui->digitalGain->setEnabled(false);
+        ui->analogGain->setEnabled(false);
+        ui->Lines->setEnabled(false);
+        ui->Tacts->setEnabled(false);
+        ui->ValGa->setEnabled(false);
+        ui->ValGd->setEnabled(false);
+    }
 }

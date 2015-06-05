@@ -23,6 +23,8 @@ private slots:
 
     void on_Apply_clicked();
 
+    void on_AE_stateChanged(int ae);
+
 private:
     Ui::VSensorSettings *ui;
 };

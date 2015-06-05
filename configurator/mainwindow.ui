@@ -607,7 +607,7 @@
   </action>
   <action name="actionVideo_Sensor">
    <property name="text">
-    <string>Video Sensor</string>
+    <string>Video Sensor (Debug)</string>
    </property>
   </action>
  </widget>
