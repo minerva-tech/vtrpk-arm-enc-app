@@ -22,6 +22,7 @@ public:
 	virtual std::string GetMDCfg();
 	virtual std::vector<uint8_t> GetROI();
 	virtual std::string GetVersionInfo();
+	virtual std::string GetVSensorConfig();
     virtual int GetStreamsEnableFlag();
 	virtual uint8_t GetCameraID();
 	virtual Auxiliary::VideoSensorParameters GetVideoSensorParameters();

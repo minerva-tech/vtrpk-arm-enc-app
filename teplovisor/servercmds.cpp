@@ -104,6 +104,8 @@ std::string ServerCmds::GetVersionInfo()
 
 		ver += "\n";
 	}
+
+
 #if not VIDEO_SENSOR
 	if (m_flir) {
 		char t[128];
@@ -299,4 +301,26 @@ void ServerCmds::SetBitrate(int bitrate)
     g_bitrate = bitrate * 100;
 	g_change_bitrate = true;
 	g_stop = false;
+}
+
+std::string ServerCmds::GetVSensorConfig() 
+{
+	std::ifstream eeprom(eeprom_filename);
+		if (!eeprom)
+			return std::string();
+
+		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
+
+		uint32_t size = 0;
+		eeprom.read((char*)&size, sizeof(size));
+
+		if (size > vsensor_settings_max_size)
+			return std::string();
+
+		std::string str;
+		str.resize(size);
+
+		eeprom.read(&str[0], str.size()*sizeof(str[0]));
+
+		return str;
 }
