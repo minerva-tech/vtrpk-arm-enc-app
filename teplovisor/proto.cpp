@@ -52,6 +52,9 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 	case VersionInfo:
 		getEncCfgChunk(msg, m_version_info, boost::bind(&IServerCmds::SetVersionInfo, m_callbacks, _1));
 		break;
+//    case VSensSettings:
+//        getEncCfgChunk(msg, m_vsensor_settings, boost::bind(&IServerCmds::SetVSensorSettings, m_callbacks, _1));
+//		break;
     }
 
 	return;
@@ -71,7 +74,7 @@ void Server::execute(uint8_t command, uint8_t arg0, uint8_t arg1)
 		m_callbacks->Start();
 		break;
 	case Stop:
-		m_callbacks->Stop();
+   		m_callbacks->Stop();
 		break;
 	case RequestEncConfig:
 		boost::thread(boost::bind(&Server::SendEncCfg, m_callbacks->GetEncCfg())); // possible deadlock, SendEncCfg should start separate thread for sending.
@@ -95,7 +98,8 @@ void Server::execute(uint8_t command, uint8_t arg0, uint8_t arg1)
         log() << "Set streams enable flag command : " << (int)arg0;
         m_callbacks->SetStreamsEnableFlag(arg0);
         break;
-	case RequestVSensorConfig: 
+	case RequestVSensorConfig: // Command #11
+        printf(" EXECUTE : VSENSOR\n");
         boost::thread(boost::bind(&Server::SendVSensorConfig, m_callbacks->GetVSensorConfig()));
 		break;
     case BufferClear:
@@ -151,6 +155,7 @@ void Server::SendCfg(const CfgContainer& cfg, MessageTypes msg_type)
 
 	bool empty_last_pkt = false;
 
+    int ixxx = 0;
 	while(cfg_it != cfg.end()) {
 		const size_t data_left = cfg.end() - cfg_it;
 //		const bool last_pkt = data_left <= Server::Message::mts;
@@ -165,6 +170,8 @@ void Server::SendCfg(const CfgContainer& cfg, MessageTypes msg_type)
 		std::copy(cfg_it, cfg_it+to_send, &msgs.back().payload[0]);
 
 		cfg_it += to_send;
+        
+        printf(" I_X_X_X %d\n", ixxx++);
 	}
 	
 	if (empty_last_pkt)

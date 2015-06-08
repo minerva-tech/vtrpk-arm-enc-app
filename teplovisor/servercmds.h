@@ -34,7 +34,7 @@ public:
 	virtual void SetVersionInfo(const std::string& str);
     virtual void SetStreamsEnableFlag(int streams_enable);
 	virtual void SetCameraID(uint8_t id);
-
+ //   virtual void SetVSensorSettings(const std::string& str);
     virtual void BufferClear();
     virtual void SetBitrate(int bitrate);
 

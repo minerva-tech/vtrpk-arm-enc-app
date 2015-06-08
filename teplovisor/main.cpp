@@ -758,7 +758,7 @@ int main(int argc, char *argv[])
 		if (eeprom) {
 			eeprom.seekg(vsensor_config_offset+sizeof(Auxiliary::VideoSensorResolutionData), std::ios_base::beg);
 			eeprom.read((char*)&vs_set, sizeof(vs_set));
-			
+            
 			vsensor.set(vs_set);
 		}
 

@@ -27,10 +27,10 @@ public:
 	virtual void SetVersionInfo(const std::string&) = 0;
     virtual void SetStreamsEnableFlag(int streams_enable) = 0;
 	virtual void SetCameraID(uint8_t id) = 0;
-
+   // virtual void SetVSensorSettings(const std::string&) = 0;
     virtual void BufferClear() = 0;
     virtual void SetBitrate(int bitrate) = 0;
-};
+    };
 
 class Server
 {
@@ -121,7 +121,7 @@ class Client {
 
 	class Cmds : public IServerCmds {
 	public:
-		Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_version_info_received(false), m_streams_enable(-1) {}
+		Cmds() : m_hello_received(false), m_enc_cfg_received(false), m_md_cfg_received(false), m_roi_received(false), m_version_info_received(false), m_vsensor_settings_received(false), m_streams_enable(-1) {}// m_vsensor_settings_received(false),
 
 		virtual bool Hello(int id) {m_hello_received = true; log() << "Camera ID received : " << id; m_camera_id = id; return false;}
 		virtual void Start() {assert(0);}
@@ -141,6 +141,7 @@ class Client {
 		virtual void SetVersionInfo(const std::string& ver_info) {m_version_info = ver_info; m_version_info_received = true;}
 		virtual void SetStreamsEnableFlag(int streams_enable) {m_streams_enable = streams_enable;}
 		virtual void SetCameraID(uint8_t id) {}
+      //  virtual void SetVSensorSettings(const std::string& cfg) {m_vsensor_settings = cfg; m_vsensor_settings_received = true;}
 		virtual void BufferClear() {}
 		virtual void SetBitrate(int bitrate) {}
 

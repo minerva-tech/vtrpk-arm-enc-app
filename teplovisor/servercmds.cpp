@@ -56,7 +56,7 @@ std::string ServerCmds::GetMDCfg()
 	str.resize(size);
 
 	eeprom.read(&str[0], str.size()*sizeof(str[0]));
-
+    log() << "MD config size: " << size;
 	return str;
 }
 
@@ -80,6 +80,55 @@ std::vector<uint8_t> ServerCmds::GetROI()
 	eeprom.read((char*)&str[0], str.size()*sizeof(str[0]));
 
 	return str;
+}
+
+std::string ServerCmds::GetVSensorConfig() 
+{
+	log() << "Read eeprom for vsensor settings"; 
+    
+    std::ifstream eeprom(eeprom_filename);
+	if (!eeprom)
+		return std::string();
+    
+    /* Durty hack. STEP 1.
+	eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
+
+	uint32_t size = 0;
+	eeprom.read((char*)&size, sizeof(size));
+    
+
+    printf(" !!! Vsensor settings size: %08x\n",size);
+		
+    if (size > vsensor_settings_max_size){
+        printf(" ERROR: GetVSensorConfig() size too big\n");
+		return std::string();
+    }
+    */
+    
+    /* DURTY HACK. STEP 2 */
+    #if 1
+    
+    uint32_t size = 20;
+    eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
+	std::string str;
+    str.resize(size);
+    //str[0] = 'a';
+    eeprom.read(&str[0], str.size()*sizeof(str[0]));
+    printf(" %8X %8X %8X %8X %8X\n", str[0], str[1], str[2], str[3], str[4]);
+    printf(" %8X %8X %8X %8X %8X\n", str[5], str[6], str[7], str[8], str[9]);
+    printf(" %8X %8X %8X %8X %8X\n", str[10], str[11], str[12], str[13], str[14]);
+    
+    return str;
+    
+    #else
+    
+    /* Best Test Code */
+    char teststr[] = "Jopa Hui Pizda 0123456789";
+    log() << "    ___ Vsensor settings " << teststr; 
+    return teststr;
+    
+    #endif
+        
 }
 
 std::string ServerCmds::GetVersionInfo() 
@@ -192,7 +241,8 @@ uint16_t ServerCmds::GetRegister(uint8_t addr)
 Auxiliary::VideoSensorParameters ServerCmds::GetVideoSensorParameters()
 {
 	Auxiliary::VideoSensorParameters params;
-	
+	   log() << "Vsensor settings parameters called";
+           
 	std::ifstream eeprom(eeprom_filename);
 	if (eeprom) {
 		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
@@ -303,24 +353,3 @@ void ServerCmds::SetBitrate(int bitrate)
 	g_stop = false;
 }
 
-std::string ServerCmds::GetVSensorConfig() 
-{
-	std::ifstream eeprom(eeprom_filename);
-		if (!eeprom)
-			return std::string();
-
-		eeprom.seekg(vsensor_config_offset, std::ios_base::beg);
-
-		uint32_t size = 0;
-		eeprom.read((char*)&size, sizeof(size));
-
-		if (size > vsensor_settings_max_size)
-			return std::string();
-
-		std::string str;
-		str.resize(size);
-
-		eeprom.read(&str[0], str.size()*sizeof(str[0]));
-
-		return str;
-}

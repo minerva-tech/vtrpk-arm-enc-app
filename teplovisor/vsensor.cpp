@@ -232,13 +232,19 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
             << " auto exposure: " << (int)settings.ae_enable;
 
     autoexposure_enable = (bool)settings.ae_enable;
+    int binning = settings.binning;
+    if(binning>3){
+        printf("IERROR: binning settings is incorrect %d. Set binning OFF\n",settings.binning);
+        binning = 0;
+        // TODO: rewrite eeprom here
+    }
     
-    if (settings.binning) {
+    if (/*settings.*/binning) {
         log() << "binning is on";
         set_regs(resolution_half_reg_list);
         bcc_reg_list[0].val |= 0x0001;// reg 0x0A bit 0
         bcc_reg_list[0].val &= 0x00FF;// clean binning div factor
-        bcc_reg_list[0].val |= ((settings.binning-1)<<8)&0x0300;
+        bcc_reg_list[0].val |= ((/*settings.*/binning-1)<<8)&0x0300;
     } else {
         log() << "binning is off";
         set_regs(resolution_full_reg_list);
@@ -259,7 +265,7 @@ void VSensor::set(const Auxiliary::VideoSensorSettingsData& settings)
 
     /* initialize e2v aec */
     
-    aec_init(binning_gain[(int)settings.binning]);
+    aec_init(binning_gain[(int)/*settings.*/binning]);
 }
 
 void VSensor::increment_integration_time(uint16_t delta)

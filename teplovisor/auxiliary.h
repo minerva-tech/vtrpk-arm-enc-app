@@ -33,10 +33,10 @@ namespace Auxiliary {
 		uint8_t val[8];
 	};
 	
-/*	struct VideoSensorResolutionsData {
+	struct VideoSensorResolutionsData {
 		uint32_t src; // top 16 bits are width, bottom 16 bits are height.
 		uint32_t dst;
-	};*/
+	};
 
 	struct VideoSensorResolutionData {
 		int16_t src_w;
