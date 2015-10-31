@@ -1,6 +1,6 @@
 #pragma once
 
-#define VIDEO_SENSOR 1
+#define VIDEO_SENSOR 0
 
 const int SRC_WIDTH  = 320;
 const int SRC_HEIGHT = 256;

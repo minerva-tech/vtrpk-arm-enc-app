@@ -128,29 +128,34 @@ bool Comm::open(const std::string& addr, unsigned short port)
 {
 	close();
 
+    m_addr = addr;
+    m_port_num = port;
+
 	boost::system::error_code ec;
 
     // TODO : Proper error handling
     m_port.connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(addr), port), ec);
 
-	m_out_buf.reset();
+    m_out_buf.reset();
 
-	if (ec) {
-		log() << "Port opening error : " << ec.message();
-		return false;
-	}
+    if (ec)
+        log() << "Port opening error : " << ec.message();
 
-	m_sending_in_progress = false;
+    m_sending_in_progress = false;
     m_in_buf.reset();
 
-	std::fill(&m_in_count_lsb[0], &m_in_count_lsb[sizeof(m_in_count_lsb)/sizeof(m_in_count_lsb[0])], -1);
+    std::fill(&m_in_count_lsb[0], &m_in_count_lsb[sizeof(m_in_count_lsb)/sizeof(m_in_count_lsb[0])], -1);
 
-    m_port.async_read_some(asio::buffer(m_in_buf.buf),
-        bind(&Comm::recv_ethernet_chunk, this, &m_in_buf.buf[0], asio::placeholders::error, asio::placeholders::bytes_transferred));
+    if (!ec)
+        m_port.async_read_some(asio::buffer(m_in_buf.buf),
+            bind(&Comm::recv_ethernet_chunk, this, &m_in_buf.buf[0], asio::placeholders::error, asio::placeholders::bytes_transferred));
+    else
+        m_port.async_connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(addr), port),
+            boost::bind(&Comm::connected, this, asio::placeholders::error));
 
-	m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
+    m_thread = thread(bind(&asio::io_service::run, ref(m_io_service)));
 
-	return true;
+    return true;
 }
 
 void Comm::close()
@@ -209,6 +214,8 @@ void Comm::transmit(uint8_t port, size_t size, const uint8_t* p)
 //! Pointer p is available for use immediately after returning from transmit() because it will be copied to Pkt inside of transmit_pkt
 void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 {
+    return; // no transmission via tcp port.
+
 	const uint8_t* pend = p+size;
 
 	while (p != pend) {
@@ -284,6 +291,24 @@ void Comm::transmitted(shared_ptr<Pkt> sp, const system::error_code& e, size_t)
 }
 */
 
+void Comm::connected(const system::error_code& e)
+{
+    if (!e) {
+        log() << "Connect successful";
+
+        m_in_buf.reset();
+
+        m_port.async_read_some(asio::buffer(m_in_buf.buf),
+            bind(&Comm::recv_ethernet_chunk, this, &m_in_buf.buf[0], asio::placeholders::error, asio::placeholders::bytes_transferred));
+    } else {
+        log() << "Connection error : " << e.message();
+        m_port.close();
+
+        m_port.async_connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(m_addr), m_port_num),
+            boost::bind(&Comm::connected, this, asio::placeholders::error));
+    }
+}
+
 void Comm::recv_pkt(const Pkt* pkt, int cam_id_override)
 {
 	int comment = Invalid;
@@ -317,13 +342,18 @@ void Comm::recv_pkt(const Pkt* pkt, int cam_id_override)
 void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred)
 {
     if (e) {
-        if (e != asio::error::operation_aborted)
+        if (e == asio::error::eof || e == asio::error::connection_reset) {
+            log() << "Connection was reset by peer";
+            m_port.close();
+
+            m_port.async_connect(asio::ip::tcp::endpoint(asio::ip::address::from_string(m_addr), m_port_num),
+                boost::bind(&Comm::connected, this, asio::placeholders::error));
+
+            return;
+        } else if (e != asio::error::operation_aborted)
             log() << Log::Error << "Error of data receiving : " << e.message();
         else
             log() << "Error of data receiving : operation aborted";
-
-        if (!bytes_transferred)
-            return;
     }
 
     log() << "bte : " << bytes_transferred;
@@ -332,9 +362,12 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
 
     m_in_buf.writing_pt += bytes_transferred;
 
+    assert(m_in_buf.writing_pt == pend - m_in_buf.buf.begin());
+
     while (m_in_buf.remains + m_in_buf.writing_pt - m_in_buf.cur >= sizeof(EthernetPkt)) {
         if (m_in_buf.remains) {
             assert(m_in_buf.cur == 0);
+            assert(m_in_buf.remains < sizeof(EthernetPkt));
 
             uint8_t* buf_end = m_in_buf.buf.end();
 
@@ -343,10 +376,10 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
             EthernetPkt pkt;
             uint8_t* ppkt = reinterpret_cast<uint8_t*>(&pkt);
 
-            memcpy(ppkt, pkt_start, m_in_buf.remains);
-            memcpy(ppkt + m_in_buf.remains, m_in_buf.buf.begin(), sizeof(EthernetPkt) - m_in_buf.remains);
-
             const size_t second_part_size = sizeof(EthernetPkt) - m_in_buf.remains;
+
+            memcpy(ppkt, pkt_start, m_in_buf.remains);
+            memcpy(ppkt + m_in_buf.remains, m_in_buf.buf.begin(), second_part_size);
 
             m_in_buf.remains = std::max(0, m_in_buf.remains - (pkt.payload.len + 7)); // TODO : DIRTY, fix it after vovs will talk with modem guys re their packets
 
@@ -365,7 +398,7 @@ void Comm::recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::siz
 
         uint8_t* pkt_start = m_in_buf.buf.begin() + m_in_buf.cur;
 
-        if (m_in_buf.buf.begin() + m_in_buf.writing_pt - pkt_start >= sizeof(EthernetPkt)) {
+        if (m_in_buf.writing_pt - m_in_buf.cur >= sizeof(EthernetPkt)) {
             EthernetPkt* pkt = reinterpret_cast<EthernetPkt*>(pkt_start);
 
             if (pkt->payload.header.port == 0x3c)

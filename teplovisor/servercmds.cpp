@@ -14,6 +14,12 @@
 extern char __BUILD_DATE;
 extern char __BUILD_NUMBER;
 
+void ServerCmds::Stop()
+{
+	g_stop = true;
+	BufferClear();
+}
+
 std::string ServerCmds::GetEncCfg() 
 {
 	std::ifstream eeprom(eeprom_filename);
@@ -171,7 +177,7 @@ std::string ServerCmds::GetVersionInfo()
 	}
 #else
     char t[128];
-	sprintf(t, "\"Teplovisor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
+	sprintf(t, "\"Videosensor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
 	sprintf(t, "FPGA revision\t\t%x\n", GetRegister(0x2e)); ver += t;
 #endif
 

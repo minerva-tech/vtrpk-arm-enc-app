@@ -16,7 +16,7 @@ public:
 
 	virtual bool Hello(int id) {Comm::instance().drop_unsent();return true;}
 	virtual void Start() {log()<<"start";g_stop = false;}
-	virtual void Stop() {g_stop = true;}
+	virtual void Stop();
 
 	virtual std::string GetEncCfg();
 	virtual std::string GetMDCfg();

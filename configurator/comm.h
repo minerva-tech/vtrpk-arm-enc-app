@@ -47,7 +47,7 @@ struct CircBuf
 /*! Lower layer communication class. Stuff like "send these 12 bytes over COM1" should be processed here. Let it be just
 	wrapper over boost::asio.
 */
-class Comm
+class Comm : public boost::noncopyable
 {
 struct Pkt;
 struct EthernetPkt;
@@ -114,7 +114,7 @@ private:
 
 //	typedef array<uint8_t, CHUNK_SIZE> Buf;
 
-    struct Buf {
+    struct Buf  {
         Buf() : cur(0), remains(0), writing_pt(0) {}
         void reset() { cur = 0; remains = 0; writing_pt = 0; }
         boost::array <uint8_t, CHUNK_SIZE> buf;
@@ -132,6 +132,7 @@ private:
     void recv_pkt(const Pkt* pkt, int cam_id_override = -1);
     void recv_chunk(uint8_t* p, const boost::system::error_code& e, std::size_t bytes_transferred, uint8_t cam_id);
     void recv_ethernet_chunk(uint8_t* p, const system::error_code& e, std::size_t bytes_transferred);
+    void connected(const boost::system::error_code& e);
 
 	Callback m_callback[4];
 
@@ -163,6 +164,9 @@ private:
 
 	boost::chrono::steady_clock::time_point m_start;
 	uint32_t m_recv_amount[4];
+
+    std::string m_addr;
+    uint16_t m_port_num;
 };
 
 const int MAX_APP_PAYLOAD = 50;
