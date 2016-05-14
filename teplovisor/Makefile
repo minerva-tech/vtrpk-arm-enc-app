@@ -3,7 +3,13 @@
 #CC   = $(CROOT)/arm-unknown-linux-uclibcgnueabi-gcc
 #LINK = $(CROOT)/arm-unknown-linux-uclibcgnueabi-g++
 #STRIP= $(CROOT)/arm-unknown-linux-uclibcgnueabi-strip
-CROOT = /home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/buildroot/output/host/usr/bin
+
+PWD = $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+#MKFILE_PATH = $(abspath $(lastword $(MAKEFILE_LIST)))
+#PWD = $(notdir $(patsubst %/,%,$(dir $(MKFILE_PATH))))
+
+BUILDROOT = $(PWD)/../../vtrpk-build-tools/Output/minerva_sdmmc/output
+CROOT = $(BUILDROOT)/host/usr/bin
 CPPC = $(CROOT)/arm-unknown-linux-uclibcgnueabi-g++
 CC   = $(CROOT)/arm-unknown-linux-uclibcgnueabi-gcc
 LINK = $(CROOT)/arm-unknown-linux-uclibcgnueabi-g++
@@ -42,6 +48,7 @@ OBJ = main.o \
       cap.o \
       proto.o \
       flir.o \
+      utils.o \
       default_enc_cfg.o
 
 BOOST_MODULES_TYPE = 
@@ -51,26 +58,26 @@ BOOST_MODULES_LIBS = $(addsuffix $(BOOST_MODULES_TYPE),$(BOOST_MODULES))
 BOOST_LDFLAGS = $(addprefix -lboost_,$(BOOST_MODULES_LIBS))
 
 #ROOT = /home/a/ti-dvsdk_dm365-evm_4_02_00_06
-ROOT = /home/a/Documents/VRTPK
-H264ROOT = /home/a/Documents/VRTPK/dm365_h264_enc
+ROOT = $(PWD)/../../TI
+H264ROOT = $(ROOT)/dm365_h264_enc
 #DVSDK_INCLUDE = /home/kov/dm365/ti_tools/psp/linux-2.6.32.17-psp03.01.01.39/include/
 #DVSDK_INCLUDE = /home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/output/build/linux-custom/include/
-DVSDK_INCLUDE = /home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/buildroot/output/build/linux-custom/include/
-H264_ENC_INCLUDE = $(H264ROOT)/apps/client/test/inc/
+DVSDK_INCLUDE = $(BUILDROOT)/build/linux-custom/include
+H264_ENC_INCLUDE = $(H264ROOT)/apps/client/test/inc
 #FRAMEWORK_INCLUDE = $(ROOT)/framework-components_2_26_00_01/packages/
 #XDAIS_INCLUDE = $(ROOT)/xdais_6_26_01_03/packages
-FRAMEWORK_INCLUDE = $(ROOT)/dvsdk_4_02_00_06/framework-components_2_26_00_01/packages/
-XDAIS_INCLUDE = $(ROOT)/dvsdk_4_02_00_06/xdais_6_26_01_03/packages
-H264_IFACE_INCLUDE = $(H264ROOT)/apps/inc/
+FRAMEWORK_INCLUDE = $(ROOT)/framework-components_2_26_00_01/packages
+XDAIS_INCLUDE = $(ROOT)/xdais_6_26_01_03/packages
+H264_IFACE_INCLUDE = $(H264ROOT)/apps/inc
 #XDC_INCLUDE = $(ROOT)/xdctools_3_16_03_36/packages
 #XDC_INSTALL_DIR = $(ROOT)/xdctools_3_16_03_36/
-XDC_INCLUDE = $(ROOT)/xdctools_3_22_04_46/packages
-XDC_INSTALL_DIR = $(ROOT)/xdctools_3_22_04_46/
+XDC_INCLUDE = $(ROOT)/xdctools_3_16_03_36/packages
+XDC_INSTALL_DIR = $(ROOT)/xdctools_3_16_03_36
 MVTOOL_DIR = ""
 #LINUXUTILS_INCLUDE = $(ROOT)/linuxutils_2_26_01_02/packages/
 #CE_INCLUDE = $(ROOT)/codec-engine_2_26_02_11/packages/
-LINUXUTILS_INCLUDE = $(ROOT)/dvsdk_4_02_00_06/linuxutils_2_26_01_02/packages/
-CE_INCLUDE = $(ROOT)/dvsdk_4_02_00_06/codec-engine_2_26_02_11/packages/
+LINUXUTILS_INCLUDE = $(ROOT)/linuxutils_2_26_01_02/packages
+CE_INCLUDE = $(ROOT)/codec-engine_2_26_02_11/packages
 #LINUXKERNEL_INCLUDE = /home/kov/dm365/buildroot/output/build/linux-custom/include/
 
 XDCPLATFORM = ti.platforms.evmDM365
@@ -102,7 +109,7 @@ CONFIGPKG = h264enc_ti_dm365_linux
 ALG_LIB1 = $(H264ROOT)/lib/h264venc_ti_arm926.a
 ALG_LIB2 = $(H264ROOT)/lib/h264v_ti_dma_dm365.a
 
-BOOSTROOT = /home/a/Documents/boost/boost_1_53_0
+BOOSTROOT = $(PWD)/../../boost/boost_1_53_0
 
 #CPPFLAGS += -I /home/kov/dm365/boost/boost_1_48_0/ $(BOOST_CPPFLAGS) -O2 -march=armv5t -D"_ARM926" -U"ENABLE_ARM926_TCM"
 #CPPFLAGS += -I/home/a/Documents/boost_1_48_0/ $(INCLUDES) $(BOOST_CPPFLAGS) -O2 -march=armv5t -D"_ARM926" -U"ENABLE_ARM926_TCM" 

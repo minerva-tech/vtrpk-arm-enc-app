@@ -42,7 +42,7 @@ UCArm9.LONGNAME = 'bin/arm-unknown-linux-uclibcgnueabi-gcc';
 /*GCArmv5T.platform = "ti.platforms.evm3530";*/
 /*GCArmv5T.rootDir = "/home/kov/dm365/buildroot/output/host/usr";*/
 /*GCArmv5T.rootDir = "/home/a/Documents/VRTPK/vtrpk-build-tools/output/host/usr";*/
-UCArm9.rootDir = "/home/a/Documents/VRTPK/vtrpk-build-tools-v2/vtrpk-build-tools/buildroot/output/host/usr";
+UCArm9.rootDir = "/home/a/ogonek/vtrpk-build-tools/Output/minerva_sdmmc/output/host/usr";
 /*GCArmv5T.rootDir = "/usr";*/
 
 /*

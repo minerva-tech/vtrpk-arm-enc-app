@@ -11,6 +11,9 @@ const int BITRATE_STEP = 2000;
 const int BITRATE_MIN  = 1000;
 const int BITRATE_MAX  =64000;
 
+const int FPS_MAX = 8;
+const int AVI_LENGTH_MAX = 200;
+
 const char eeprom_filename[] = "/sys/devices/platform/spi_davinci.4/spi4.0/eeprom";
 const char version_info_filename[] = "/etc/versioninfo";
 

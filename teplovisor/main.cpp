@@ -17,6 +17,11 @@
 
 #include "defines.h"
 #include "default_enc_cfg.h"
+
+#include "avimux.h"
+
+#include "utils.h"
+
 /*
 extern "C" {
 #include "tables.h"
@@ -28,7 +33,7 @@ extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long 
 
 volatile bool g_stop = false;
 int g_chroma_value = 0x80;
-bool g_dump_yuv = false;
+bool g_dump_yuv = true;
 
 int g_tx_buffer_size = 1000;
 
@@ -276,7 +281,8 @@ void setReg(uint8_t addr, uint16_t val)
 	close(fd);
 }
 
-void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir)
+//void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir)
+void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment)
 {
 	log() << "aux packet received: " << std::hex << (int)payload[-1] << " " << (int)payload[0] << " " << (int)payload[1] <<
 	" " << (int)payload[2] << " " << (int)payload[3] << " " << (int)payload[4] << " " << (int)payload[5] <<
@@ -307,7 +313,7 @@ void auxiliaryCb(uint8_t camera, const uint8_t* payload, int comment, Flir& flir
 
         log() << "sending data to camera, size : " << Auxiliary::Size(payload);
 
-		flir.send(data.val, Auxiliary::Size(payload));
+//		flir.send(data.val, Auxiliary::Size(payload));
 	}
 }
 
@@ -429,8 +435,8 @@ void initMD()
 	*(uint16_t*)(regs + 0x00c) = val5 & 0xffff;
 	*(uint16_t*)(regs + 0x00e) = val5 >> 16;
 
-	*(uint16_t*)(regs + 0x008) = val6 & 0xffff;
-	*(uint16_t*)(regs + 0x00a) = val6 >> 16;
+//	*(uint16_t*)(regs + 0x008) = val6 & 0xffff;
+//	*(uint16_t*)(regs + 0x00a) = val6 >> 16;
 
 	*(uint16_t*)(regs + 0x010) = val7 & 0xffff;
 	*(uint16_t*)(regs + 0x012) = val7 >> 16;
@@ -471,40 +477,7 @@ void loadMask(std::vector<uint8_t>& info_mask, int s, int h)
 	// as info_mask has nothing but zeroes, fill it with ones
 	memset(&info_mask[0], 0xff, info_mask.size());
 }
-/*
-const char STARTCODE[12] = "FRAME START";
 
-void readStartcode(const volatile uint16_t* reg, int thres)
-{
-	bool startcode_at_begin = true;
-
-	int startcode_off = 0;
-	int was_read = 0;
-
-	while (startcode_off != sizeof(STARTCODE)/(sizeof(STARTCODE[0])) && was_read++ < thres) {
-		const uint16_t val = *reg;
-
-		if (val == *(uint16_t*)&STARTCODE[startcode_off]) {
-			startcode_off += 2;
-		} else {
-			if (val == *(uint16_t*)&STARTCODE[0])
-				startcode_off = 2;
-			else
-				startcode_off = 0;
-			startcode_at_begin = false;
-			continue;
-		}
-	}
-
-	if (!startcode_at_begin)
-		log() << "No startcode was found at the place where it should be. Was thrown " << was_read*2 << " bytes.";
-
-	if (startcode_off == 12)
-		log() << "Startcode was found";
-	else
-		log() << "Startcode wasn't found";
-}
-*/
 void fillInfo(std::vector<uint8_t>& info, const std::vector<uint8_t>& info_mask, uint8_t* data, int w, int s, int h, int chroma_val)
 {
 	std::vector<uint8_t>::iterator it_info = info.begin();
@@ -543,36 +516,6 @@ struct adapt_bitrate_desc_t {
 	int switch_up_from_here;
 	int switch_down_from_here;
 };
-
-static void LED_RXD(int on)
-{
-    FILE* fled = fopen("/sys/class/leds/rxd/brightness", "wt");
-    if(NULL==fled) log()<< " - LED RXD open failed";
-
-    if(on)
-        fprintf(fled, "1");
-    else
-        fprintf(fled, "0");
-
-	fflush(fled);
-    fclose(fled);
-    //boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
-}
-
-static void LED_ERR(int on)
-{
-    FILE* fled = fopen("/sys/class/leds/error/brightness", "wt");
-    if(NULL==fled) log()<< " - LED ERR open failed";
-
-    if(on)
-        fprintf(fled, "1");
-    else
-        fprintf(fled, "0");
-
-	fflush(fled);
-    fclose(fled);
-    //boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
-}
 
 adapt_bitrate_desc_t g_adapt_bitrate_desc[] = {{0, 50, -1}, {1, 60, 40}, {3, 70, 50}, {7, 80, 60}, {-1, 1000, 70}};
 
@@ -613,7 +556,7 @@ void run()
 
 	v4l2_buffer buf = cap.getFrame(); // skip first frame as it contains garbage
 	cap.putFrame(buf);
-	
+
 	struct timespec clock_cur;
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	printf("Teplovisor app first frame captured time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
@@ -628,7 +571,7 @@ void run()
 
 	while(!g_stop) {
         // Startup time measure point #1
-        LED_RXD(1);
+        utils::LED_RXD(1);
 
 		v4l2_buffer buf = cap.getFrame();
 
@@ -662,7 +605,7 @@ void run()
 		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
 
         // Startup time measure point #2
-        LED_ERR(0);
+        utils::LED_ERR(0);
 
 		if (coded_size) {
 			Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
@@ -699,11 +642,10 @@ int main(int argc, char *argv[])
 	struct timespec clock_cur;
 	clock_gettime(CLOCK_MONOTONIC, &clock_cur);
 	printf("Teplovisor app starting time: %lu ms\n", clock_cur.tv_nsec/1000000+clock_cur.tv_sec*1000);
-	
+
+	utils::LED_ERR(1);
+
 	try {
-
-        LED_ERR(1);
-
 		if (argc < 3) {
 			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)>\n" << std::endl;
 			return 0;
@@ -712,14 +654,16 @@ int main(int argc, char *argv[])
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
-		Flir flir("/dev/ttyS0");
+		//Flir flir("/dev/ttyS0");
 
-		ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
+	//	ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
+		ServerCmds cmds;
 		Server server(&cmds);
 
 		Comm::instance().setCameraID(cmds.GetCameraID());
 
-		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(flir)), 3);
+//		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3, boost::ref(flir)), 3);
+		Comm::instance().setCallback(boost::bind(auxiliaryCb, _1, _2, _3), 3);
 
 		CMEM_init();
 
