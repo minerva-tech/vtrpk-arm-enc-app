@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <fstream>
+#include <memory>
 
 #define 	AVIF_HASINDEX		0x00000010
 #define 	AVIF_MUSTUSEINDEX   0x00000020
@@ -31,4 +32,19 @@ private:
 	void write_hdrl();
 	void open_movi();
 	void close_movi(){}
+};
+
+class FileWriter
+{
+public:
+	FileWriter(const timeval& ts);
+	~FileWriter();
+
+	void add_frame(const v4l2_buffer& buf);
+private:
+	std::string gen_fname(const timeval& ts);
+	void delete_old_files(size_t target_size);
+
+	timeval _start;
+	std::unique_ptr<AviMux> _muxer;
 };

@@ -28,7 +28,8 @@ BOOST_MODULES = \
     date_time \
     thread \
     system \
-    chrono
+    chrono \
+    filesystem
 
 #  filesystem    \
 #  graph         \
@@ -49,7 +50,8 @@ OBJ = main.o \
       proto.o \
       flir.o \
       utils.o \
-      default_enc_cfg.o
+      default_enc_cfg.o \
+      avimux.o
 
 BOOST_MODULES_TYPE = 
 

@@ -33,7 +33,7 @@ extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long 
 
 volatile bool g_stop = false;
 int g_chroma_value = 0x80;
-bool g_dump_yuv = true;
+bool g_dump_yuv = false;
 
 int g_tx_buffer_size = 1000;
 
@@ -569,11 +569,16 @@ void run()
 	if (g_dump_yuv)
 		f_dump_yuv = fopen("dump.yuv", "wb");
 
+//	Get RTC value. And put it into FileWriter. We already captured first frame above.
+	FileWriter file_writer(buf.timestamp);
+
 	while(!g_stop) {
         // Startup time measure point #1
         utils::LED_RXD(1);
 
 		v4l2_buffer buf = cap.getFrame();
+
+		file_writer.add_frame(buf);
 
 		if (g_dump_yuv) {
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);

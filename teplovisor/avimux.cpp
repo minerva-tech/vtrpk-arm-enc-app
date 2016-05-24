@@ -1,3 +1,8 @@
+#include <ctime>
+#include <linux/videodev2.h>
+
+#include <boost/filesystem.hpp>
+
 #include "defines.h"
 #include "avimux.h"
 
@@ -115,4 +120,54 @@ void AviMux::open_movi()
 	} movi;
 	
 	_fs.write(reinterpret_cast<const char*>(&movi), sizeof(movi));
+}
+
+FileWriter::FileWriter(const timeval& ts) :
+	_start(ts),
+	_muxer(new AviMux(gen_fname(ts)))
+{
+	::system("hwclock");
+}
+
+FileWriter::~FileWriter()
+{	
+}
+
+std::string FileWriter::gen_fname(const timeval& ts)
+{
+//	char datetime[13]; // YYMMDD_HHmmss
+//	std::strftime(datetime, 13, "%y%m%d_%H%M%S", std::localtime(&ts.tv_sec));
+
+	char date[7] = {0};
+	std::strftime(date, 6, "%y%m%d", std::localtime(&ts.tv_sec));
+
+	char time[7] = {0};
+	std::strftime(time, 6, "%H%M%S", std::localtime(&ts.tv_sec));
+
+	if (boost::filesystem::exists(date)) {
+		if (!boost::filesystem::is_directory(date)) {
+			// TODO : Clarify what we should do in this case
+		}
+	} else {
+		boost::filesystem::create_directory(date);
+	}
+	
+	return std::string(date)+"/"+time+".avi";
+}
+
+void FileWriter::delete_old_files(size_t target_size)
+{
+	
+}
+
+void FileWriter::add_frame(const v4l2_buffer& buf)
+{
+	if (difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
+		const size_t target_size = 0;
+		delete_old_files(target_size);
+		_muxer.reset(new AviMux(gen_fname(buf.timestamp)));
+		_start = buf.timestamp;
+	}
+
+	_muxer->add_frame((uint8_t*)buf.m.userptr, SRC_WIDTH*SRC_HEIGHT/* buf.bytesused/3*2 */);
 }
