@@ -571,6 +571,10 @@ void run()
 
 //	Get RTC value. And put it into FileWriter. We already captured first frame above.
 	FileWriter file_writer(buf.timestamp);
+	
+	// ?????
+	// if (!file_writer)
+	// 	Comm::instance().allowTransmission(true);
 
 	while(!g_stop) {
         // Startup time measure point #1
@@ -580,58 +584,63 @@ void run()
 
 		file_writer.add_frame(buf);
 
-		if (g_dump_yuv) {
+		if (g_dump_yuv)
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
-		}
 
-		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
+//		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
-		size_t coded_size=0;
+		if (Comm::instance().isTransmissionAllowed()) {
+			auto frm = file_writer.next_frame();
 
-		XDAS_Int8* bs = NULL;
+			cap.putFrame(buf);
 
-		if (!to_skip) {
-			bs = enc.encFrame((XDAS_Int8*)buf.m.userptr, w, h, w, &coded_size);
-			to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
-			log() << "Frame encoded";
+			size_t coded_size=0;
+
+			XDAS_Int8* bs = NULL;
+
+			if (!to_skip) {
+				bs = enc.encFrame((XDAS_Int8*)frm.first, w, h/2, w*2, &coded_size);
+				to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
+				log() << "Frame encoded";
+			} else {
+				if (to_skip>0) // to_skip == -1 means no video is sent at all
+					to_skip--; 
+
+				log() << "     VRTPK App: Frame skipped";
+			}
+
+//			const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
+
+//			const ptrdiff_t info_size = cur - &info_out[0];
+
+			Auxiliary::SendTimestamp(frm.second.tv_sec, frm.second.tv_usec);
+
+			// Startup time measure point #2
+			utils::LED_ERR(0);
+
+			if (coded_size) {
+				Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
+
+//				fwrite((uint8_t*)bs, 1, coded_size, f_dump);
+			}
+
+//			if (info_size)
+//				Comm::instance().transmit(2, info_size, &info_out[0]);
+
+			const int buf_size = Comm::instance().getBufferSize();
+			log() << "buffer size " << buf_size;
+			if (buf_size > g_adapt_bitrate_desc[adapt_bitrate_pos].switch_up_from_here) {
+				adapt_bitrate_pos++;
+				log() << "switched to " << adapt_bitrate_pos;
+			}
+			if (buf_size < g_adapt_bitrate_desc[adapt_bitrate_pos].switch_down_from_here) {
+				if (to_skip<0)
+					to_skip = 0;
+				adapt_bitrate_pos--;
+				log() << "switched to " << adapt_bitrate_pos;
+			}
 		} else {
-			if (to_skip>0) // to_skip == -1 means no video is sent at all
-				to_skip--; 
-
-			log() << "     VRTPK App: Frame skipped";
-		}
-
-		cap.putFrame(buf);
-
-		const uint8_t* cur = encode_frame(&info[0], &info_out[0], w/2, h/2);
-
-		const ptrdiff_t info_size = cur - &info_out[0];
-
-		Auxiliary::SendTimestamp(buf.timestamp.tv_sec, buf.timestamp.tv_usec);
-
-        // Startup time measure point #2
-        utils::LED_ERR(0);
-
-		if (coded_size) {
-			Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
-
-//			fwrite((uint8_t*)bs, 1, coded_size, f_dump);
-		}
-
-		if (info_size)
-			Comm::instance().transmit(2, info_size, &info_out[0]);
-
-		const int buf_size = Comm::instance().getBufferSize();
-		log() << "buffer size " << buf_size;
-		if (buf_size > g_adapt_bitrate_desc[adapt_bitrate_pos].switch_up_from_here) {
-			adapt_bitrate_pos++;
-			log() << "switched to " << adapt_bitrate_pos;
-		}
-		if (buf_size < g_adapt_bitrate_desc[adapt_bitrate_pos].switch_down_from_here) {
-            if (to_skip<0)
-                to_skip = 0;
-			adapt_bitrate_pos--;
-			log() << "switched to " << adapt_bitrate_pos;
+			cap.putFrame(buf);
 		}
 	}
 

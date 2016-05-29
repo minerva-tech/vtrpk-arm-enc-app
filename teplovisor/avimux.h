@@ -13,20 +13,20 @@
 
 class AviMux
 {
-	struct chunk_t {
-		std::streamoff off;
-		size_t sz;
-	};
+//	struct chunk_t {
+//		std::streamoff off;
+//		size_t sz;
+//	};
 	
 public:
 	AviMux(const std::string& fname);
 	~AviMux();
 
-	bool add_frame(uint8_t* p, size_t s);
+	size_t add_frame(uint8_t* p, size_t s);
 
 private:
 	std::ofstream _fs;
-	std::vector<chunk_t> _offsets;
+//	std::vector<chunk_t> _offsets;
 	
 	void write_idx1(){}
 	void write_hdrl();
@@ -37,14 +37,34 @@ private:
 class FileWriter
 {
 public:
+	typedef std::pair<uint8_t*, timeval> buf_t;
+
 	FileWriter(const timeval& ts);
 	~FileWriter();
 
+	operator bool();
+
 	void add_frame(const v4l2_buffer& buf);
+	buf_t next_frame();
 private:
+	struct cached_frame_t {
+		int file_idx;
+		size_t off;
+		timeval ts;
+	};
+
 	std::string gen_fname(const timeval& ts);
-	void delete_old_files(size_t target_size);
+	void delete_old_files(size_t target_size, const std::string& path);
 
 	timeval _start;
 	std::unique_ptr<AviMux> _muxer;
+
+	buf_t _cache; // current frame if file isn't used (and if it's used as well). May be there should be std::circular_buffer
+	std::deque<cached_frame_t> _frames; // i don't want to parse avis and moreover 1 hour of video at 8 fps is 28800 frames 
+						// which means like 200Kb
+	std::vector<std::string> _fnames;
+	
+	int _cur_file_idx = -1;
+	std::ifstream _fstream;
 };
+ 

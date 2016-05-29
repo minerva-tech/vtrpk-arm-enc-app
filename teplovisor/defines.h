@@ -4,7 +4,8 @@ const int SRC_WIDTH  = 320;
 const int SRC_HEIGHT = 256;
 
 const int TARGET_WIDTH  = 320;
-const int TARGET_HEIGHT = 128;
+//const int TARGET_HEIGHT = 128;
+const int TARGET_HEIGHT = 256;
 
 const int BITRATE_BIAS = 0;
 const int BITRATE_STEP = 2000;

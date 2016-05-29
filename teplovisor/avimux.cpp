@@ -22,22 +22,24 @@ AviMux::~AviMux()
 	write_idx1();
 }
 
-bool AviMux::add_frame(uint8_t* p, size_t s)
+size_t AviMux::add_frame(uint8_t* p, size_t s)
 {
-	_offsets.push_back(chunk_t{_fs.tellp(), s});
+//	_offsets.push_back(chunk_t{_fs.tellp(), s});
 
 	struct chunk_hdr_t {
 		char code[4] = {'0', '0', 'd', 'b'};
 		uint32_t chunk_sz = 0;
 	} chunk_hdr;
-	
+
 	chunk_hdr.chunk_sz = s;
-	
+
 	_fs.write(reinterpret_cast<const char*>(&chunk_hdr), sizeof(chunk_hdr));
-	
+
+	const size_t off = _fs.tellp();
+
 	_fs.write(reinterpret_cast<const char*>(p), s);
 	
-	return _offsets.size()>AVI_LENGTH_MAX;
+	return off;
 }
 
 void AviMux::write_hdrl()
@@ -127,10 +129,18 @@ FileWriter::FileWriter(const timeval& ts) :
 	_muxer(new AviMux(gen_fname(ts)))
 {
 	::system("hwclock");
+
+	// check_that_media_is_available_and_set_the_flag();
 }
 
 FileWriter::~FileWriter()
 {	
+}
+
+FileWriter::operator bool()
+{
+	// check_the_flag_which_was_set_in_ctor();
+	return true;
 }
 
 std::string FileWriter::gen_fname(const timeval& ts)
@@ -146,28 +156,80 @@ std::string FileWriter::gen_fname(const timeval& ts)
 
 	if (boost::filesystem::exists(date)) {
 		if (!boost::filesystem::is_directory(date)) {
+			boost::filesystem::remove(date);
 			// TODO : Clarify what we should do in this case
 		}
 	} else {
 		boost::filesystem::create_directory(date);
 	}
-	
-	return std::string(date)+"/"+time+".avi";
+
+	std::string fname = std::string(date)+"/"+time+".avi";
+
+	if (boost::filesystem::exists(fname))
+		boost::filesystem::remove_all(fname);
+
+	_fnames.push_back(fname);
+
+	return fname;
 }
 
-void FileWriter::delete_old_files(size_t target_size)
+void FileWriter::delete_old_files(size_t target_size, const std::string& path)
 {
-	
+	while (boost::filesystem::space(path).available < target_size) {
+		boost::filesystem::recursive_directory_iterator dir_it(path);
+
+		auto oldest = std::min_element(dir_it, boost::filesystem::recursive_directory_iterator(), 
+		[](const boost::filesystem::path& a, const boost::filesystem::path& b)->bool{
+			return boost::filesystem::last_write_time(a) < boost::filesystem::last_write_time(b);
+		});
+
+		const auto parent_path = oldest->path().parent_path();
+
+		boost::filesystem::remove(oldest->path());
+
+//		if (boost;:filesystem::is_empty(parent_path))
+//			boost::filesystem::remove(parent_path);
+	}
 }
 
 void FileWriter::add_frame(const v4l2_buffer& buf)
 {
+	_cache.first = (uint8_t*)buf.m.userptr;
+	_cache.second = buf.timestamp;
+
 	if (difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
 		const size_t target_size = 0;
-		delete_old_files(target_size);
+		delete_old_files(target_size, ".");
 		_muxer.reset(new AviMux(gen_fname(buf.timestamp)));
 		_start = buf.timestamp;
 	}
 
-	_muxer->add_frame((uint8_t*)buf.m.userptr, SRC_WIDTH*SRC_HEIGHT/* buf.bytesused/3*2 */);
+	size_t off = _muxer->add_frame((uint8_t*)buf.m.userptr, SRC_WIDTH*SRC_HEIGHT/* buf.bytesused/3*2 */);
+
+	_frames.push_back({_fnames.size()-1, off, buf.timestamp});
+}
+
+FileWriter::buf_t FileWriter::next_frame()
+{
+	if (_frames.empty())
+		return {nullptr, {0,0}};
+
+	if (_frames.size() == 1) { // < 1 probably if there is no storing device
+		_frames.pop_front();
+		return _cache;
+	}
+
+	auto& fr = _frames.front();
+
+	if (fr.file_idx != _cur_file_idx) {
+		_fstream.open(_fnames[fr.file_idx], std::ofstream::binary);
+	}
+
+	_fstream.seekg(fr.off);
+	_fstream.read(reinterpret_cast<char*>(_cache.first), SRC_WIDTH*SRC_HEIGHT);
+	_cache.second = fr.ts;
+
+	_frames.pop_front();
+
+	return _cache;
 }
