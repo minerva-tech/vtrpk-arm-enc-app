@@ -13,6 +13,7 @@
 #include "cap.h"
 #include "enc.h"
 #include "proto.h"
+#include "control.h"
 #include "flir.h"
 
 #include "defines.h"
@@ -667,6 +668,8 @@ int main(int argc, char *argv[])
 
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
+
+		Control ctrl("/dev/ttyS0");
 
 		//Flir flir("/dev/ttyS0");
 

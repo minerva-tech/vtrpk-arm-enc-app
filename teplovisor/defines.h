@@ -15,7 +15,11 @@ const int BITRATE_MAX  =64000;
 const int FPS_MAX = 8;
 const int AVI_LENGTH_MAX = 200;
 
-const int AVI_DURATION_MAX_SEC = 5;
+const int AVI_DURATION_MAX_SEC = 30;
+
+const int CONTROL_PORT_BAUDRATE = 9600;
+
+const char AVI_PATH[] = "/mnt/2";
 
 const char eeprom_filename[] = "/sys/devices/platform/spi_davinci.4/spi4.0/eeprom";
 const char version_info_filename[] = "/etc/versioninfo";

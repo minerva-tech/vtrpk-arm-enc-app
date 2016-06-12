@@ -130,6 +130,8 @@ FileWriter::FileWriter(const timeval& ts) :
 {
 	::system("hwclock");
 
+	check_media();
+
 	// check_that_media_is_available_and_set_the_flag();
 }
 
@@ -137,10 +139,30 @@ FileWriter::~FileWriter()
 {	
 }
 
+void FileWriter::check_media()
+{
+	_media_is_ready = false;
+	
+	if (boost::filesystem::exists(AVI_PATH) && boost::filesystem::is_directory(AVI_PATH)) {
+		const std::string fname = (boost::filesystem::path(AVI_PATH)/boost::filesystem::path("test.file")).native();
+		const char test_string[] = "test string";
+		{
+			std::ofstream of(fname, std::ios_base::binary | std::ios_base::trunc);
+			of.write(test_string, sizeof(test_string));
+		}
+		{
+			std::ifstream fi(fname, std::ios_base::binary);
+			char read_result[sizeof(test_string)] = {0};
+			fi.read(read_result, sizeof(test_string));
+			_media_is_ready = std::strcmp(test_string, read_result) == 0;
+		}
+	}
+}
+
 FileWriter::operator bool()
 {
 	// check_the_flag_which_was_set_in_ctor();
-	return true;
+	return _media_is_ready;
 }
 
 std::string FileWriter::gen_fname(const timeval& ts)
@@ -197,27 +219,30 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 	_cache.first = (uint8_t*)buf.m.userptr;
 	_cache.second = buf.timestamp;
 
-	if (difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
-		const size_t target_size = 0;
-		delete_old_files(target_size, ".");
-		_muxer.reset(new AviMux(gen_fname(buf.timestamp)));
-		_start = buf.timestamp;
+	if (_media_is_ready) {
+		if (difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
+			const size_t target_size = 0;
+			delete_old_files(target_size, ".");
+			_muxer.reset(new AviMux(gen_fname(buf.timestamp)));
+			_start = buf.timestamp;
+		}
+
+		size_t off = _muxer->add_frame((uint8_t*)buf.m.userptr, SRC_WIDTH*SRC_HEIGHT/* buf.bytesused/3*2 */);
+
+		_frames.push_back({_fnames.size()-1, off, buf.timestamp});
 	}
-
-	size_t off = _muxer->add_frame((uint8_t*)buf.m.userptr, SRC_WIDTH*SRC_HEIGHT/* buf.bytesused/3*2 */);
-
-	_frames.push_back({_fnames.size()-1, off, buf.timestamp});
 }
 
 FileWriter::buf_t FileWriter::next_frame()
 {
-	if (_frames.empty())
-		return {nullptr, {0,0}};
 
-	if (_frames.size() == 1) { // < 1 probably if there is no storing device
+	if (_frames.size() == 1 || !_media_is_ready) { // < 1 probably if there is no storing device
 		_frames.pop_front();
 		return _cache;
 	}
+
+	if (_frames.empty())
+		return {nullptr, {0,0}};
 
 	auto& fr = _frames.front();
 
