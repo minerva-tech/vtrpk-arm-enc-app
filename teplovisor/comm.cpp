@@ -228,7 +228,7 @@ void Comm::release() {
 #endif
 
 //! Pointer p is available for use immediately after returning from transmit() because it will be copied to Pkt inside of transmit_pkt
-void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
+size_t Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 {
 	const uint8_t* pend = p+size;
 
@@ -239,8 +239,10 @@ void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 		if (m_out_buf.full())
 			log() << "m_out_buf.full()";
 
-		while (m_out_buf.full())
-			thread::yield();
+		while (m_out_buf.full()) {
+			return size-(pend-p); // according to mail from 05 Aug 2016
+//			thread::yield(); 
+		}
 
 		{
 		lock_guard<mutex> _(m_transmit_lock);
@@ -258,10 +260,12 @@ void Comm::transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p)
 		}
 		}
 	}
+	
+	return size;
 }
 
-void Comm::transmit(uint8_t port, size_t size, const uint8_t* p) {
-	transmit(m_camera_id, port, size, p);
+size_t Comm::transmit(uint8_t port, size_t size, const uint8_t* p) {
+	return transmit(m_camera_id, port, size, p);
 }
 
 void Comm::setCameraID(int id) {

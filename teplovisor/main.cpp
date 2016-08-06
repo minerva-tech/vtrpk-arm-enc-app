@@ -577,6 +577,9 @@ void run()
 	// if (!file_writer)
 	// 	Comm::instance().allowTransmission(true);
 
+	XDAS_Int8* bs = nullptr;
+	size_t coded_size=0;
+
 	while(!g_stop) {
         // Startup time measure point #1
         utils::LED_RXD(1);
@@ -595,14 +598,11 @@ void run()
 
 			cap.putFrame(buf);
 
-			size_t coded_size=0;
-
-			XDAS_Int8* bs = NULL;
-
 			if (!to_skip) {
-				bs = enc.encFrame((XDAS_Int8*)frm.first, w, h/2, w*2, &coded_size);
+				if (!bs) // if bs != nullptr, there are some unsent data in it
+					bs = enc.encFrame((XDAS_Int8*)frm.first, w, h/2, w*2, &coded_size);
 				to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip;
-				log() << "Frame encoded";
+//				log() << "Frame encoded";
 			} else {
 				if (to_skip>0) // to_skip == -1 means no video is sent at all
 					to_skip--; 
@@ -620,8 +620,14 @@ void run()
 			utils::LED_ERR(0);
 
 			if (coded_size) {
-				Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
-
+				size_t sent = Comm::instance().transmit(1, coded_size, (uint8_t*)bs);
+				if (sent == coded_size) {
+					bs = nullptr;
+					coded_size = 0;
+				} else {
+					bs += sent;
+					coded_size -= sent;
+				}
 //				fwrite((uint8_t*)bs, 1, coded_size, f_dump);
 			}
 
@@ -629,7 +635,7 @@ void run()
 //				Comm::instance().transmit(2, info_size, &info_out[0]);
 
 			const int buf_size = Comm::instance().getBufferSize();
-			log() << "buffer size " << buf_size;
+//			log() << "buffer size " << buf_size;
 			if (buf_size > g_adapt_bitrate_desc[adapt_bitrate_pos].switch_up_from_here) {
 				adapt_bitrate_pos++;
 				log() << "switched to " << adapt_bitrate_pos;
@@ -660,6 +666,8 @@ int main(int argc, char *argv[])
 
 	utils::LED_ERR(1);
 
+	// TODO: mount usb stick
+
 	try {
 		if (argc < 3) {
 			std::cout << "a.out <baud_rate> <flow_control> <output buffer size (PACKETS, NOT BYTES)>\n" << std::endl;
@@ -669,7 +677,7 @@ int main(int argc, char *argv[])
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
-		Control ctrl("/dev/ttyS0");
+//		Control ctrl("/dev/ttyS0");
 
 		//Flir flir("/dev/ttyS0");
 

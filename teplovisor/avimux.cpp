@@ -3,6 +3,7 @@
 
 #include <boost/filesystem.hpp>
 
+#include "log_to_file.h"
 #include "defines.h"
 #include "avimux.h"
 
@@ -125,12 +126,15 @@ void AviMux::open_movi()
 }
 
 FileWriter::FileWriter(const timeval& ts) :
-	_start(ts),
-	_muxer(new AviMux(gen_fname(ts)))
+	_start(ts)
 {
-	::system("hwclock");
+	::system("hwclock --hctosys");
+	
+	::system((std::string("ntfs-3g /dev/sda1 ")+AVI_PATH).c_str());
 
 	check_media();
+
+	_muxer.reset(new AviMux(gen_fname(ts)));
 
 	// check_that_media_is_available_and_set_the_flag();
 }
@@ -170,11 +174,15 @@ std::string FileWriter::gen_fname(const timeval& ts)
 //	char datetime[13]; // YYMMDD_HHmmss
 //	std::strftime(datetime, 13, "%y%m%d_%H%M%S", std::localtime(&ts.tv_sec));
 
-	char date[7] = {0};
-	std::strftime(date, 6, "%y%m%d", std::localtime(&ts.tv_sec));
+	char datec[7] = {0};
+	std::strftime(datec, 6, "%y%m%d", std::localtime(&ts.tv_sec));
 
 	char time[7] = {0};
 	std::strftime(time, 6, "%H%M%S", std::localtime(&ts.tv_sec));
+
+	std::string date = (boost::filesystem::path(AVI_PATH)/boost::filesystem::path(datec)).native();
+
+	log() << "New segment file name: " << std::string(date)+"/"+time+".avi";
 
 	if (boost::filesystem::exists(date)) {
 		if (!boost::filesystem::is_directory(date)) {
@@ -198,19 +206,37 @@ std::string FileWriter::gen_fname(const timeval& ts)
 void FileWriter::delete_old_files(size_t target_size, const std::string& path)
 {
 	while (boost::filesystem::space(path).available < target_size) {
+		log() << "No space available at " << path;
+
+		boost::filesystem::path to_delete;
+		std::time_t oldest = std::time(nullptr);
+
 		boost::filesystem::recursive_directory_iterator dir_it(path);
+		boost::system::error_code ec;
 
-		auto oldest = std::min_element(dir_it, boost::filesystem::recursive_directory_iterator(), 
-		[](const boost::filesystem::path& a, const boost::filesystem::path& b)->bool{
-			return boost::filesystem::last_write_time(a) < boost::filesystem::last_write_time(b);
-		});
+		for (; dir_it != boost::filesystem::recursive_directory_iterator(); ++dir_it) {
+			boost::system::error_code ec;
+			std::time_t t = boost::filesystem::last_write_time(*dir_it, ec);
 
-		const auto parent_path = oldest->path().parent_path();
+			if (!ec && boost::filesystem::is_regular_file(*dir_it, ec) && t < oldest) {
+				oldest = t;
+				to_delete = dir_it->path();
+			}
+		}
 
-		boost::filesystem::remove(oldest->path());
+		log() << "Trying to delete " << to_delete.string();
 
-//		if (boost;:filesystem::is_empty(parent_path))
-//			boost::filesystem::remove(parent_path);
+		const auto parent_path = to_delete.parent_path();
+
+		boost::filesystem::remove(to_delete, ec);
+
+		if (ec)
+			log() << "Can't delete file : " << to_delete.string();
+
+		if (boost::filesystem::is_empty(parent_path))
+			boost::filesystem::remove(parent_path, ec);
+
+		return;
 	}
 }
 
@@ -221,8 +247,8 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 
 	if (_media_is_ready) {
 		if (difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
-			const size_t target_size = 0;
-			delete_old_files(target_size, ".");
+			const size_t target_size = SRC_WIDTH*SRC_HEIGHT*AVI_DURATION_MAX_SEC*8 * 2;
+			delete_old_files(target_size, AVI_PATH);
 			_muxer.reset(new AviMux(gen_fname(buf.timestamp)));
 			_start = buf.timestamp;
 		}
@@ -250,10 +276,14 @@ FileWriter::buf_t FileWriter::next_frame()
 		_fstream.open(_fnames[fr.file_idx], std::ofstream::binary);
 	}
 
-	_fstream.seekg(fr.off);
-	_fstream.read(reinterpret_cast<char*>(_cache.first), SRC_WIDTH*SRC_HEIGHT);
-	_cache.second = fr.ts;
-
+	if (_fstream.is_open()) {
+		_fstream.seekg(fr.off);
+		_fstream.read(reinterpret_cast<char*>(_cache.first), SRC_WIDTH*SRC_HEIGHT);
+		_cache.second = fr.ts;
+	} else {
+		// TODO : ? skip till live edge?
+	}
+	
 	_frames.pop_front();
 
 	return _cache;

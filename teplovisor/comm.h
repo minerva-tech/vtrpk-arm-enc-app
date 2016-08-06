@@ -66,7 +66,7 @@ friend struct boost::interprocess::ipcdetail::placement_destroy; // with even mi
 
 public:
 	enum Comment { //!< bit flags
-		Invalid	= 0,
+		Invalid		= 0,
 		Normal		= 1,
 		CrcError	= 2,
 		PacketLost	= 4
@@ -88,18 +88,18 @@ public:
 
 	static const int mss = 12; //< Maximum payload size for single packet
 
-	void transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p);
-	void transmit(uint8_t port, size_t size, const uint8_t* p);
-	
+	size_t transmit(uint8_t cam, uint8_t port, size_t size, const uint8_t* p);
+	size_t transmit(uint8_t port, size_t size, const uint8_t* p);
+
 	void setCameraID(int id);
-	int cameraID() const;
+	int  cameraID() const;
 
 	void setCallback(const Callback& c, int port) { m_callback[port] = c; }
-	
+
 	void setTxBufferSize(size_t size) { m_out_buf.setSize(size); out_buf_size = size; } // TODO: For debug purposes only!
 
 	~Comm();
-	
+
 //	FILE* fout;
 
 	bool open(const std::string& port, int baud_rate, bool flow_control);
@@ -107,12 +107,12 @@ public:
 	void transmit_and_close();
 
 	std::vector<std::pair<std::string, uint32_t> > getStat();
-	
+
 	void drop_unsent();
-	
+
 	void allowTransmission(bool);
 	bool isTransmissionAllowed() const;
-	
+
 	int getBufferedDataSize() const;
 	int getTransmissionRate() const;
 	int getTransmissionTime() const;

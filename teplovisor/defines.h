@@ -19,7 +19,7 @@ const int AVI_DURATION_MAX_SEC = 30;
 
 const int CONTROL_PORT_BAUDRATE = 9600;
 
-const char AVI_PATH[] = "/mnt/2";
+const char AVI_PATH[] = "/mnt/ntfs";
 
 const char eeprom_filename[] = "/sys/devices/platform/spi_davinci.4/spi4.0/eeprom";
 const char version_info_filename[] = "/etc/versioninfo";
