@@ -1,6 +1,8 @@
 #include <ctime>
 #include <linux/videodev2.h>
 
+#include <mntent.h>
+
 #include <boost/filesystem.hpp>
 
 #include "log_to_file.h"
@@ -128,13 +130,12 @@ void AviMux::open_movi()
 FileWriter::FileWriter(const timeval& ts) :
 	_start(ts)
 {
-	::system("hwclock --hctosys");
-	
-	::system((std::string("ntfs-3g /dev/sda1 ")+AVI_PATH).c_str());
+	::system((std::string("ntfs-3g ") + USB_DRIVE_DEV + std::string(" ") + AVI_PATH).c_str());
 
 	check_media();
 
-	_muxer.reset(new AviMux(gen_fname(ts)));
+	if (_media_is_ready)
+		_muxer.reset(new AviMux(gen_fname(ts)));
 
 	// check_that_media_is_available_and_set_the_flag();
 }
@@ -146,7 +147,26 @@ FileWriter::~FileWriter()
 void FileWriter::check_media()
 {
 	_media_is_ready = false;
-	
+
+	FILE* mnt_file = setmntent(PROC_MOUNTS_PATH, "r");
+
+	if (!mnt_file)
+		return;
+
+	mntent *ent = getmntent(mnt_file);
+	while (true) {
+		if (strcmp(ent->mnt_fsname, USB_DRIVE_DEV) == 0 && strcmp(ent->mnt_dir, AVI_PATH) == 0) {
+			log() << "Media was mounted " << ent->mnt_fsname << " to " << ent->mnt_dir;
+			break;
+		}
+
+		ent = getmntent(mnt_file);
+		if (ent == NULL) {
+			log() << "Media wasn't mounted, no files will be stored.";
+			return;
+		}
+	}
+
 	if (boost::filesystem::exists(AVI_PATH) && boost::filesystem::is_directory(AVI_PATH)) {
 		const std::string fname = (boost::filesystem::path(AVI_PATH)/boost::filesystem::path("test.file")).native();
 		const char test_string[] = "test string";
@@ -263,7 +283,8 @@ FileWriter::buf_t FileWriter::next_frame()
 {
 
 	if (_frames.size() == 1 || !_media_is_ready) { // < 1 probably if there is no storing device
-		_frames.pop_front();
+		if (!_frames.empty())
+			_frames.pop_front();
 		return _cache;
 	}
 

@@ -677,6 +677,8 @@ int main(int argc, char *argv[])
 		if (!Comm::instance().open("/dev/ttyS1", atoi(argv[1]), atoi(argv[2])))
 			throw ex("Cannot open serial port");
 
+		::system("hwclock --hctosys");
+
 //		Control ctrl("/dev/ttyS0");
 
 		//Flir flir("/dev/ttyS0");

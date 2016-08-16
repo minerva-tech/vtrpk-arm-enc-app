@@ -17,9 +17,12 @@ const int AVI_LENGTH_MAX = 200;
 
 const int AVI_DURATION_MAX_SEC = 30;
 
-const int CONTROL_PORT_BAUDRATE = 9600;
+const int CONTROL_PORT_BAUDRATE = 115200;
 
+const char USB_DRIVE_DEV[] = "/dev/sda1";
 const char AVI_PATH[] = "/mnt/ntfs";
+
+const char PROC_MOUNTS_PATH[] = "/proc/mounts";
 
 const char eeprom_filename[] = "/sys/devices/platform/spi_davinci.4/spi4.0/eeprom";
 const char version_info_filename[] = "/etc/versioninfo";

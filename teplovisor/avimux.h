@@ -70,4 +70,3 @@ private:
 	int _cur_file_idx = -1;
 	std::ifstream _fstream;
 };
- 
