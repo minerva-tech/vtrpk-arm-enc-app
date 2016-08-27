@@ -15,12 +15,16 @@ const int BITRATE_MAX  =64000;
 const int FPS_MAX = 8;
 const int AVI_LENGTH_MAX = 200;
 
+const int AVI_FIRST_SEGMENT_DURATION = 10;
 const int AVI_DURATION_MAX_SEC = 30;
 
 const int CONTROL_PORT_BAUDRATE = 115200;
 
+const unsigned char CRC_OFFSET = 0x89;
+
 const char USB_DRIVE_DEV[] = "/dev/sda1";
 const char AVI_PATH[] = "/mnt/ntfs";
+const char AVI_FALLBACK_PATH[] = "/tmp";
 
 const char PROC_MOUNTS_PATH[] = "/proc/mounts";
 

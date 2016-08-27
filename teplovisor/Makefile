@@ -112,7 +112,7 @@ CONFIGPKG = h264enc_ti_dm365_linux
 ALG_LIB1 = $(H264ROOT)/lib/h264venc_ti_arm926.a
 ALG_LIB2 = $(H264ROOT)/lib/h264v_ti_dma_dm365.a
 
-BOOSTROOT = $(PWD)/../../boost/boost_1_53_0
+BOOSTROOT = $(PWD)/../../boost/boost_1_61_0
 
 #CPPFLAGS += -I /home/kov/dm365/boost/boost_1_48_0/ $(BOOST_CPPFLAGS) -O2 -march=armv5t -D"_ARM926" -U"ENABLE_ARM926_TCM"
 #CPPFLAGS += -I/home/a/Documents/boost_1_48_0/ $(INCLUDES) $(BOOST_CPPFLAGS) -O2 -march=armv5t -D"_ARM926" -U"ENABLE_ARM926_TCM" 

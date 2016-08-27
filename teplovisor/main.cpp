@@ -572,7 +572,7 @@ void run()
 
 //	Get RTC value. And put it into FileWriter. We already captured first frame above.
 	FileWriter file_writer(buf.timestamp);
-	
+
 	// ?????
 	// if (!file_writer)
 	// 	Comm::instance().allowTransmission(true);
@@ -679,7 +679,7 @@ int main(int argc, char *argv[])
 
 		::system("hwclock --hctosys");
 
-//		Control ctrl("/dev/ttyS0");
+		Control ctrl("/dev/ttyS0");
 
 		//Flir flir("/dev/ttyS0");
 
@@ -728,4 +728,4 @@ int main(int argc, char *argv[])
 	::system("sync");
 
 	return 0;
-}
+	}

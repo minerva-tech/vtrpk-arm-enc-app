@@ -12,16 +12,16 @@
 AviMux::AviMux(const std::string& fname)
 {
 	_fs.open(fname, std::ofstream::binary);
-	
+
 	write_hdrl();
-	
+
 	open_movi();
 }
 
 AviMux::~AviMux()
 {
 	close_movi();
-	
+
 	write_idx1();
 }
 
@@ -123,19 +123,16 @@ void AviMux::open_movi()
 		uint32_t list0_sz = 0;
 		char movi[4] = {'m', 'o', 'v', 'i'};
 	} movi;
-	
+
 	_fs.write(reinterpret_cast<const char*>(&movi), sizeof(movi));
 }
 
 FileWriter::FileWriter(const timeval& ts) :
-	_start(ts)
+	_start(ts),
+	_media_is_ready(false),
+	_media_was_checked(false)
 {
-	::system((std::string("ntfs-3g ") + USB_DRIVE_DEV + std::string(" ") + AVI_PATH).c_str());
-
-	check_media();
-
-	if (_media_is_ready)
-		_muxer.reset(new AviMux(gen_fname(ts)));
+	_muxer.reset(new AviMux(gen_fname(ts, AVI_FALLBACK_PATH)));		
 
 	// check_that_media_is_available_and_set_the_flag();
 }
@@ -189,7 +186,7 @@ FileWriter::operator bool()
 	return _media_is_ready;
 }
 
-std::string FileWriter::gen_fname(const timeval& ts)
+std::string FileWriter::gen_fname(const timeval& ts, const char* path)
 {
 //	char datetime[13]; // YYMMDD_HHmmss
 //	std::strftime(datetime, 13, "%y%m%d_%H%M%S", std::localtime(&ts.tv_sec));
@@ -200,7 +197,7 @@ std::string FileWriter::gen_fname(const timeval& ts)
 	char time[7] = {0};
 	std::strftime(time, 6, "%H%M%S", std::localtime(&ts.tv_sec));
 
-	std::string date = (boost::filesystem::path(AVI_PATH)/boost::filesystem::path(datec)).native();
+	std::string date = (boost::filesystem::path(path)/boost::filesystem::path(datec)).native();
 
 	log() << "New segment file name: " << std::string(date)+"/"+time+".avi";
 
@@ -265,11 +262,42 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 	_cache.first = (uint8_t*)buf.m.userptr;
 	_cache.second = buf.timestamp;
 
-	if (_media_is_ready) {
-		if (difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
-			const size_t target_size = SRC_WIDTH*SRC_HEIGHT*AVI_DURATION_MAX_SEC*8 * 2;
+	const size_t target_size = SRC_WIDTH*SRC_HEIGHT*AVI_DURATION_MAX_SEC*8 * 2;
+
+	if (!_media_was_checked && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
+		::system((std::string("ntfs-3g ") + USB_DRIVE_DEV + std::string(" ") + AVI_PATH).c_str());
+
+		check_media();
+
+		_media_was_checked = true;
+
+		if (_media_is_ready) {
+			const boost::filesystem::path from = boost::filesystem::path(_fnames.front());
+			const boost::filesystem::path to = boost::filesystem::path(AVI_PATH) /
+				from.lexically_relative(boost::filesystem::path(AVI_FALLBACK_PATH));
+
+			const boost::filesystem::path date = boost::filesystem::path(AVI_PATH) / 
+					*std::next(from.rbegin());
+
+			log() << "Creating directory " << date.string();
+
+			if (boost::filesystem::exists(date) && !boost::filesystem::is_directory(date))
+				boost::filesystem::remove(date);
+			else
+				boost::filesystem::create_directory(date);
+
 			delete_old_files(target_size, AVI_PATH);
-			_muxer.reset(new AviMux(gen_fname(buf.timestamp)));
+
+			log() << "Copy " << from.string() << " to " << to.string();
+
+			boost::filesystem::copy_file(from, to);
+		}
+	}
+
+	if (_media_is_ready || !_media_was_checked) {
+		if (_media_is_ready && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
+			delete_old_files(target_size, AVI_PATH);
+			_muxer.reset(new AviMux(gen_fname(buf.timestamp, AVI_PATH)));
 			_start = buf.timestamp;
 		}
 
@@ -281,7 +309,6 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 
 FileWriter::buf_t FileWriter::next_frame()
 {
-
 	if (_frames.size() == 1 || !_media_is_ready) { // < 1 probably if there is no storing device
 		if (!_frames.empty())
 			_frames.pop_front();

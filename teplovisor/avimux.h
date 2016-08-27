@@ -54,10 +54,11 @@ private:
 	};
 
 	void check_media();
-	std::string gen_fname(const timeval& ts);
+	std::string gen_fname(const timeval& ts, const char* path);
 	void delete_old_files(size_t target_size, const std::string& path);
 
 	bool _media_is_ready;
+	bool _media_was_checked;
 
 	timeval _start;
 	std::unique_ptr<AviMux> _muxer;
