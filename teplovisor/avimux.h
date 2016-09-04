@@ -4,6 +4,8 @@
 #include <fstream>
 #include <memory>
 
+#include "utils.h"
+
 #define 	AVIF_HASINDEX		0x00000010
 #define 	AVIF_MUSTUSEINDEX   0x00000020
 #define 	AVIF_ISINTERLEAVED  0x00000100
@@ -53,6 +55,11 @@ private:
 		timeval ts;
 	};
 
+	enum class streaming_mode_t {
+		no_latency = 0,
+		transmit_all = 1
+	};
+
 	void check_media();
 	std::string gen_fname(const timeval& ts, const char* path);
 	void delete_old_files(size_t target_size, const std::string& path);
@@ -70,4 +77,6 @@ private:
 	
 	int _cur_file_idx = -1;
 	std::ifstream _fstream;
+	
+	streaming_mode_t _streaming_mode;
 };

@@ -33,6 +33,7 @@ extern "C" {
 extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
 
 volatile bool g_stop = false;
+volatile bool g_shutdown = false;
 int g_chroma_value = 0x80;
 bool g_dump_yuv = false;
 
@@ -52,7 +53,7 @@ public:
 
 	virtual std::string GetEncCfg() {
 
-		std::ifstream eeprom(eeprom_filename);
+		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return std::string();
 
@@ -73,7 +74,7 @@ public:
 	}
 
 	virtual std::string GetMDCfg() {
-		std::ifstream eeprom(eeprom_filename);
+		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return std::string();
 
@@ -96,7 +97,7 @@ public:
 	}
 
 	virtual std::vector<uint8_t> GetROI() {
-		std::ifstream eeprom(eeprom_filename);
+		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return std::vector<uint8_t>();
 
@@ -154,14 +155,14 @@ public:
 	}
 
 	virtual uint8_t GetCameraID() {
-		std::ifstream eeprom(eeprom_filename);
+		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return 0;
 
 		eeprom.seekg(cam_id_config_offset, std::ios_base::beg);
 
 		uint8_t id;
-		eeprom >> id;
+		eeprom.read((char*)&id, sizeof(id));
 
 		id = std::min((uint8_t)3, id);
 
@@ -192,7 +193,7 @@ public:
 		if (str.size() > encoder_config_max_size)
 			return;
 
-		std::ofstream eeprom(eeprom_filename);
+		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return;
 
@@ -208,7 +209,7 @@ public:
 		if (str.size() > md_config_max_size)
 			return;
 
-		std::ofstream eeprom(eeprom_filename);
+		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return;
 
@@ -224,7 +225,7 @@ public:
 		if (str.size() > roi_config_max_size)
 			return;
 
-		std::ofstream eeprom(eeprom_filename);
+		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return;
 
@@ -246,13 +247,13 @@ public:
 	}
 
 	virtual void SetCameraID(uint8_t id) {
-		std::ofstream eeprom(eeprom_filename);
+		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return;
 
 		eeprom.seekp(cam_id_config_offset, std::ios_base::beg);
 
-		eeprom << id;
+		eeprom.write((char*)&id, sizeof(id));
 
 		Comm::instance().setCameraID(id);
 
@@ -583,7 +584,7 @@ void run()
 	while(!g_stop) {
         // Startup time measure point #1
         utils::LED_RXD(1);
-
+		
 		v4l2_buffer buf = cap.getFrame();
 
 		file_writer.add_frame(buf);
@@ -649,6 +650,9 @@ void run()
 		} else {
 			cap.putFrame(buf);
 		}
+		
+		if (utils::get_gpio(11) == 1)
+			g_stop = true;
 	}
 
 	if (g_dump_yuv)
@@ -679,9 +683,13 @@ int main(int argc, char *argv[])
 
 		::system("hwclock --hctosys");
 
-		Control ctrl("/dev/ttyS0");
+		{
+			utils::set_gpio(14, 0);
+			Flir flir("/dev/ttyS0");
+		}
+		utils::set_gpio(14, 1);
 
-		//Flir flir("/dev/ttyS0");
+		Control ctrl("/dev/ttyS0");
 
 	//	ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 		ServerCmds cmds;
@@ -701,7 +709,7 @@ int main(int argc, char *argv[])
 
 		Comm::instance().setTxBufferSize(g_tx_buffer_size);
 
-		while(1) {
+		while(!g_shutdown) {
 			try {
 				run();
 			}

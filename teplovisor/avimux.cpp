@@ -132,7 +132,9 @@ FileWriter::FileWriter(const timeval& ts) :
 	_media_is_ready(false),
 	_media_was_checked(false)
 {
-	_muxer.reset(new AviMux(gen_fname(ts, AVI_FALLBACK_PATH)));		
+	_muxer.reset(new AviMux(gen_fname(ts, AVI_FALLBACK_PATH)));
+
+	_streaming_mode = static_cast<streaming_mode_t>(utils::get_streaming_mode());
 
 	// check_that_media_is_available_and_set_the_flag();
 }
@@ -309,7 +311,7 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 
 FileWriter::buf_t FileWriter::next_frame()
 {
-	if (_frames.size() == 1 || !_media_is_ready) { // < 1 probably if there is no storing device
+	if (_frames.size() == 1 || !_media_is_ready || _streaming_mode == streaming_mode_t::no_latency) { // < 1 probably if there is no storing device
 		if (!_frames.empty())
 			_frames.pop_front();
 		return _cache;

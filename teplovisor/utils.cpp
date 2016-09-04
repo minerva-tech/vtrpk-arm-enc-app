@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include "defines.h"
+
 namespace utils {
 
 void LED_RXD(int on)
@@ -30,6 +32,93 @@ void LED_ERR(int on)
 	fflush(fled);
     fclose(fled);
     //boost::this_thread::sleep_for(boost::chrono::milliseconds(1750));
+}
+
+void set_gpio(int num, int val)
+{
+	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
+	fprintf(fexport, "%i", num);
+	fclose(fexport);
+
+	char name[] = "/sys/class/gpio/gpioXXXX/direction";
+	sprintf(name, "/sys/class/gpio/gpio%i/direction", num);
+	FILE* fdir = fopen(name, "wt");
+	fprintf(fdir, "out");
+	fclose(fdir);
+
+	sprintf(name, "/sys/class/gpio/gpio%i/value", num);
+	FILE* fval = fopen(name, "wb");
+	fprintf(fval, "%i\n", val);
+	fclose(fval);
+}
+
+int get_gpio(int num)
+{
+	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
+	fprintf(fexport, "%i", num);
+	fclose(fexport);
+
+	char name[] = "/sys/class/gpio/gpioXXXX/direction";
+	sprintf(name, "/sys/class/gpio/gpio%i/direction", num);
+	FILE* fdir = fopen(name, "wt");
+	fprintf(fdir, "in");
+	fclose(fdir);
+
+	sprintf(name, "/sys/class/gpio/gpio%i/value", num);
+	FILE* fval = fopen(name, "wb");
+	int val = 0;
+	fscanf(fval, "%i\n", &val);
+	fclose(fval);
+	
+	return val;
+}
+
+std::string get_version_info() 
+{
+	std::string ver;
+
+	std::ifstream version_file(version_info_filename);
+	if (!version_file) {
+		ver = "No system version info.\n";
+	} else {
+		version_file.seekg(0, std::ios_base::end);
+		const uint32_t size = version_file.tellg();
+		version_file.seekg(0, std::ios_base::beg);
+
+		log() << "Version Info size: " << size;
+
+		ver.resize(size);
+
+		version_file.read(&ver[0], ver.size()*sizeof(ver[0]));
+	}
+
+	return ver;
+}
+
+void set_streaming_mode(uint8_t mode)
+{
+		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
+		if (!eeprom)
+			return;
+
+		eeprom.seekp(streaming_mode_offset, std::ios_base::beg);
+
+		eeprom.write((char*)&mode, sizeof(mode));
+}
+
+uint8_t get_streaming_mode()
+{
+		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
+		if (!eeprom)
+			return 0;
+
+		eeprom.seekg(streaming_mode_offset, std::ios_base::beg);
+
+		uint8_t mode = 0;
+
+		eeprom.read((char*)&mode, sizeof(mode));
+		
+		return mode;
 }
 
 } // namespace utils
