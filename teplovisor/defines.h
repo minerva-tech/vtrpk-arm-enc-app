@@ -23,7 +23,7 @@ const int CONTROL_PORT_BAUDRATE = 115200;
 const unsigned char CRC_OFFSET = 0x89;
 
 const char USB_DRIVE_DEV[] = "/dev/sda1";
-const char AVI_PATH[] = "/mnt/ntfs";
+const char AVI_PATH[] = "/mnt/usb-storage";
 const char AVI_FALLBACK_PATH[] = "/tmp";
 
 const char PROC_MOUNTS_PATH[] = "/proc/mounts";

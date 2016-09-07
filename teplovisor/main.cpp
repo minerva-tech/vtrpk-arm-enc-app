@@ -571,8 +571,12 @@ void run()
 	if (g_dump_yuv)
 		f_dump_yuv = fopen("dump.yuv", "wb");
 
+//	log() << "-1";
+
 //	Get RTC value. And put it into FileWriter. We already captured first frame above.
 	FileWriter file_writer(buf.timestamp);
+	
+//	log() << "0";
 
 	// ?????
 	// if (!file_writer)
@@ -584,10 +588,14 @@ void run()
 	while(!g_stop) {
         // Startup time measure point #1
         utils::LED_RXD(1);
-		
+
 		v4l2_buffer buf = cap.getFrame();
 
+//		log() << "1";
+
 		file_writer.add_frame(buf);
+
+//		log() << "2";
 
 		if (g_dump_yuv)
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
@@ -651,7 +659,7 @@ void run()
 			cap.putFrame(buf);
 		}
 		
-		if (utils::get_gpio(11) == 1)
+		if (utils::get_gpio(10) == 1)
 			g_stop = true;
 	}
 

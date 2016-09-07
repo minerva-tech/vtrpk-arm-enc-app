@@ -98,7 +98,8 @@ void Control::parse(uint8_t* p, size_t sz)
 		log() << "Control data length : " <<  length << ", so full message length : " << full_len;
 
 		if (m_buf.size() >= full_len) {
-			log() << "Packet was received, size : " << full_len << " dst/src : " << m_buf[0] << " cmd/ack/req : " << m_buf[1];
+			log() << "Packet was received, size : " << full_len << " dst/src : " << (int)m_buf[0] 
+				<< " cmd/ack/req : " << (int)m_buf[1];
 
 			pkt_t *pkt = reinterpret_cast<pkt_t*>(&m_buf[0]);
 			pkt->crcf = m_buf[full_len-1];

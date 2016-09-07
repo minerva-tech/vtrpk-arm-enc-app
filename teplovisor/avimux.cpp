@@ -3,8 +3,6 @@
 
 #include <mntent.h>
 
-#include <boost/filesystem.hpp>
-
 #include "log_to_file.h"
 #include "defines.h"
 #include "avimux.h"
@@ -140,7 +138,14 @@ FileWriter::FileWriter(const timeval& ts) :
 }
 
 FileWriter::~FileWriter()
-{	
+{
+	if (_copy_from && _copy_to) {
+		delete_old_files(target_size, AVI_PATH);
+
+		log() << "Copy " << _copy_from->string() << " to " << _copy_to->string();
+
+		boost::filesystem::copy_file(*_copy_from, *_copy_to);	
+	}
 }
 
 void FileWriter::check_media()
@@ -264,8 +269,6 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 	_cache.first = (uint8_t*)buf.m.userptr;
 	_cache.second = buf.timestamp;
 
-	const size_t target_size = SRC_WIDTH*SRC_HEIGHT*AVI_DURATION_MAX_SEC*8 * 2;
-
 	if (!_media_was_checked && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
 		::system((std::string("ntfs-3g ") + USB_DRIVE_DEV + std::string(" ") + AVI_PATH).c_str());
 
@@ -274,12 +277,12 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 		_media_was_checked = true;
 
 		if (_media_is_ready) {
-			const boost::filesystem::path from = boost::filesystem::path(_fnames.front());
-			const boost::filesystem::path to = boost::filesystem::path(AVI_PATH) /
-				from.lexically_relative(boost::filesystem::path(AVI_FALLBACK_PATH));
+			_copy_from = boost::filesystem::path(_fnames.front());
+			_copy_to = boost::filesystem::path(AVI_PATH) /
+				_copy_from->lexically_relative(boost::filesystem::path(AVI_FALLBACK_PATH));
 
 			const boost::filesystem::path date = boost::filesystem::path(AVI_PATH) / 
-					*std::next(from.rbegin());
+					*std::next(_copy_from->rbegin());
 
 			log() << "Creating directory " << date.string();
 
@@ -287,12 +290,6 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 				boost::filesystem::remove(date);
 			else
 				boost::filesystem::create_directory(date);
-
-			delete_old_files(target_size, AVI_PATH);
-
-			log() << "Copy " << from.string() << " to " << to.string();
-
-			boost::filesystem::copy_file(from, to);
 		}
 	}
 

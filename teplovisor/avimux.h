@@ -4,6 +4,8 @@
 #include <fstream>
 #include <memory>
 
+#include <boost/filesystem.hpp>
+
 #include "utils.h"
 
 #define 	AVIF_HASINDEX		0x00000010
@@ -49,6 +51,8 @@ public:
 	void add_frame(const v4l2_buffer& buf);
 	buf_t next_frame();
 private:
+	static const size_t target_size = SRC_WIDTH*SRC_HEIGHT*AVI_DURATION_MAX_SEC*8 * 2;
+
 	struct cached_frame_t {
 		int file_idx;
 		size_t off;
@@ -66,6 +70,9 @@ private:
 
 	bool _media_is_ready;
 	bool _media_was_checked;
+	
+	boost::optional<boost::filesystem::path> _copy_from;
+	boost::optional<boost::filesystem::path> _copy_to;
 
 	timeval _start;
 	std::unique_ptr<AviMux> _muxer;
