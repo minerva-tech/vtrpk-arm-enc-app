@@ -49,10 +49,11 @@ OBJ = main.o \
       cap.o \
       proto.o \
       flir.o \
-	  control.o \
+      control.o \
       utils.o \
       default_enc_cfg.o \
-      avimux.o
+      avimux.o \
+      servercmds.o
 
 BOOST_MODULES_TYPE = 
 

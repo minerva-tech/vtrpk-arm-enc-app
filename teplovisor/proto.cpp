@@ -37,7 +37,7 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 
 	switch (msg->type()) {
 	case Command:
-		execute(msg->payload[0], msg->payload[1]);
+        execute(msg->payload[0], msg->payload[1], msg->payload[2]);
 		break;
 	case EncConfig:
 		//getEncCfgChunk(msg);
@@ -49,28 +49,32 @@ void Server::Callback(uint8_t camera, const uint8_t* payload, int comment)
 	case MDConfig:
 		getEncCfgChunk(msg, m_md_cfg, boost::bind(&IServerCmds::SetMDCfg, m_callbacks, _1));
 		break;
-    case VersionInfo:
-        getEncCfgChunk(msg, m_version_info, boost::bind(&IServerCmds::SetVersionInfo, m_callbacks, _1));
-        break;
+	case VersionInfo:
+		getEncCfgChunk(msg, m_version_info, boost::bind(&IServerCmds::SetVersionInfo, m_callbacks, _1));
+		break;
+//    case VSensSettings:
+//        getEncCfgChunk(msg, m_vsensor_settings, boost::bind(&IServerCmds::SetVSensorSettings, m_callbacks, _1));
+//		break;
     }
 
 	return;
 }
 
-void Server::execute(uint8_t command, uint8_t arg)
+void Server::execute(uint8_t command, uint8_t arg0, uint8_t arg1)
 {
 	log() << "command was received : " << (int)command;
 	
 	switch (command) {
 	case Hello:
-		if (m_callbacks->Hello(arg))
-			boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID()));
+        log() << "Hello command received : " << (int)arg0;
+        if (m_callbacks->Hello(arg0))
+            boost::thread(boost::bind(&Server::SendCommand, Hello, Comm::instance().cameraID(), 0));
 		break;
 	case Start:
 		m_callbacks->Start();
 		break;
 	case Stop:
-		m_callbacks->Stop();
+   		m_callbacks->Stop();
 		break;
 	case RequestEncConfig:
 		boost::thread(boost::bind(&Server::SendEncCfg, m_callbacks->GetEncCfg())); // possible deadlock, SendEncCfg should start separate thread for sending.
@@ -81,15 +85,30 @@ void Server::execute(uint8_t command, uint8_t arg)
 	case RequestROI:
 		boost::thread(boost::bind(&Server::SendROI, m_callbacks->GetROI()));
 		break;
-    case RequestVersionInfo:
-        boost::thread(boost::bind(&Server::SendVersionInfo, m_callbacks->GetVersionInfo()));
-        break;
-    case RequestRegister:
-		boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg, m_callbacks->GetRegister(arg)));
+	case RequestVersionInfo:
+		boost::thread(boost::bind(&Server::SendVersionInfo, m_callbacks->GetVersionInfo()));
+		break;
+	case RequestRegister:
+        boost::thread(boost::bind(&Auxiliary::SendRegisterVal, arg0, m_callbacks->GetRegister(arg0)));
 		break;
 	case SetID:
-		m_callbacks->SetCameraID(arg);
+        m_callbacks->SetCameraID(arg0);
 		break;
+    case ToggleStreams:
+        log() << "Set streams enable flag command : " << (int)arg0;
+        m_callbacks->SetStreamsEnableFlag(arg0);
+        break;
+	case RequestVSensorConfig: // Command #11
+        printf(" EXECUTE : VSENSOR\n");
+        boost::thread(boost::bind(&Server::SendVSensorConfig, m_callbacks->GetVSensorConfig()));
+		break;
+    case BufferClear:
+        m_callbacks->BufferClear();
+        break;
+    case SetBitrate:
+        log() << "Set bitrate command : " << (int)arg0 << " " << (int)arg1;
+        m_callbacks->SetBitrate(arg0 | (arg1 << 8));
+        break;
 	default:
 		log() << "Invalid command";
 	};
@@ -105,19 +124,19 @@ void Server::getEncCfgChunk(const Server::Message* msg, CfgContainer& cfg, const
 //	std::string& str = m_config[cfg_idx];
 
 //	std::copy(&msg->payload[0], &msg->payload[msg->size()], std::inserter(str, str.end()));
-    if (msg->first_pkt()) {
-        cfg.clear();
-        m_first_packet_was_received[msg->type()] = true;
-    }
+	if (msg->first_pkt()) {
+		cfg.clear();
+		m_first_packet_was_received[msg->type()] = true;
+	}
 
 	std::copy(&msg->payload[0], &msg->payload[msg->size()], std::inserter(cfg, cfg.end()));
 
-    if (msg->last_pkt() && m_first_packet_was_received[msg->type()]) {
+	if (msg->last_pkt() && m_first_packet_was_received[msg->type()]) {
 //		m_callbacks->SetEncCfg(str);
 		cb(cfg);
 //		str.clear();
 		cfg.clear();
-        m_first_packet_was_received[msg->type()] = false;
+		m_first_packet_was_received[msg->type()] = false;
 	}
 
 	return;
@@ -136,6 +155,7 @@ void Server::SendCfg(const CfgContainer& cfg, MessageTypes msg_type)
 
 	bool empty_last_pkt = false;
 
+    int ixxx = 0;
 	while(cfg_it != cfg.end()) {
 		const size_t data_left = cfg.end() - cfg_it;
 //		const bool last_pkt = data_left <= Server::Message::mts;
@@ -150,6 +170,8 @@ void Server::SendCfg(const CfgContainer& cfg, MessageTypes msg_type)
 		std::copy(cfg_it, cfg_it+to_send, &msgs.back().payload[0]);
 
 		cfg_it += to_send;
+        
+        printf(" I_X_X_X %d\n", ixxx++);
 	}
 	
 	if (empty_last_pkt)
@@ -181,20 +203,26 @@ void Server::SendVersionInfo(const std::string& version_info)
     SendCfg(version_info, VersionInfo);
 }
 
+void Server::SendVSensorConfig(const std::string& vsensset)
+{
+	SendCfg(vsensset, VSensSettings);
+}
+
 void Server::SendID(int id)
 {
     SendCommand(SetID, id);
 }
 
-void Server::SendCommand(Commands cmd, uint8_t arg)
+void Server::SendCommand(Commands cmd, uint8_t arg0, uint8_t arg1)
 {
 	Server::Message msg(Command, true, 1);
 	msg.payload[0] = cmd;
-	msg.payload[1] = arg;
+    msg.payload[1] = arg0;
+    msg.payload[2] = arg1;
 	Comm::instance().transmit(0, sizeof(msg), reinterpret_cast<const uint8_t*>(&msg));
 }
 
-int Client::Handshake(IObserver* observer)
+int Client::Handshake(IObserver* observer, bool* motion_enable)
 {
     Cmds cmds;
     Server server(&cmds);
@@ -203,12 +231,16 @@ int Client::Handshake(IObserver* observer)
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
     while(!cmds.m_hello_received) {
+//    while(cmds.m_streams_enable == -1) { // CAUTION! when we will enable "motion detector" checkbox, this part of a code should be changed. Problem is after hello is received, camera number still isn't set. So, togglestreams command is rejected because it contains wrong camera number, and we ignore cam id in hello packet only
         if (chrono::steady_clock::now() - start > timeout)
             return -1;
         if (observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    if (motion_enable)
+        *motion_enable = cmds.m_streams_enable & MOTION_ENABLE_BIT;
 
     return cmds.m_camera_id;
 }
@@ -228,6 +260,8 @@ std::string Client::GetEncCfg(IObserver* observer)
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_enc_cfg_received = false;
+
     return cmds.m_enc_cfg;
 }
 
@@ -244,6 +278,8 @@ std::string Client::GetMDCfg(IObserver* observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
+
+    cmds.m_md_cfg_received = false;
 
     return cmds.m_md_cfg;
 }
@@ -262,6 +298,8 @@ std::vector<uint8_t> Client::GetROI(IObserver* observer)
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_roi_received = false;
+
     return cmds.m_roi;
 }
 
@@ -273,11 +311,32 @@ std::string Client::GetVersionInfo(IObserver* observer)
     server.SendCommand(Server::RequestVersionInfo);
 
     chrono::steady_clock::time_point start = chrono::steady_clock::now();
-    while(!cmds.m_roi_received && chrono::steady_clock::now() - start < timeout) {
+    while(!cmds.m_version_info_received && chrono::steady_clock::now() - start < timeout) {
         if (observer)
             observer->progress();
         boost::this_thread::sleep(boost::posix_time::milliseconds(10));
     }
 
+    cmds.m_version_info_received = false;
+
     return cmds.m_version_info;
+}
+/*Video sensor info*/
+std::string Client::GetVSensorConfig(IObserver* observer)
+{
+    Cmds cmds;
+    Server server(&cmds);
+
+    server.SendCommand(Server::RequestVSensorConfig);
+
+    chrono::steady_clock::time_point start = chrono::steady_clock::now();
+    while(!cmds.m_vsensor_settings_received && chrono::steady_clock::now() - start < timeout) {
+        if (observer)
+            observer->progress();
+        boost::this_thread::sleep(boost::posix_time::milliseconds(10));
+    }
+
+    cmds.m_vsensor_settings_received = false;
+
+    return cmds.m_vsensor_settings;
 }

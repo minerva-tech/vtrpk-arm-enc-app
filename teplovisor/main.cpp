@@ -23,6 +23,9 @@
 
 #include "utils.h"
 
+#include "auxiliary.h"
+#include "servercmds.h"
+
 /*
 extern "C" {
 #include "tables.h"
@@ -31,6 +34,9 @@ extern "C" {
 }*/
 
 extern "C" uint8_t* encode_frame(const uint8_t* in, uint8_t* out, unsigned long w, unsigned long h);
+
+volatile int  g_bitrate = -1;
+volatile bool g_change_bitrate = false; // TODO argh, it's soooo ugly. It must be changed as soon as i'll have hardware for checking that console still works after all changes.
 
 volatile bool g_stop = false;
 volatile bool g_shutdown = false;
@@ -41,228 +47,6 @@ int g_tx_buffer_size = 1000;
 
 extern char __BUILD_DATE;
 extern char __BUILD_NUMBER;
-
-class ServerCmds : public IServerCmds
-{
-public:
-	ServerCmds(Flir* flir = NULL) : m_flir(flir) {}
-
-	virtual bool Hello(int id) {Comm::instance().drop_unsent();return true;}
-	virtual void Start() {log()<<"start";g_stop = false;}
-	virtual void Stop() {g_stop = true;}
-
-	virtual std::string GetEncCfg() {
-
-		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return std::string();
-
-		eeprom.seekg(encoder_config_offset, std::ios_base::beg);
-
-		uint32_t size = 0;
-		eeprom.read((char*)&size, sizeof(size));
-
-		if (size > encoder_config_max_size)
-			return std::string();
-
-		std::string str;
-		str.resize(size);
-
-		eeprom.read(&str[0], str.size()*sizeof(str[0]));
-
-		return str;
-	}
-
-	virtual std::string GetMDCfg() {
-		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return std::string();
-
-		eeprom.seekg(md_config_offset, std::ios_base::beg);
-
-		uint32_t size = 0;
-		eeprom.read((char*)&size, sizeof(size));
-
-		log() << "MD config size: " << size;
-
-		if (size > md_config_max_size)
-			return std::string();
-
-		std::string str;
-		str.resize(size);
-
-		eeprom.read(&str[0], str.size()*sizeof(str[0]));
-
-		return str;
-	}
-
-	virtual std::vector<uint8_t> GetROI() {
-		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return std::vector<uint8_t>();
-
-		eeprom.seekg(roi_config_offset, std::ios_base::beg);
-
-		uint32_t size = 0;
-		eeprom.read((char*)&size, sizeof(size));
-
-		if (size > roi_config_max_size)
-			return std::vector<uint8_t>();
-
-		std::vector<uint8_t> str;
-		str.resize(size);
-
-		eeprom.read((char*)&str[0], str.size()*sizeof(str[0]));
-
-		return str;
-	}
-	
-	virtual std::string GetVersionInfo() {
-		std::string ver;
-
-		std::ifstream version_file(version_info_filename);
-		if (!version_file) {
-			ver = "No system version info.\n";
-		} else {
-			version_file.seekg(0, std::ios_base::end);
-			const uint32_t size = version_file.tellg();
-			version_file.seekg(0, std::ios_base::beg);
-
-			log() << "Version Info size: " << size;
-
-			ver.resize(size);
-
-			version_file.read(&ver[0], ver.size()*sizeof(ver[0]));
-
-            ver += "\n";
-		}
-		
-		if (m_flir) {
-			char t[128];
-			sprintf(t, "\"Teplovisor\" build\t\t%u (%u)\n", (unsigned long)&__BUILD_NUMBER, (unsigned long)&__BUILD_DATE); ver += t;
-
-			sprintf(t, "FPGA revision\t\t%x\n", GetRegister(0x2e)); ver += t;
-
-			uint32_t flir_data[4];
-			m_flir->get_serials(flir_data);
-			sprintf(t, "Camera serial number\t%u\n", flir_data[0]); ver += t;
-			sprintf(t, "Sensor serial number\t%u\n", flir_data[1]); ver += t;
-			sprintf(t, "Camera SW version\t\t%u\n", flir_data[2]); ver += t;
-			sprintf(t, "Camera HW version\t\t%u\n", flir_data[3]); ver += t;
-		}
-
-		return ver;
-	}
-
-	virtual uint8_t GetCameraID() {
-		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return 0;
-
-		eeprom.seekg(cam_id_config_offset, std::ios_base::beg);
-
-		uint8_t id;
-		eeprom.read((char*)&id, sizeof(id));
-
-		id = std::min((uint8_t)3, id);
-
-		return id;
-	}
-
-	virtual uint16_t GetRegister(uint8_t addr) {
-		int fd;
-
-		if ((fd = open("/dev/mem", O_RDWR | O_SYNC)) == -1) {
-			log() << "cannot open /dev/mem. su?";
-			return 0;
-		}
-
-		void* map_base = mmap(0, 1024, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0x04000000);
-
-		uint16_t* regs = (uint16_t*)map_base;
-
-		const uint16_t val = regs[addr/2];
-
-		munmap((void*)map_base, 1024);
-		close(fd);
-
-		return val;
-	}
-
-	virtual void SetEncCfg(const std::string& str) {
-		if (str.size() > encoder_config_max_size)
-			return;
-
-		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return;
-
-		eeprom.seekp(encoder_config_offset, std::ios_base::beg);
-
-		const int size = str.size();
-		eeprom.write((char*)&size, sizeof(size));
-
-		eeprom.write(&str[0], str.size()*sizeof(str[0]));
-	}
-
-	virtual void SetMDCfg(const std::string& str) {
-		if (str.size() > md_config_max_size)
-			return;
-
-		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return;
-
-		eeprom.seekp(md_config_offset, std::ios_base::beg);
-
-		const int size = str.size();
-		eeprom.write((char*)&size, sizeof(size));
-
-		eeprom.write(&str[0], str.size()*sizeof(str[0]));
-	}
-
-	virtual void SetROI(const std::vector<uint8_t>& str) {
-		if (str.size() > roi_config_max_size)
-			return;
-
-		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return;
-
-		eeprom.seekp(roi_config_offset, std::ios_base::beg);
-
-		const int size = str.size();
-		eeprom.write((char*)&size, sizeof(size));
-
-        log() << "roi size + " << sizeof(size);
-
-        eeprom.write((char*)&str[0], str.size()*sizeof(str[0]));
-
-        log() << "roi size + " << str.size()*sizeof(str[0]);
-	}
-
-	virtual void SetVersionInfo(const std::string& str)
-	{
-		// nothing to do.
-	}
-
-	virtual void SetCameraID(uint8_t id) {
-		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
-		if (!eeprom)
-			return;
-
-		eeprom.seekp(cam_id_config_offset, std::ios_base::beg);
-
-		eeprom.write((char*)&id, sizeof(id));
-
-		Comm::instance().setCameraID(id);
-
-		log() << "New camera ID received : " << (int)id;
-	}
-	
-private:
-	Flir* m_flir;
-};
 
 void setReg(uint8_t addr, uint16_t val)
 {
