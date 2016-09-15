@@ -658,9 +658,11 @@ void run()
 		} else {
 			cap.putFrame(buf);
 		}
-		
-		if (utils::get_gpio(10) == 1)
+
+		if (utils::get_gpio(10) != 0) {
 			g_stop = true;
+			g_shutdown = true;
+		}
 	}
 
 	if (g_dump_yuv)
@@ -742,6 +744,7 @@ int main(int argc, char *argv[])
 	}
 
 	::system("sync");
+	::system((std::string("umount ")+AVI_PATH).c_str());
 
 	return 0;
 	}

@@ -40,5 +40,7 @@ enum {
 	encoder_config_max_size = roi_config_offset - encoder_config_offset,
 	roi_config_max_size = 50*1024,
 	streaming_mode_offset = roi_config_offset + roi_config_max_size,
-	streaming_mode_size = 1
+	streaming_mode_size = 1,
+	flash_drive_avail_offset = streaming_mode_offset + streaming_mode_size,
+	flash_drive_avail_size = 2
 };

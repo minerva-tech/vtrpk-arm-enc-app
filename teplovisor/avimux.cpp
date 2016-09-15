@@ -99,7 +99,7 @@ void AviMux::write_hdrl()
 		struct strf_t { // bitmapinfoheader
 			uint32_t biSize = sizeof(strf_t);
 			int32_t  biWidth = SRC_WIDTH;
-			int32_t  biHeight = SRC_HEIGHT;
+			int32_t  biHeight = -SRC_HEIGHT; // vertical flip
 			uint16_t biPlanes = 1;
 			uint16_t biBitCount = 8;
 			uint32_t biCompression = 0;
@@ -130,7 +130,11 @@ FileWriter::FileWriter(const timeval& ts) :
 	_media_is_ready(false),
 	_media_was_checked(false)
 {
-	_muxer.reset(new AviMux(gen_fname(ts, AVI_FALLBACK_PATH)));
+	std::string name = gen_fname(ts, AVI_FALLBACK_PATH);
+
+	_copy_from = boost::filesystem::path(name);
+
+	_muxer.reset(new AviMux(name));
 
 	_streaming_mode = static_cast<streaming_mode_t>(utils::get_streaming_mode());
 
@@ -139,12 +143,20 @@ FileWriter::FileWriter(const timeval& ts) :
 
 FileWriter::~FileWriter()
 {
-	if (_copy_from && _copy_to) {
-		delete_old_files(target_size, AVI_PATH);
+	log() << "FileWriter::~FileWriter()";
 
-		log() << "Copy " << _copy_from->string() << " to " << _copy_to->string();
+	if (_copy_from) {
+		if (_copy_to) {
+			delete_old_files(target_size, AVI_PATH);
 
-		boost::filesystem::copy_file(*_copy_from, *_copy_to);	
+			log() << "Copy " << _copy_from->string() << " to " << _copy_to->string();
+
+			boost::filesystem::copy_file(*_copy_from, *_copy_to);
+		}
+
+		log() << "Deleting " << *_copy_from;
+
+		boost::filesystem::remove(*_copy_from);
 	}
 }
 
@@ -277,7 +289,7 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 		_media_was_checked = true;
 
 		if (_media_is_ready) {
-			_copy_from = boost::filesystem::path(_fnames.front());
+//			_copy_from = boost::filesystem::path(_fnames.front());
 			_copy_to = boost::filesystem::path(AVI_PATH) /
 				_copy_from->lexically_relative(boost::filesystem::path(AVI_FALLBACK_PATH));
 
@@ -290,7 +302,14 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 				boost::filesystem::remove(date);
 			else
 				boost::filesystem::create_directory(date);
-		}
+		}// else {
+//			_copy_from = boost::filesystem::path(_fnames.front()); // It's necessary for removing in the end even if flash isn't inserted
+//		}
+
+		auto flash_avail = utils::get_flash_avail();
+		flash_avail.last_run = flash_avail.this_run;
+		flash_avail.this_run = _media_is_ready;
+		utils::set_flash_avail(flash_avail);
 	}
 
 	if (_media_is_ready || !_media_was_checked) {

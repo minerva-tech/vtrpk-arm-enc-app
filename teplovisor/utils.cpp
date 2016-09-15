@@ -37,13 +37,13 @@ void LED_ERR(int on)
 void set_gpio(int num, int val)
 {
 	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
-	fprintf(fexport, "%i", num);
+	fprintf(fexport, "%i\n", num);
 	fclose(fexport);
 
 	char name[] = "/sys/class/gpio/gpioXXXX/direction";
 	sprintf(name, "/sys/class/gpio/gpio%i/direction", num);
 	FILE* fdir = fopen(name, "wt");
-	fprintf(fdir, "out");
+	fprintf(fdir, "out\n");
 	fclose(fdir);
 
 	sprintf(name, "/sys/class/gpio/gpio%i/value", num);
@@ -55,19 +55,19 @@ void set_gpio(int num, int val)
 int get_gpio(int num)
 {
 	FILE* fexport = fopen("/sys/class/gpio/export", "wt");
-	fprintf(fexport, "%i", num);
+	fprintf(fexport, "%i\n", num);
 	fclose(fexport);
 
 	char name[] = "/sys/class/gpio/gpioXXXX/direction";
 	sprintf(name, "/sys/class/gpio/gpio%i/direction", num);
 	FILE* fdir = fopen(name, "wt");
-	fprintf(fdir, "in");
+	fprintf(fdir, "in\n");
 	fclose(fdir);
 
 	sprintf(name, "/sys/class/gpio/gpio%i/value", num);
-	FILE* fval = fopen(name, "wb");
+	FILE* fval = fopen(name, "rb");
 	int val = 0;
-	fscanf(fval, "%i\n", &val);
+	fscanf(fval, "%i", &val);
 	fclose(fval);
 	
 	return val;
@@ -103,6 +103,8 @@ void set_streaming_mode(uint8_t mode)
 
 		eeprom.seekp(streaming_mode_offset, std::ios_base::beg);
 
+		log() << "Writing mode " << (int)mode;
+
 		eeprom.write((char*)&mode, sizeof(mode));
 }
 
@@ -114,11 +116,39 @@ uint8_t get_streaming_mode()
 
 		eeprom.seekg(streaming_mode_offset, std::ios_base::beg);
 
-		uint8_t mode = 0;
+		uint8_t mode = 0xBA;
 
 		eeprom.read((char*)&mode, sizeof(mode));
-		
+
+		log() << "Read mode " << (int)mode;
+
 		return mode;
+}
+
+void set_flash_avail(const flash_avail_t& v)
+{
+		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
+		if (!eeprom)
+			return;
+
+		eeprom.seekp(flash_drive_avail_offset, std::ios_base::beg);
+
+		eeprom.write((char*)&v, sizeof(v));
+}
+
+flash_avail_t get_flash_avail()
+{
+		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
+		if (!eeprom)
+			return flash_avail_t{false, false};
+
+		eeprom.seekg(flash_drive_avail_offset, std::ios_base::beg);
+
+		flash_avail_t v;
+
+		eeprom.read((char*)&v, sizeof(v));
+
+		return v;
 }
 
 } // namespace utils

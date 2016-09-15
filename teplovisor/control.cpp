@@ -47,6 +47,11 @@ void SerialComm::send(const uint8_t* data, size_t sz)
 
 void SerialComm::recv_cb(uint8_t* p, const boost::system::error_code& e, std::size_t bytes_transferred)
 {
+	if (e) {
+		log() << "Control port error " << e.message();
+		return;
+	}
+
 	log() << "Control port received " << bytes_transferred << " bytes";
 	log() << "[" << (int)p[0] << ", " << (bytes_transferred>1 ? (int)p[1] : 0) << ", " << 
 		(bytes_transferred>2 ? (int)p[2] : 0) << "]";
@@ -77,10 +82,10 @@ void Control::rate()
 	m_serial.set_rate(CONTROL_PORT_BAUDRATE);
 }
 
-template <typename T>
-static T crc(T* b, T* e, T crc)
+template <typename I, typename T>
+static T crc(const I& b, const I& e, T crc)
 {
-	for (T* i=b; i!=e; ++i)
+	for (I i=b; i!=e; ++i)
 		crc += *i;
 
 	return crc;
@@ -92,10 +97,10 @@ void Control::parse(uint8_t* p, size_t sz)
 
 	while (m_buf.size() > 2) {
 		const uint32_t length = m_buf[2];
-		
+
 		const uint32_t full_len = length ? length + 5 : 4;
 
-		log() << "Control data length : " <<  length << ", so full message length : " << full_len;
+		log() << "Control data length : " << length << ", so full message length : " << full_len;
 
 		if (m_buf.size() >= full_len) {
 			log() << "Packet was received, size : " << full_len << " dst/src : " << (int)m_buf[0] 
@@ -104,9 +109,10 @@ void Control::parse(uint8_t* p, size_t sz)
 			pkt_t *pkt = reinterpret_cast<pkt_t*>(&m_buf[0]);
 			pkt->crcf = m_buf[full_len-1];
 
-			const uint8_t crch = crc(&m_buf[0], &m_buf[3], CRC_OFFSET);
+			const uint8_t crch = crc(m_buf.begin(), m_buf.begin()+3, CRC_OFFSET);
 
-			const uint8_t crcf = crc(&m_buf[4], &m_buf[full_len-1], crch);
+			if (length)
+				const uint8_t crcf = crc(m_buf.begin()+4, m_buf.begin()+full_len-1, crch);
 
 			if (pkt->dst == 0x03) { // according to mail from 16.08.2016
 				const pkt_t ans = dispatch(pkt);
@@ -179,6 +185,9 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 		case VISIS_VC_GET_STATUS : { // TODO : error state
 			ans.len = 2;
 			ans.cmd = VISYS_VC_STATUS_NOTIFY;
+			auto flash_avail = utils::get_flash_avail();
+			ans.data[0] = flash_avail.last_run;
+			ans.data[1] = flash_avail.this_run;
 		} break;
 
 		case VISYS_VC_GET_SW_VER : { // TODO : firmware version
@@ -196,7 +205,7 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 
 		case VISYS_VC_SET_MODE : {
 			// TODO : set mode (and really obey it)
-			utils::set_streaming_mode(ans.data[0]);
+			utils::set_streaming_mode(pkt->data[0]);
 			ans.cmd = pkt->cmd;
 			ans.req = 1;
 		} break;
