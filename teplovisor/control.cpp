@@ -74,7 +74,9 @@ Control::Control(const std::string& port) :
 
 void Control::send(const pkt_t& pkt) // TODO : parameters like command, dst, blablabla, and fill raw data buffer in this method
 {
-	m_serial.send(reinterpret_cast<const uint8_t*>(&pkt), pkt.len ? pkt.len+5 : 4);
+	const size_t len = pkt.len ? pkt.len+5 : 4;
+	log() << "Sending answer, len : " << len;
+	m_serial.send(reinterpret_cast<const uint8_t*>(&pkt), len);
 }
 
 void Control::rate()
@@ -106,15 +108,17 @@ void Control::parse(uint8_t* p, size_t sz)
 			log() << "Packet was received, size : " << full_len << " dst/src : " << (int)m_buf[0] 
 				<< " cmd/ack/req : " << (int)m_buf[1];
 
-			pkt_t *pkt = reinterpret_cast<pkt_t*>(&m_buf[0]);
-			pkt->crcf = m_buf[full_len-1];
+//			pkt_t *pkt = reinterpret_cast<pkt_t*>(&m_buf[0]);
+			pkt_t pkt;
+			std::copy(m_buf.begin(), m_buf.begin()+full_len, (uint8_t*)&pkt);
+			pkt.crcf = m_buf[full_len-1];
 
 			const uint8_t crch = crc(m_buf.begin(), m_buf.begin()+3, CRC_OFFSET);
 
 			if (length)
 				const uint8_t crcf = crc(m_buf.begin()+4, m_buf.begin()+full_len-1, crch);
 
-			if (pkt->dst == 0x03) { // according to mail from 16.08.2016
+			if (pkt.dst == 0x03) { // according to mail from 16.08.2016
 				const pkt_t ans = dispatch(pkt);
 
 				send(ans);
@@ -126,22 +130,24 @@ void Control::parse(uint8_t* p, size_t sz)
 	}
 }
 
-Control::pkt_t Control::dispatch(const pkt_t* pkt)
+Control::pkt_t Control::dispatch(const pkt_t& pkt)
 {
 	pkt_t ans = {0};
 	ans.src = 3;
-	ans.dst = pkt->src;
+	ans.dst = pkt.src;
 
-	switch (pkt->cmd) {
+	switch (pkt.cmd) {
 		case VISYS_VC_GET_TIME : {
 			auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 			std::tm* hms = std::localtime(&t);
 
+			log() << "Current time: " << hms->tm_hour << ":" << hms->tm_min << ":" << hms->tm_sec;
+
 			ans.data[0] = hms->tm_hour;
 			ans.data[1] = hms->tm_min;
 			ans.data[2] = hms->tm_sec;
-			ans.crch = crc((uint8_t*)&ans, ((uint8_t*)&ans) + 3, CRC_OFFSET); // TODO : set_crc(pkt_t&); in send(pkt_t)
-			ans.data[3] = crc(&ans.data[0], &ans.data[3], ans.crch);
+//			ans.crch = crc((uint8_t*)&ans, ((uint8_t*)&ans) + 3, CRC_OFFSET); // TODO : set_crc(pkt_t&); in send(pkt_t)
+//			ans.data[3] = crc(&ans.data[0], &ans.data[3], ans.crch);
 
 			ans.cmd = VISYS_VC_TIME_NOTIFY;
 			ans.len = 3;
@@ -149,12 +155,12 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 
 		case VISYS_VC_SET_TIME : {
 			// TODO : set time to RT clock.
-			char time[9];
-			sprintf(time, "%.2i:%.2i:%.2i", pkt->data[0], pkt->data[1], pkt->data[2]);
+			char time[32];
+			sprintf(time, "%.2i:%.2i:%.2i", pkt.data[0], pkt.data[1], pkt.data[2]);
 			::system((std::string("date --set=") + time).c_str());
 			::system("hwclock --systohc");
 			
-			ans.cmd = pkt->cmd;
+			ans.cmd = pkt.cmd;
 			ans.req = 1;
 		} break;
 
@@ -165,7 +171,8 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 			ans.data[0] = hms->tm_year;
 			ans.data[1] = hms->tm_mon;
 			ans.data[2] = hms->tm_mday;
-			ans.data[3] = crc(&ans.data[0], &ans.data[3], ans.crch);
+//			ans.crch = crc((uint8_t*)&ans, ((uint8_t*)&ans) + 3, CRC_OFFSET); // TODO : set_crc(pkt_t&); in send(pkt_t)
+//			ans.data[3] = crc(&ans.data[0], &ans.data[3], ans.crch);
 			
 			ans.cmd = VISYS_VC_DATE_NOTIFY;
 			ans.len = 3;
@@ -173,12 +180,12 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 
 		case VISYS_VC_SET_DATE : {
 			// TODO : set date to RT clock.
-			char date[9];
-			sprintf(date, "%.2i%.2i%.4i", pkt->data[1], pkt->data[2], pkt->data[0]);
+			char date[32];
+			sprintf(date, "%.2i%.2i%.4i", pkt.data[1], pkt.data[2], pkt.data[0]);
 			::system((std::string("date ") + date).c_str());
 			::system("hwclock --systohc");
 
-			ans.cmd = pkt->cmd;
+			ans.cmd = pkt.cmd;
 			ans.req = 1;
 		} break;
 
@@ -205,8 +212,8 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 
 		case VISYS_VC_SET_MODE : {
 			// TODO : set mode (and really obey it)
-			utils::set_streaming_mode(pkt->data[0]);
-			ans.cmd = pkt->cmd;
+			utils::set_streaming_mode(pkt.data[0]);
+			ans.cmd = pkt.cmd;
 			ans.req = 1;
 		} break;
 
@@ -219,7 +226,7 @@ Control::pkt_t Control::dispatch(const pkt_t* pkt)
 
 	ans.crch = crc((uint8_t*)&ans, ((uint8_t*)&ans) + 3, CRC_OFFSET); // TODO : set_crc(pkt_t&); in send(pkt_t)
 	if (ans.len > 0)
-		ans.crcf = crc((uint8_t*)&ans.data[0], (uint8_t*)&ans.data[ans.len], ans.crch);
+		ans.data[ans.len] = crc((uint8_t*)&ans.data[0], (uint8_t*)&ans.data[ans.len], ans.crch);
 
 	return ans;
 }

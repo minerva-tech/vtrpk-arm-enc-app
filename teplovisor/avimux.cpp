@@ -281,7 +281,7 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 	_cache.first = (uint8_t*)buf.m.userptr;
 	_cache.second = buf.timestamp;
 
-	if (!_media_was_checked && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
+	if (!_media_was_checked && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_FIRST_SEGMENT_DURATION) {
 		::system((std::string("ntfs-3g ") + USB_DRIVE_DEV + std::string(" ") + AVI_PATH).c_str());
 
 		check_media();

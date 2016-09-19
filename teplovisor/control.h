@@ -74,5 +74,5 @@ private:
 	
 	std::deque<uint8_t> m_buf;
 
-	pkt_t dispatch(const pkt_t* pkt);
+	pkt_t dispatch(const pkt_t& pkt);
 };
