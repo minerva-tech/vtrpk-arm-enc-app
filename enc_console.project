@@ -72,6 +72,8 @@
     <File Name="teplovisor/control.cpp"/>
     <File Name="teplovisor/control.h"/>
     <File Name="teplovisor/Makefile"/>
+    <File Name="teplovisor/servercmds.cpp"/>
+    <File Name="teplovisor/servercmds.h"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
   <Dependencies Name="Release"/>

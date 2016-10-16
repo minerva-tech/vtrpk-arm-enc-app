@@ -8,6 +8,8 @@
 #include "comm.h"
 #include "proto.h"
 
+#include "utils.h"
+
 using namespace boost;
 
 const uint32_t baudrates[] = {921600, 460800, 115200, 57600, /*28800,*/ 19200, 9600}; // 28800 cannot be set somehow. You can try "stty -F /dev/ttyS0 28800"
@@ -41,8 +43,17 @@ Flir::Flir(const std::string& port) :
 		m_port.close();
 		m_io_service.stop();
 		m_thread.join();
+
+		auto hw_status = utils::get_hw_status();
+		hw_status.this_run.flir_avail = false;
+		utils::set_hw_status(hw_status);
+
 		return;
 	}
+
+	auto hw_status = utils::get_hw_status();
+	hw_status.this_run.flir_avail = true;
+	utils::set_hw_status(hw_status);
 
 	if (baudrate != baudrates[0]) {
 		const uint8_t BAUD_RATE[] = {0x00, 0x07};

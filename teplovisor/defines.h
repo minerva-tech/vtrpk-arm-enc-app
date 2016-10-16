@@ -18,7 +18,7 @@ const int AVI_LENGTH_MAX = 200;
 const int AVI_FIRST_SEGMENT_DURATION = 10;
 const int AVI_DURATION_MAX_SEC = 30;
 
-const int CONTROL_PORT_BAUDRATE = 115200;
+const int CONTROL_PORT_BAUDRATE = 4800;
 
 const unsigned char CRC_OFFSET = 0x89;
 
@@ -41,6 +41,6 @@ enum {
 	roi_config_max_size = 50*1024,
 	streaming_mode_offset = roi_config_offset + roi_config_max_size,
 	streaming_mode_size = 1,
-	flash_drive_avail_offset = streaming_mode_offset + streaming_mode_size,
-	flash_drive_avail_size = 2
+	hw_status_offset = streaming_mode_offset + streaming_mode_size,
+	hw_status_size = 2
 };

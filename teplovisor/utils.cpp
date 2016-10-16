@@ -125,26 +125,26 @@ uint8_t get_streaming_mode()
 		return mode;
 }
 
-void set_flash_avail(const flash_avail_t& v)
+void set_hw_status(const hw_status_t& v)
 {
 		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
 			return;
 
-		eeprom.seekp(flash_drive_avail_offset, std::ios_base::beg);
+		eeprom.seekp(hw_status_offset, std::ios_base::beg);
 
 		eeprom.write((char*)&v, sizeof(v));
 }
 
-flash_avail_t get_flash_avail()
+hw_status_t get_hw_status()
 {
 		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
-			return flash_avail_t{false, false};
+			return hw_status_t();
 
-		eeprom.seekg(flash_drive_avail_offset, std::ios_base::beg);
+		eeprom.seekg(hw_status_offset, std::ios_base::beg);
 
-		flash_avail_t v;
+		hw_status_t v;
 
 		eeprom.read((char*)&v, sizeof(v));
 

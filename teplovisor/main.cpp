@@ -484,6 +484,8 @@ int main(int argc, char *argv[])
 		utils::set_gpio(14, 1);
 
 		Control ctrl("/dev/ttyS0");
+		
+		ctrl.send_status();
 
 	//	ServerCmds cmds(&flir); // flir instance is needed to ask it for versions/serials when host asks it.
 		ServerCmds cmds;

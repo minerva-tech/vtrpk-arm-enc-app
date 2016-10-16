@@ -281,6 +281,8 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 	_cache.first = (uint8_t*)buf.m.userptr;
 	_cache.second = buf.timestamp;
 
+	bool force_segment = false;
+
 	if (!_media_was_checked && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_FIRST_SEGMENT_DURATION) {
 		::system((std::string("ntfs-3g ") + USB_DRIVE_DEV + std::string(" ") + AVI_PATH).c_str());
 
@@ -289,6 +291,8 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 		_media_was_checked = true;
 
 		if (_media_is_ready) {
+			force_segment = true;
+
 //			_copy_from = boost::filesystem::path(_fnames.front());
 			_copy_to = boost::filesystem::path(AVI_PATH) /
 				_copy_from->lexically_relative(boost::filesystem::path(AVI_FALLBACK_PATH));
@@ -306,14 +310,16 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 //			_copy_from = boost::filesystem::path(_fnames.front()); // It's necessary for removing in the end even if flash isn't inserted
 //		}
 
-		auto flash_avail = utils::get_flash_avail();
-		flash_avail.last_run = flash_avail.this_run;
-		flash_avail.this_run = _media_is_ready;
-		utils::set_flash_avail(flash_avail);
+		auto hw_status = utils::get_hw_status();
+		log() << "media was checked, hw state: " << (int)hw_status.last_run.data << ", " << (int)hw_status.this_run.data;
+		hw_status.last_run = hw_status.this_run;
+		hw_status.this_run.flash_avail = _media_is_ready;
+		log() << "status was updated, hw state: " << (int)hw_status.last_run.data << ", " << (int)hw_status.this_run.data;
+		utils::set_hw_status(hw_status);
 	}
 
 	if (_media_is_ready || !_media_was_checked) {
-		if (_media_is_ready && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
+		if (force_segment || _media_is_ready && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
 			delete_old_files(target_size, AVI_PATH);
 			_muxer.reset(new AviMux(gen_fname(buf.timestamp, AVI_PATH)));
 			_start = buf.timestamp;

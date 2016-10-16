@@ -46,25 +46,32 @@ class Control : public SerialParser { // TODO : it's duplicate of Flir and Comm,
 	};
 
 	enum {
-		VISYS_VC_GET_TIME = 0x09,
-		VISYS_VC_TIME_NOTIFY = 0x10,
-		VISYS_VC_SET_TIME = 0x11,
-		VISYS_VC_GET_DATE = 0x12,
-		VISYS_VC_DATE_NOTIFY = 0x13,
-		VISYS_VC_SET_DATE = 0x14,
-		VISIS_VC_GET_STATUS = 0x15,
-		VISYS_VC_STATUS_NOTIFY = 0x16,
-		VISYS_VC_GET_SW_VER = 0x17,
-		VISYS_VC_SW_VER_NOTIFY = 0x18,
-		VISYS_VC_GET_MODE = 0x19,
-		VISYS_VC_MODE_NOTIFY = 0x1a,
-		VISYS_VC_SET_MODE = 0x1b
+		VISYS_VC_PING = 0x00,
+		
+		VISYS_VC_GET_SW_VER = 0x01,		
+		VISYS_VC_SW_VER_NOTIFY = 0x0D,
+
+		VISYS_VC_GET_TIME = 0x02,
+		VISYS_VC_TIME_NOTIFY = 0x03,
+		VISYS_VC_SET_TIME = 0x04,
+
+		VISYS_VC_GET_DATE = 0x05,
+		VISYS_VC_DATE_NOTIFY = 0x06,
+		VISYS_VC_SET_DATE = 0x07,
+
+		VISIS_VC_GET_STATUS = 0x08,
+		VISYS_VC_STATUS_NOTIFY = 0x09,
+
+		VISYS_VC_GET_MODE = 0x0A,
+		VISYS_VC_MODE_NOTIFY = 0x0B,
+		VISYS_VC_SET_MODE = 0x0C
 	};
 
 public:
 	Control(const std::string& port);
 
 	void send(const pkt_t&); // TODO 
+	void send_status();
 
 	virtual void rate() override;
 	virtual void parse(uint8_t* p, size_t sz) override;

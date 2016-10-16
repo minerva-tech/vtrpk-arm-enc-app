@@ -87,8 +87,13 @@ void Control::rate()
 template <typename I, typename T>
 static T crc(const I& b, const I& e, T crc)
 {
-	for (I i=b; i!=e; ++i)
+//	log() << "CRC start " << (int)crc;
+	for (I i=b; i!=e; ++i) {
+//		log () << "CRC byte " << (int)*i;
 		crc += *i;
+	}
+
+//	log() << "CRC value " << (int)crc;
 
 	return crc;
 }
@@ -115,13 +120,16 @@ void Control::parse(uint8_t* p, size_t sz)
 
 			const uint8_t crch = crc(m_buf.begin(), m_buf.begin()+3, CRC_OFFSET);
 
-			if (length)
-				const uint8_t crcf = crc(m_buf.begin()+4, m_buf.begin()+full_len-1, crch);
+			uint8_t crcf = length ? crc(m_buf.begin()+4, m_buf.begin()+full_len-1, crch) : 0;
 
-			if (pkt.dst == 0x03) { // according to mail from 16.08.2016
-				const pkt_t ans = dispatch(pkt);
+			if (pkt.dst == 0x03) { // according to a mail from 16.08.2016
+				if (crch == pkt.crch && (pkt.len == 0 || crcf == pkt.crcf)) {
+					const pkt_t ans = dispatch(pkt);
 
-				send(ans);
+					send(ans);
+				} else {
+					// doing nothing accorind to a mail from 13 0ct 2016
+				}
 			}
 
 			m_buf.erase(m_buf.begin(), m_buf.begin() + full_len);
@@ -137,6 +145,11 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 	ans.dst = pkt.src;
 
 	switch (pkt.cmd) {
+		case VISYS_VC_PING:
+			ans.cmd = pkt.cmd;
+			ans.req = 1;			
+			break;
+
 		case VISYS_VC_GET_TIME : {
 			auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 			std::tm* hms = std::localtime(&t);
@@ -179,10 +192,15 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 		} break;
 
 		case VISYS_VC_SET_DATE : {
-			// TODO : set date to RT clock.
+			auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+			std::tm* hms = std::localtime(&t);
+
 			char date[32];
-			sprintf(date, "%.2i%.2i%.4i", pkt.data[1], pkt.data[2], pkt.data[0]);
-			::system((std::string("date ") + date).c_str());
+
+			sprintf(date, "\"%.4i-%.2i-%.2i %.2i:%.2i:%.2i\"", pkt.data[0]+1900, pkt.data[1]+1, pkt.data[2],
+				hms->tm_hour, hms->tm_min, hms->tm_sec);
+			log() << "Setting date " << date;
+			::system((std::string("date --set=") + date).c_str());
 			::system("hwclock --systohc");
 
 			ans.cmd = pkt.cmd;
@@ -192,15 +210,15 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 		case VISIS_VC_GET_STATUS : { // TODO : error state
 			ans.len = 2;
 			ans.cmd = VISYS_VC_STATUS_NOTIFY;
-			auto flash_avail = utils::get_flash_avail();
-			ans.data[0] = flash_avail.last_run;
-			ans.data[1] = flash_avail.this_run;
+			auto hw_status = utils::get_hw_status();
+			ans.data[0] = hw_status.last_run.data;
+			ans.data[1] = hw_status.this_run.data;
 		} break;
 
 		case VISYS_VC_GET_SW_VER : { // TODO : firmware version
 			auto ver = utils::get_version_info();
-			memcpy(&ans.data[0], ver.c_str(), std::min(size_t(26), ver.size()));
-			ans.len = 26;
+			memcpy(&ans.data[0], ver.c_str(), std::min(size_t(20), ver.size()));
+			ans.len = std::min(size_t(20), ver.size());
 			ans.cmd = VISYS_VC_SW_VER_NOTIFY;
 		} break;
 
@@ -229,4 +247,23 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 		ans.data[ans.len] = crc((uint8_t*)&ans.data[0], (uint8_t*)&ans.data[ans.len], ans.crch);
 
 	return ans;
+}
+
+void Control::send_status()
+{
+	pkt_t ans = {0};
+	ans.src = 3;
+	ans.dst = 1;
+
+	ans.len = 2;
+	ans.cmd = VISYS_VC_STATUS_NOTIFY;
+	auto hw_status = utils::get_hw_status();
+	ans.data[0] = hw_status.last_run.data;
+	ans.data[1] = hw_status.this_run.data;
+	
+	ans.crch = crc((uint8_t*)&ans, ((uint8_t*)&ans) + 3, CRC_OFFSET); // TODO : set_crc(pkt_t&); in send(pkt_t)
+	if (ans.len > 0)
+		ans.data[ans.len] = crc((uint8_t*)&ans.data[0], (uint8_t*)&ans.data[ans.len], ans.crch);	
+		
+	send(ans);
 }
