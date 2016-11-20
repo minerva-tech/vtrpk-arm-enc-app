@@ -167,14 +167,17 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 		} break;
 
 		case VISYS_VC_SET_TIME : {
-			// TODO : set time to RT clock.
-			char time[32];
-			sprintf(time, "%.2i:%.2i:%.2i", pkt.data[0], pkt.data[1], pkt.data[2]);
-			::system((std::string("date --set=") + time).c_str());
-			::system("hwclock --systohc");
-			
 			ans.cmd = pkt.cmd;
 			ans.req = 1;
+
+			if (pkt.data[0] > 23 || pkt.data[1] > 59 || pkt.data[2] > 59) {
+				ans.ack = 1;
+			} else {
+				char time[32];
+				sprintf(time, "%.2i:%.2i:%.2i", pkt.data[0], pkt.data[1], pkt.data[2]);
+				::system((std::string("date --set=") + time).c_str());
+				::system("hwclock --systohc");
+			}
 		} break;
 
 		case VISYS_VC_GET_DATE : {
@@ -195,16 +198,20 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 			auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 			std::tm* hms = std::localtime(&t);
 
-			char date[32];
-
-			sprintf(date, "\"%.4i-%.2i-%.2i %.2i:%.2i:%.2i\"", pkt.data[0]+1900, pkt.data[1]+1, pkt.data[2],
-				hms->tm_hour, hms->tm_min, hms->tm_sec);
-			log() << "Setting date " << date;
-			::system((std::string("date --set=") + date).c_str());
-			::system("hwclock --systohc");
-
 			ans.cmd = pkt.cmd;
 			ans.req = 1;
+
+			if (pkt.data[0] <= 70 || pkt.data[0] >= 138 || pkt.data[1] > 11 || pkt.data[2] > 31) {
+				ans.ack = 1;
+			} else {
+				char date[32];
+
+				sprintf(date, "\"%.4i-%.2i-%.2i %.2i:%.2i:%.2i\"", pkt.data[0]+1900, pkt.data[1]+1, pkt.data[2],
+					hms->tm_hour, hms->tm_min, hms->tm_sec);
+				log() << "Setting date " << date;
+				::system((std::string("date --set=") + date).c_str());
+				::system("hwclock --systohc");
+			}
 		} break;
 
 		case VISIS_VC_GET_STATUS : { // TODO : error state
@@ -223,7 +230,7 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 		} break;
 
 		case VISYS_VC_GET_MODE : { // TODO : firmware version
-			ans.data[0] = utils::get_streaming_mode();
+			ans.data[0] = static_cast<uint8_t>(utils::get_streaming_mode());
 			ans.len = 1;
 			ans.cmd = VISYS_VC_MODE_NOTIFY;
 		} break;
@@ -239,6 +246,7 @@ Control::pkt_t Control::dispatch(const pkt_t& pkt)
 			log() << "Error : unknown command code";
 			ans.req = 1;
 			ans.ack = 1;
+			ans.cmd = pkt.cmd;
 			break;
 	}
 

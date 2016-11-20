@@ -95,6 +95,12 @@ std::string get_version_info()
 	return ver;
 }
 
+bool is_recovery() 
+{
+	std::string ver = get_version_info();
+	return ver[0] == 'R';
+}
+
 void set_streaming_mode(uint8_t mode)
 {
 		std::ofstream eeprom(eeprom_filename, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
@@ -108,11 +114,11 @@ void set_streaming_mode(uint8_t mode)
 		eeprom.write((char*)&mode, sizeof(mode));
 }
 
-uint8_t get_streaming_mode()
+utils::streaming_mode_t get_streaming_mode()
 {
 		std::ifstream eeprom(eeprom_filename, std::ios_base::in | std::ios_base::binary);
 		if (!eeprom)
-			return 0;
+			return utils::streaming_mode_t::no_latency;
 
 		eeprom.seekg(streaming_mode_offset, std::ios_base::beg);
 
@@ -122,7 +128,7 @@ uint8_t get_streaming_mode()
 
 		log() << "Read mode " << (int)mode;
 
-		return mode;
+		return static_cast<utils::streaming_mode_t>(mode);
 }
 
 void set_hw_status(const hw_status_t& v)

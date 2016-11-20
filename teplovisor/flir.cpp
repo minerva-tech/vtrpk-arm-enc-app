@@ -38,43 +38,46 @@ Flir::Flir(const std::string& port) :
 
 	const uint32_t baudrate = detect_baudrate(true);
 
+	auto hw_status = utils::get_hw_status();
+	hw_status.last_run.flir_avail = hw_status.this_run.flir_avail;
+
 	if (baudrate == 0) {
 		log() << "FLIR doesn't answer at any baudrate.";
 		m_port.close();
 		m_io_service.stop();
 		m_thread.join();
 
-		auto hw_status = utils::get_hw_status();
 		hw_status.this_run.flir_avail = false;
 		utils::set_hw_status(hw_status);
 
 		return;
-	}
-
-	auto hw_status = utils::get_hw_status();
-	hw_status.this_run.flir_avail = true;
-	utils::set_hw_status(hw_status);
-
-	if (baudrate != baudrates[0]) {
-		const uint8_t BAUD_RATE[] = {0x00, 0x07};
-		send(0x07, BAUD_RATE, 2);
-
-		const uint32_t baudrate = detect_baudrate();
+	} else {
+		hw_status.this_run.flir_avail = true;
+		utils::set_hw_status(hw_status);
 
 		if (baudrate != baudrates[0]) {
-			log() << "Cannot set baudrate for FLIR.";
-			return;
-		} else {
-			send(0x01, NULL, 0);
-		}
-	}
+			const uint8_t BAUD_RATE[] = {0x00, 0x07};
+			send(0x07, BAUD_RATE, 2);
 
-	const uint8_t XP_mode[] = {0x03, 0x03};
-	send(0x12, XP_mode, 2);
-	const uint8_t LVDS_mode[] = {0x05, 0x00};
-	send(0x12, LVDS_mode, 2);
-	const uint8_t CMOS_mode[] = {0x06, 0x01};
-	send(0x12, CMOS_mode, 2);
+			const uint32_t baudrate = detect_baudrate();
+
+			if (baudrate != baudrates[0]) {
+				log() << "Cannot set baudrate for FLIR.";
+				return;
+			} else {
+				send(0x01, NULL, 0);
+			}
+		}
+
+		const uint8_t XP_mode[] = {0x03, 0x03};
+		send(0x12, XP_mode, 2);
+		const uint8_t LVDS_mode[] = {0x05, 0x00};
+		send(0x12, LVDS_mode, 2);
+		const uint8_t CMOS_mode[] = {0x06, 0x01};
+		send(0x12, CMOS_mode, 2);
+
+		return;
+	}
 }
 
 Flir::~Flir()

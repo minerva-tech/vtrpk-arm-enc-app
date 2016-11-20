@@ -372,5 +372,6 @@ void ServerCmds::SetBitrate(int bitrate)
     g_bitrate = bitrate * 100;
 	g_change_bitrate = true;
 	g_stop = false;
-}
 
+	Comm::instance().allowTransmission(true);
+}

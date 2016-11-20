@@ -59,13 +59,8 @@ private:
 		timeval ts;
 	};
 
-	enum class streaming_mode_t {
-		no_latency = 0,
-		transmit_all = 1
-	};
-
 	void check_media();
-	std::string gen_fname(const timeval& ts, const char* path);
+	std::string gen_fname(const char* path);
 	void delete_old_files(size_t target_size, const std::string& path);
 
 	bool _media_is_ready;
@@ -76,6 +71,10 @@ private:
 
 	timeval _start;
 	std::unique_ptr<AviMux> _muxer;
+	
+	char _time[7]  = {0};
+	char _datec[7] = {0};
+	int _fragment_num = 0;
 
 	buf_t _cache; // current frame if file isn't used (and if it's used as well). May be there should be std::circular_buffer
 	std::deque<cached_frame_t> _frames; // i don't want to parse avis and moreover 1 hour of video at 8 fps is 28800 frames 
@@ -85,5 +84,5 @@ private:
 	int _cur_file_idx = -1;
 	std::ifstream _fstream;
 	
-	streaming_mode_t _streaming_mode;
+	utils::streaming_mode_t _streaming_mode;
 };

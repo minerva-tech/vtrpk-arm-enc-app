@@ -313,7 +313,8 @@ void run()
 	int adapt_bitrate_pos = 0;
 	int to_skip = g_adapt_bitrate_desc[adapt_bitrate_pos].to_skip; // how much video frames should be skipped according to current channel state
 	
-	Comm::instance().allowTransmission(true);
+	if (utils::get_streaming_mode() == utils::streaming_mode_t::no_latency)
+		Comm::instance().allowTransmission(true);
 
 	while(g_stop) {
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(100));
@@ -355,13 +356,9 @@ void run()
 	if (g_dump_yuv)
 		f_dump_yuv = fopen("dump.yuv", "wb");
 
-//	log() << "-1";
-
 //	Get RTC value. And put it into FileWriter. We already captured first frame above.
 	FileWriter file_writer(buf.timestamp);
 	
-//	log() << "0";
-
 	// ?????
 	// if (!file_writer)
 	// 	Comm::instance().allowTransmission(true);
@@ -375,11 +372,7 @@ void run()
 
 		v4l2_buffer buf = cap.getFrame();
 
-//		log() << "1";
-
 		file_writer.add_frame(buf);
-
-//		log() << "2";
 
 		if (g_dump_yuv)
 			fwrite((uint8_t*)buf.m.userptr, 1, w*h*3/2, f_dump_yuv);
@@ -387,6 +380,7 @@ void run()
 //		fillInfo(info, info_mask, (uint8_t*)(buf.m.userptr + w*h), w, w, h/2, g_chroma_value); // data is in chroma planes.
 
 		if (Comm::instance().isTransmissionAllowed()) {
+
 			auto frm = file_writer.next_frame();
 
 			cap.putFrame(buf);
@@ -477,11 +471,22 @@ int main(int argc, char *argv[])
 
 		::system("hwclock --hctosys");
 
+#define UNISCAN_UART 1
+#if UNISCAN_UART
+		{
+			utils::set_gpio(12, 0);
+			utils::set_gpio(14, 0);
+			Flir flir("/dev/ttyS0");
+		}
+		utils::set_gpio(12, 1);
+//		utils::set_gpio(14, 1);
+#else
 		{
 			utils::set_gpio(14, 0);
 			Flir flir("/dev/ttyS0");
 		}
 		utils::set_gpio(14, 1);
+#endif
 
 		Control ctrl("/dev/ttyS0");
 		

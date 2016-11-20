@@ -34,11 +34,15 @@ size_t AviMux::add_frame(uint8_t* p, size_t s)
 
 	chunk_hdr.chunk_sz = s;
 
+	log() << "+Write chunk hdr";
 	_fs.write(reinterpret_cast<const char*>(&chunk_hdr), sizeof(chunk_hdr));
+	log() << "-Write chunk hdr";
 
 	const size_t off = _fs.tellp();
 
+	log() << "+Write data";
 	_fs.write(reinterpret_cast<const char*>(p), s);
+	log() << "-Write data";
 	
 	return off;
 }
@@ -111,7 +115,9 @@ void AviMux::write_hdrl()
 		} strf;
 	} header;
 
+	log() << "+Write header";
 	_fs.write(reinterpret_cast<const char*>(&header), sizeof(header));
+	log() << "-Write header";
 }
 
 void AviMux::open_movi()
@@ -122,7 +128,9 @@ void AviMux::open_movi()
 		char movi[4] = {'m', 'o', 'v', 'i'};
 	} movi;
 
+	log() << "+Write movi";
 	_fs.write(reinterpret_cast<const char*>(&movi), sizeof(movi));
+	log() << "-Write movi";
 }
 
 FileWriter::FileWriter(const timeval& ts) :
@@ -130,13 +138,20 @@ FileWriter::FileWriter(const timeval& ts) :
 	_media_is_ready(false),
 	_media_was_checked(false)
 {
-	std::string name = gen_fname(ts, AVI_FALLBACK_PATH);
+//	char datetime[13]; // YYMMDD_HHmmss
+//	std::strftime(datetime, 13, "%y%m%d_%H%M%S", std::localtime(&ts.tv_sec));
+
+	std::strftime(_datec, 6, "%y%m%d", std::localtime(&ts.tv_sec));
+
+	std::strftime(_time,  6, "%H%M%S", std::localtime(&ts.tv_sec));
+
+	std::string name = gen_fname(AVI_FALLBACK_PATH);
 
 	_copy_from = boost::filesystem::path(name);
 
 	_muxer.reset(new AviMux(name));
 
-	_streaming_mode = static_cast<streaming_mode_t>(utils::get_streaming_mode());
+	_streaming_mode = static_cast<utils::streaming_mode_t>(utils::get_streaming_mode());
 
 	// check_that_media_is_available_and_set_the_flag();
 }
@@ -205,20 +220,9 @@ FileWriter::operator bool()
 	return _media_is_ready;
 }
 
-std::string FileWriter::gen_fname(const timeval& ts, const char* path)
+std::string FileWriter::gen_fname(const char* path)
 {
-//	char datetime[13]; // YYMMDD_HHmmss
-//	std::strftime(datetime, 13, "%y%m%d_%H%M%S", std::localtime(&ts.tv_sec));
-
-	char datec[7] = {0};
-	std::strftime(datec, 6, "%y%m%d", std::localtime(&ts.tv_sec));
-
-	char time[7] = {0};
-	std::strftime(time, 6, "%H%M%S", std::localtime(&ts.tv_sec));
-
-	std::string date = (boost::filesystem::path(path)/boost::filesystem::path(datec)).native();
-
-	log() << "New segment file name: " << std::string(date)+"/"+time+".avi";
+	std::string date = (boost::filesystem::path(path)/boost::filesystem::path(_datec)).native();
 
 	if (boost::filesystem::exists(date)) {
 		if (!boost::filesystem::is_directory(date)) {
@@ -226,10 +230,19 @@ std::string FileWriter::gen_fname(const timeval& ts, const char* path)
 			// TODO : Clarify what we should do in this case
 		}
 	} else {
+		log() << "+Create dir";
 		boost::filesystem::create_directory(date);
+		log() << "-Create dir";
 	}
 
-	std::string fname = std::string(date)+"/"+time+".avi";
+	char fragment_num[3] = "00";
+	std::snprintf(fragment_num, 3, "%02i", _fragment_num);
+
+	std::string fname = date + "/" + _time + "_" + fragment_num + ".avi";
+	
+	_fragment_num++;
+
+	log() << "New segment file name: " << fname;
 
 	if (boost::filesystem::exists(fname))
 		boost::filesystem::remove_all(fname);
@@ -264,13 +277,18 @@ void FileWriter::delete_old_files(size_t target_size, const std::string& path)
 
 		const auto parent_path = to_delete.parent_path();
 
+		log() << "+Delete file";
 		boost::filesystem::remove(to_delete, ec);
+		log() << "-Delete file";
 
 		if (ec)
 			log() << "Can't delete file : " << to_delete.string();
 
-		if (boost::filesystem::is_empty(parent_path))
+		if (boost::filesystem::is_empty(parent_path)) {
+			log() << "+Delete dir";
 			boost::filesystem::remove(parent_path, ec);
+			log() << "-Delete dir";
+		}
 
 		return;
 	}
@@ -312,8 +330,12 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 
 		auto hw_status = utils::get_hw_status();
 		log() << "media was checked, hw state: " << (int)hw_status.last_run.data << ", " << (int)hw_status.this_run.data;
-		hw_status.last_run = hw_status.this_run;
-		hw_status.this_run.flash_avail = _media_is_ready;
+		hw_status.last_run.flash_avail 	= hw_status.this_run.flash_avail;
+		hw_status.last_run.recovery 	= hw_status.this_run.recovery;
+
+		hw_status.this_run.flash_avail 	= _media_is_ready;
+		hw_status.this_run.recovery 	= utils::is_recovery(); // TODO : according to the mail of 16 oct 2016
+
 		log() << "status was updated, hw state: " << (int)hw_status.last_run.data << ", " << (int)hw_status.this_run.data;
 		utils::set_hw_status(hw_status);
 	}
@@ -321,7 +343,7 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 	if (_media_is_ready || !_media_was_checked) {
 		if (force_segment || _media_is_ready && difftime(buf.timestamp.tv_sec, _start.tv_sec) > AVI_DURATION_MAX_SEC) {
 			delete_old_files(target_size, AVI_PATH);
-			_muxer.reset(new AviMux(gen_fname(buf.timestamp, AVI_PATH)));
+			_muxer.reset(new AviMux(gen_fname(AVI_PATH)));
 			_start = buf.timestamp;
 		}
 
@@ -333,19 +355,21 @@ void FileWriter::add_frame(const v4l2_buffer& buf)
 
 FileWriter::buf_t FileWriter::next_frame()
 {
-	if (_frames.size() == 1 || !_media_is_ready || _streaming_mode == streaming_mode_t::no_latency) { // < 1 probably if there is no storing device
+//	if (_frames.size() == 1 || !_media_is_ready || _streaming_mode == streaming_mode_t::no_latency) { // < 1 probably if there is no storing device
+	if (_frames.size() <= 1 || _streaming_mode == utils::streaming_mode_t::no_latency) { // < 1 probably if there is no storing device
 		if (!_frames.empty())
 			_frames.pop_front();
 		return _cache;
 	}
 
-	if (_frames.empty())
-		return {nullptr, {0,0}};
+//	if (_frames.empty())
+//		return {nullptr, {0,0}};
 
 	auto& fr = _frames.front();
 
 	if (fr.file_idx != _cur_file_idx) {
 		_fstream.open(_fnames[fr.file_idx], std::ofstream::binary);
+		_cur_file_idx = fr.file_idx;
 	}
 
 	if (_fstream.is_open()) {
@@ -354,6 +378,7 @@ FileWriter::buf_t FileWriter::next_frame()
 		_cache.second = fr.ts;
 	} else {
 		// TODO : ? skip till live edge?
+		_cur_file_idx = -1;
 	}
 	
 	_frames.pop_front();
